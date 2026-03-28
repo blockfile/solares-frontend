@@ -215,76 +215,108 @@ export default function PackagePricesTab() {
 
   return (
     <div>
-      <div className="section-head">
-        <div>
-          <h3>Package Price Matrix</h3>
-          <p className="section-note">
-            Define fixed package prices per template. Quote installation will auto-balance from this
-            target.
-          </p>
-        </div>
-      </div>
-
       <div className="materials-card">
-        <div className="field">
-          <label htmlFor="packageTemplate">Template</label>
-          <select
-            id="packageTemplate"
-            className="select template-group-select"
-            value={templateId}
-            onChange={(e) => {
-              setTemplateId(e.target.value);
-              cancelEdit();
-            }}
-          >
-            <option value="">Select Template</option>
-            {groupedTemplates.map((group) => (
-              <optgroup label={`---- ${group.label} ----`} key={group.label}>
-                {group.rows.map((tpl) => (
-                  <option value={tpl.id} key={tpl.id}>
-                    {tpl.name}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+        <div className="module-card-head">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+          </svg>
+          <div className="module-card-head-text">
+            <strong>Package Price Matrix</strong>
+            <span>Define fixed package prices per template. Quote installation will auto-balance from this target.</span>
+          </div>
+        </div>
+
+        <div className="pkg-template-selector">
+          <label className="field">
+            <span>Select Template</span>
+            <select
+              id="packageTemplate"
+              className="select template-group-select"
+              value={templateId}
+              onChange={(e) => {
+                setTemplateId(e.target.value);
+                cancelEdit();
+              }}
+            >
+              <option value="">— Choose a template —</option>
+              {groupedTemplates.map((group) => (
+                <optgroup label={`── ${group.label} ──`} key={group.label}>
+                  {group.rows.map((tpl) => (
+                    <option value={tpl.id} key={tpl.id}>{tpl.name}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
         </div>
 
         {templateId && (
-          <div className="materials-form package-form">
-            <input
-              className="input"
-              placeholder="Scenario Label (e.g. 314AH Battery)"
-              value={scenarioLabel}
-              onChange={(e) => setScenarioLabel(e.target.value)}
-            />
-            <input
-              className="input"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Package Price (PHP)"
-              value={packagePrice}
-              onChange={(e) => setPackagePrice(e.target.value)}
-            />
-            <button
-              className="btn btn-primary"
-              type="button"
-              onClick={createScenario}
-              disabled={!scenarioLabel.trim() || !templateId}
-            >
-              Add Scenario
-            </button>
+          <div className="add-item-card">
+            <div className="add-item-card-head">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+              </svg>
+              <strong>Add Price Scenario</strong>
+              {selectedTemplateName && (
+                <span className="add-item-card-sub">for {selectedTemplateName}</span>
+              )}
+            </div>
+            <div className="add-item-details-row row-auto">
+              <label className="field">
+                <span>Scenario Label</span>
+                <input
+                  className="input"
+                  placeholder="e.g. 314AH Battery"
+                  value={scenarioLabel}
+                  onChange={(e) => setScenarioLabel(e.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span>Package Price (PHP)</span>
+                <input
+                  className="input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={packagePrice}
+                  onChange={(e) => setPackagePrice(e.target.value)}
+                />
+              </label>
+              <button
+                className="btn btn-primary add-item-submit"
+                type="button"
+                onClick={createScenario}
+                disabled={!scenarioLabel.trim() || !templateId}
+              >
+                Add Scenario
+              </button>
+            </div>
           </div>
-        )}
-
-        {selectedTemplateName && (
-          <p className="section-note">Editing package scenarios for: {selectedTemplateName}</p>
         )}
 
         {error && <div className="error-text">{error}</div>}
         {loading && <p className="section-note">Loading package prices...</p>}
 
+        {!templateId && !loading && (
+          <div className="template-empty-state">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+            </svg>
+            <strong>No template selected</strong>
+            <p>
+              Choose a template from the dropdown above to view and manage its package price
+              scenarios.
+            </p>
+            {templates.length > 0 && (
+              <p className="template-empty-count">
+                {templates.length} template{templates.length !== 1 ? "s" : ""} available — pick one above.
+              </p>
+            )}
+          </div>
+        )}
+
+        {templateId && (
         <div className="materials-table-wrap">
           <table className="materials-table">
             <thead>
@@ -382,6 +414,7 @@ export default function PackagePricesTab() {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   );

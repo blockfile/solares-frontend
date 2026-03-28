@@ -92,8 +92,6 @@ export default function Login() {
       <div className="login-city-card">
         <div className="login-city-brand">
           <img src={solaresLogo} alt="Solares" className="login-city-brand-image" />
-          <div className="login-city-logo">SOLARES SYSTEM</div>
-          <h1 className="login-city-title">SOLARES</h1>
           <p className="login-city-subtitle">MANAGEMENT INFORMATION SYSTEM</p>
         </div>
 

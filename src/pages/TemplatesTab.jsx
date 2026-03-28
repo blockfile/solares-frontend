@@ -815,25 +815,30 @@ export default function TemplatesTab() {
 
   return (
     <div>
-      <div className="section-head">
-        <div>
-          <h3>Template Manager</h3>
-          <p className="section-note">
-            Create new templates, maintain package items, and remove templates that are no longer
-            needed.
-          </p>
-        </div>
-      </div>
-
       <div className="materials-card">
+        <div className="module-card-head">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+          </svg>
+          <div className="module-card-head-text">
+            <strong>Template Manager</strong>
+            <span>Build reusable bill-of-materials templates. Select an existing template or create a new one to start editing.</span>
+          </div>
+        </div>
+
         <div className="template-header-grid">
-          <div className="field">
-            <label htmlFor="newTemplateName">New Template</label>
+          <div className="template-zone">
+            <div className="template-zone-label">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+              </svg>
+              Create New Template
+            </div>
             <div className="template-inline-actions">
               <input
                 id="newTemplateName"
                 className="input"
-                placeholder="Template Name"
+                placeholder="Template name…"
                 value={newTemplateName}
                 onChange={(e) => setNewTemplateName(e.target.value)}
               />
@@ -843,20 +848,27 @@ export default function TemplatesTab() {
                 disabled={!newTemplateName.trim() || savingTemplate}
                 onClick={createTemplate}
               >
-                Create Template
+                {savingTemplate ? "Creating…" : "Create Template"}
               </button>
             </div>
           </div>
 
-          <div className="field">
-            <label htmlFor="manageTemplate">Manage Template</label>
+          <div className="template-zone-or">OR</div>
+
+          <div className="template-zone">
+            <div className="template-zone-label">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+              Open Existing Template
+            </div>
             <select
               id="manageTemplate"
               className="select template-group-select"
               value={templateId}
               onChange={(e) => setTemplateId(e.target.value)}
             >
-              <option value="">Select Template</option>
+              <option value="">— Select a template —</option>
               {groupedTemplates.map((group) => (
                 <optgroup label={`---- ${group.label} ----`} key={group.label}>
                   {group.rows.map((row) => (
@@ -872,6 +884,24 @@ export default function TemplatesTab() {
 
         {error && <div className="error-text">{error}</div>}
         {loadingTemplates && <p className="section-note">Loading templates...</p>}
+
+        {!templateId && !loadingTemplates && (
+          <div className="template-empty-state">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+            </svg>
+            <strong>No template selected</strong>
+            <p>
+              Create a new template using the panel above, or select an existing one to start
+              editing its sections and items.
+            </p>
+            {templates.length > 0 && (
+              <p className="template-empty-count">
+                {templates.length} template{templates.length !== 1 ? "s" : ""} available — pick one from the dropdown above.
+              </p>
+            )}
+          </div>
+        )}
 
         {selectedTemplate && (
           <>
@@ -951,99 +981,123 @@ export default function TemplatesTab() {
               )}
             </div>
 
-            <div className="materials-form template-items-form">
-              <input
-                className="input"
-                type="number"
-                min="1"
-                step="1"
-                placeholder="No."
-                value={newItem.itemNo}
-                onChange={(e) => setNewItem((prev) => ({ ...prev, itemNo: e.target.value }))}
-              />
-              <div className="template-edit-stack">
-                <input
-                  className="input"
-                  placeholder="Search materials"
-                  value={newItemMaterialSearch}
-                  onChange={(e) => setNewItemMaterialSearch(e.target.value)}
-                />
-                <div className="template-picker-separator">
-                  <span>Pick From Materials Database</span>
-                </div>
-                <select
-                  className="select"
-                  value={newItem.catalogMaterialId}
-                  onChange={(e) => {
-                    const selectedId = Number(e.target.value || 0);
-                    const material = materials.find((row) => Number(row.id) === selectedId);
-                    if (!material) {
-                      setNewItem((prev) => ({ ...prev, catalogMaterialId: "" }));
-                      return;
-                    }
-                    setNewItem((prev) => applyMaterialToForm(material, prev));
-                    setNewItemMaterialSearch(material.material_name || "");
-                  }}
-                >
-                  <option value="">Pick From Materials Database</option>
-                  {createMaterialGroups.map((group) => (
-                    <optgroup label={group.label} key={group.label}>
-                      {group.options.map((material) => (
-                        <option value={material.id} key={material.id}>
-                          {materialOptionLabel(material)}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-                <div className="template-picker-separator">
-                  <span>Or Manual Description</span>
-                </div>
-                <input
-                  className="input"
-                  placeholder="Description"
-                  value={newItem.description}
-                  onChange={(e) =>
-                    setNewItem((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                      catalogMaterialId: ""
-                    }))
-                  }
-                />
+            <div className="add-item-card">
+              <div className="add-item-card-head">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="8"/><path d="M10 6v8M6 10h8"/></svg>
+                <strong>Add Item to Section</strong>
               </div>
-              <input
-                className="input"
-                placeholder="Unit"
-                value={newItem.unit}
-                onChange={(e) => setNewItem((prev) => ({ ...prev, unit: e.target.value }))}
-              />
-              <input
-                className="input"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Qty"
-                value={newItem.qty}
-                onChange={(e) => setNewItem((prev) => ({ ...prev, qty: e.target.value }))}
-              />
-              <input
-                className="input"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Base Price"
-                value={newItem.basePrice}
-                onChange={(e) => setNewItem((prev) => ({ ...prev, basePrice: e.target.value }))}
-              />
-              <button
-                className="btn btn-primary"
-                type="button"
-                disabled={!newItem.description.trim()}
-                onClick={createItem}
-              >
-                Add To Section
-              </button>
+
+              <div className="add-item-picker-row">
+                <label className="field">
+                  <span>Search & Filter</span>
+                  <input
+                    className="input"
+                    placeholder="Type to filter materials..."
+                    value={newItemMaterialSearch}
+                    onChange={(e) => setNewItemMaterialSearch(e.target.value)}
+                  />
+                </label>
+                <label className="field">
+                  <span>Pick from Materials Database</span>
+                  <select
+                    className="select"
+                    value={newItem.catalogMaterialId}
+                    onChange={(e) => {
+                      const selectedId = Number(e.target.value || 0);
+                      const material = materials.find((row) => Number(row.id) === selectedId);
+                      if (!material) {
+                        setNewItem((prev) => ({ ...prev, catalogMaterialId: "" }));
+                        return;
+                      }
+                      setNewItem((prev) => applyMaterialToForm(material, prev));
+                      setNewItemMaterialSearch(material.material_name || "");
+                    }}
+                  >
+                    <option value="">— Select material —</option>
+                    {createMaterialGroups.map((group) => (
+                      <optgroup label={group.label} key={group.label}>
+                        {group.options.map((material) => (
+                          <option value={material.id} key={material.id}>
+                            {materialOptionLabel(material)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </label>
+                <label className="field add-item-desc-field">
+                  <span>Manual Description</span>
+                  <input
+                    className="input"
+                    placeholder="Or type a custom description..."
+                    value={newItem.description}
+                    onChange={(e) =>
+                      setNewItem((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                        catalogMaterialId: ""
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+
+              <div className="add-item-details-row">
+                <label className="field">
+                  <span>No.</span>
+                  <input
+                    className="input"
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="—"
+                    value={newItem.itemNo}
+                    onChange={(e) => setNewItem((prev) => ({ ...prev, itemNo: e.target.value }))}
+                  />
+                </label>
+                <label className="field">
+                  <span>Unit</span>
+                  <input
+                    className="input"
+                    placeholder="PCS"
+                    value={newItem.unit}
+                    onChange={(e) => setNewItem((prev) => ({ ...prev, unit: e.target.value }))}
+                  />
+                </label>
+                <label className="field">
+                  <span>Qty</span>
+                  <input
+                    className="input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="1"
+                    value={newItem.qty}
+                    onChange={(e) => setNewItem((prev) => ({ ...prev, qty: e.target.value }))}
+                  />
+                </label>
+                <label className="field">
+                  <span>Base Price</span>
+                  <input
+                    className="input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={newItem.basePrice}
+                    onChange={(e) => setNewItem((prev) => ({ ...prev, basePrice: e.target.value }))}
+                  />
+                </label>
+                <button
+                  className="btn btn-primary add-item-submit"
+                  type="button"
+                  disabled={!newItem.description.trim()}
+                  onClick={createItem}
+                >
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="8"/><path d="M10 6v8M6 10h8"/></svg>
+                  Add to Section
+                </button>
+              </div>
             </div>
 
             {loadingItems && <p className="section-note">Loading template items...</p>}

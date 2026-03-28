@@ -131,9 +131,9 @@ export default function UsersTab({ currentUser }) {
     const active = users.filter((user) => user.status === "active").length;
     const admins = users.filter((user) => normalizeRoleKey(user.role) === "admin").length;
     return [
-      { label: "Total Users", value: total },
-      { label: "Active Users", value: active },
-      { label: "Admin Accounts", value: admins }
+      { label: "Total Users", value: total, accent: "blue" },
+      { label: "Active Users", value: active, accent: "green" },
+      { label: "Admin Accounts", value: admins, accent: "purple" }
     ];
   }, [users]);
 
@@ -304,18 +304,9 @@ export default function UsersTab({ currentUser }) {
 
   return (
     <div>
-      <div className="section-head">
-        <div>
-          <h3>Users</h3>
-          <p className="section-note">
-            Manage login accounts, assign saved roles, and issue generated temporary passwords.
-          </p>
-        </div>
-      </div>
-
       <div className="admin-summary-grid">
         {stats.map((stat) => (
-          <article className="admin-summary-card" key={stat.label}>
+          <article className={`admin-summary-card accent-${stat.accent}`} key={stat.label}>
             <strong>{stat.value}</strong>
             <span>{stat.label}</span>
           </article>
@@ -323,6 +314,15 @@ export default function UsersTab({ currentUser }) {
       </div>
 
       <div className="materials-card">
+        <div className="module-card-head">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <div className="module-card-head-text">
+            <strong>User Accounts</strong>
+            <span>Manage login accounts, assign saved roles, and issue generated temporary passwords.</span>
+          </div>
+        </div>
         <div className="admin-toolbar">
           <div className="admin-toolbar-filters">
             <input
@@ -463,7 +463,6 @@ export default function UsersTab({ currentUser }) {
         <div
           className="modal-backdrop"
           role="presentation"
-          onClick={saving ? undefined : closeEditor}
         >
           <div
             className="modal-card user-editor-modal"
@@ -607,7 +606,7 @@ export default function UsersTab({ currentUser }) {
       )}
 
       {confirmState && (
-        <div className="modal-backdrop" role="presentation" onClick={saving ? undefined : () => setConfirmState(null)}>
+        <div className="modal-backdrop" role="presentation">
           <div
             className="modal-card user-confirm-modal"
             role="dialog"
@@ -646,7 +645,7 @@ export default function UsersTab({ currentUser }) {
       )}
 
       {deleteBlockers && (
-        <div className="modal-backdrop" role="presentation" onClick={saving ? undefined : () => setDeleteBlockers(null)}>
+        <div className="modal-backdrop" role="presentation">
           <div
             className="modal-card user-blocker-modal"
             role="dialog"

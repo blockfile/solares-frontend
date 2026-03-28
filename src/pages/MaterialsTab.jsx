@@ -113,77 +113,96 @@ export default function MaterialsTab() {
 
   return (
     <div>
-      <div className="section-head">
-        <div>
-          <h3>Material Base Prices</h3>
-          <p className="section-note">
-            Maintain material prices here. Quotes and template items will fetch prices from this
-            catalog when names match.
-          </p>
-        </div>
-      </div>
-
       <div className="materials-card">
-        <div className="field">
-          <label htmlFor="subgroupFilter">Filter by Type</label>
-          <select
-            id="subgroupFilter"
-            className="select"
-            value={subgroupFilter}
-            onChange={(e) => setSubgroupFilter(e.target.value)}
-          >
-            <option value="all">All</option>
-            {subgroupOptions.map((sg) => (
-              <option value={sg} key={sg}>
-                {sg}
-              </option>
-            ))}
-          </select>
+        <div className="module-card-head">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+          <div className="module-card-head-text">
+            <strong>Material Base Prices</strong>
+            <span>Maintain material prices here. Quotes and template items will fetch prices from this catalog when names match.</span>
+          </div>
+          <div className="module-card-head-filter">
+            <select
+              id="subgroupFilter"
+              className="select"
+              value={subgroupFilter}
+              onChange={(e) => setSubgroupFilter(e.target.value)}
+            >
+              <option value="all">All Types</option>
+              {subgroupOptions.map((sg) => (
+                <option value={sg} key={sg}>{sg}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        <div className="materials-form">
-          <input
-            className="input"
-            placeholder="Material Name"
-            value={materialName}
-            onChange={(e) => setMaterialName(e.target.value)}
-          />
-          <input
-            className="input"
-            placeholder="Unit (PCS, m, roll, etc.)"
-            value={unit}
-            onChange={(e) => setUnit(e.target.value)}
-          />
-          <input
-            className="input"
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="Base Price"
-            value={basePrice}
-            onChange={(e) => setBasePrice(e.target.value)}
-          />
-          <select className="select" value={category} onChange={(e) => setCategory(e.target.value)}>
-            {CATEGORY_OPTIONS.map((opt) => (
-              <option value={opt} key={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
-          <input
-            className="input"
-            placeholder="Subgroup (battery, inverter, cable_wire, etc.)"
-            value={subgroup}
-            onChange={(e) => setSubgroup(e.target.value)}
-          />
-          <button
-            className="btn btn-primary"
-            type="button"
-            onClick={createMaterial}
-            disabled={!materialName.trim()}
-          >
-            Add Material
-          </button>
+        <div className="add-item-card">
+          <div className="add-item-card-head">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+            </svg>
+            <strong>Add Material</strong>
+          </div>
+          <div className="add-item-picker-row">
+            <label className="field">
+              <span>Material Name</span>
+              <input
+                className="input"
+                placeholder="e.g. Solar Panel 450W"
+                value={materialName}
+                onChange={(e) => setMaterialName(e.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>Unit</span>
+              <input
+                className="input"
+                placeholder="PCS, m, roll…"
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>Base Price (PHP)</span>
+              <input
+                className="input"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={basePrice}
+                onChange={(e) => setBasePrice(e.target.value)}
+              />
+            </label>
+          </div>
+          <div className="add-item-details-row row-auto">
+            <label className="field">
+              <span>Category</span>
+              <select className="select" value={category} onChange={(e) => setCategory(e.target.value)}>
+                {CATEGORY_OPTIONS.map((opt) => (
+                  <option value={opt} key={opt}>{opt}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Subgroup</span>
+              <input
+                className="input"
+                placeholder="battery, inverter, cable_wire…"
+                value={subgroup}
+                onChange={(e) => setSubgroup(e.target.value)}
+              />
+            </label>
+            <button
+              className="btn btn-primary add-item-submit"
+              type="button"
+              onClick={createMaterial}
+              disabled={!materialName.trim()}
+            >
+              Add Material
+            </button>
+          </div>
         </div>
 
         {error && <div className="error-text">{error}</div>}
@@ -310,3 +329,4 @@ export default function MaterialsTab() {
     </div>
   );
 }
+

@@ -292,10 +292,10 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
     const inProgress = events.filter((event) => event.status === "in_progress").length;
     const completed = events.filter((event) => event.status === "completed").length;
     return [
-      { label: "Planned Activities", value: planned },
-      { label: "Due Today", value: todayCount },
-      { label: "In Progress", value: inProgress },
-      { label: "Completed", value: completed }
+      { label: "Planned Activities", value: planned, accent: "blue", icon: "calendar" },
+      { label: "Due Today", value: todayCount, accent: "amber", icon: "clock" },
+      { label: "In Progress", value: inProgress, accent: "orange", icon: "zap" },
+      { label: "Completed", value: completed, accent: "green", icon: "check" }
     ];
   }, [events]);
 
@@ -533,13 +533,19 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
 
   return (
     <div>
-      <div className="section-head">
-        <div>
-          <h3>Operations Calendar</h3>
-          <p className="section-note">
-            Plan future activities, track field work, and capture completion notes with proof photos
-            from the same workspace.
-          </p>
+      <div className="calendar-hero-head">
+        <div className="calendar-hero-left">
+          <div className="calendar-hero-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </div>
+          <div>
+            <h3>Operations Calendar</h3>
+            <p className="section-note">
+              Plan future activities, track field work, and capture completion notes with proof photos.
+            </p>
+          </div>
         </div>
         <div className="calendar-head-actions">
           <button className="btn btn-primary" type="button" onClick={() => openCreateModal(selectedDate)}>
@@ -560,7 +566,29 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
 
       <div className="calendar-ops-summary">
         {stats.map((stat) => (
-          <article className="calendar-ops-stat" key={stat.label}>
+          <article className={`calendar-ops-stat calendar-ops-stat-${stat.accent}`} key={stat.label}>
+            <div className="calendar-stat-icon-wrap" aria-hidden="true">
+              {stat.icon === "calendar" && (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              )}
+              {stat.icon === "clock" && (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+              )}
+              {stat.icon === "zap" && (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+              )}
+              {stat.icon === "check" && (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+              )}
+            </div>
             <strong>{stat.value}</strong>
             <span>{stat.label}</span>
           </article>
@@ -652,7 +680,7 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
               <button
                 key={event.id}
                 type="button"
-                className={`calendar-activity-card ${
+                className={`calendar-activity-card calendar-status-${event.status} ${
                   Number(selectedEventId || 0) === Number(event.id) ? "active" : ""
                 }`}
                 onClick={() => setSelectedEventId(Number(event.id))}
@@ -810,14 +838,21 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                 <button
                   key={`upcoming-${event.id}`}
                   type="button"
-                  className="calendar-upcoming-item"
+                  className={`calendar-upcoming-item calendar-status-${event.status}`}
                   onClick={() => {
                     setSelectedDate(toDateKey(event.startDateTime));
                     setSelectedEventId(Number(event.id));
                   }}
                 >
+                  <div className="calendar-upcoming-item-top">
+                    <span className="calendar-upcoming-type">{activityTypeLabel(event.activityType)}</span>
+                    <span className={`status-pill status-pill-${event.status}`}>{statusLabel(event.status)}</span>
+                  </div>
                   <strong>{event.title}</strong>
-                  <span>{formatShortDate(event.startDateTime)}</span>
+                  <span>
+                    {event.customerName ? `${event.customerName} · ` : ""}
+                    {formatShortDate(event.startDateTime)}
+                  </span>
                 </button>
               ))}
             </div>
@@ -826,7 +861,7 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
       </div>
 
       {showEditor && (
-        <div className="modal-backdrop" role="presentation" onClick={saving ? undefined : closeEditor}>
+        <div className="modal-backdrop" role="presentation">
           <div
             className="modal-card calendar-modal-card"
             role="dialog"
@@ -1003,7 +1038,7 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
       )}
 
       {showReportModal && selectedEvent && (
-        <div className="modal-backdrop" role="presentation" onClick={reportBusy ? undefined : closeReportModal}>
+        <div className="modal-backdrop" role="presentation">
           <div
             className="modal-card calendar-modal-card"
             role="dialog"
@@ -1037,23 +1072,46 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                   </select>
                 </label>
 
-                <label className="field">
+                <div className="field calendar-field-span-2">
                   <span>Work Proof Photo</span>
-                  <input
-                    className="input"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) =>
-                      setReportForm((prev) => ({
-                        ...prev,
-                        photo: e.target.files?.[0] || null
-                      }))
-                    }
-                  />
-                  {reportForm.photo && (
-                    <span className="calendar-helper-text">{reportForm.photo.name}</span>
+                  <label className="calendar-upload-shell">
+                    <input
+                      className="calendar-upload-input"
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) =>
+                        setReportForm((prev) => ({
+                          ...prev,
+                          photo: e.target.files?.[0] || null
+                        }))
+                      }
+                    />
+                    <span className="calendar-upload-button">
+                      {reportForm.photo
+                        ? "Change Photo"
+                        : selectedEvent.completionPhotoName
+                          ? "Replace Photo"
+                          : "Choose Photo"}
+                    </span>
+                    <span className={`calendar-upload-name ${reportForm.photo ? "is-selected" : ""}`}>
+                      {reportForm.photo
+                        ? reportForm.photo.name
+                        : selectedEvent.completionPhotoName
+                          ? `Current: ${selectedEvent.completionPhotoName}`
+                          : "No photo selected"}
+                    </span>
+                  </label>
+                  {selectedEvent.completionPhotoUrl && !reportForm.photo && (
+                    <a
+                      href={selectedEvent.completionPhotoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="calendar-inline-link calendar-upload-link"
+                    >
+                      Open current photo
+                    </a>
                   )}
-                </label>
+                </div>
 
                 <label className="field calendar-field-span-2">
                   <span>Done Work Notes</span>

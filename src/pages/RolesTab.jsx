@@ -44,9 +44,9 @@ export default function RolesTab() {
 
   const roleStats = useMemo(
     () => [
-      { label: "Total Roles", value: roles.length },
-      { label: "System Roles", value: roles.filter((role) => role.isSystem).length },
-      { label: "Active Roles", value: roles.filter((role) => role.status === "active").length }
+      { label: "Total Roles", value: roles.length, accent: "blue" },
+      { label: "System Roles", value: roles.filter((role) => role.isSystem).length, accent: "amber" },
+      { label: "Active Roles", value: roles.filter((role) => role.status === "active").length, accent: "green" }
     ],
     [roles]
   );
@@ -130,19 +130,9 @@ export default function RolesTab() {
 
   return (
     <div>
-      <div className="section-head">
-        <div>
-          <h3>Roles</h3>
-          <p className="section-note">
-            Create roles, choose the modules they can access, and assign them from the Users
-            screen.
-          </p>
-        </div>
-      </div>
-
       <div className="admin-summary-grid">
         {roleStats.map((stat) => (
-          <article className="admin-summary-card" key={stat.label}>
+          <article className={`admin-summary-card accent-${stat.accent}`} key={stat.label}>
             <strong>{stat.value}</strong>
             <span>{stat.label}</span>
           </article>
@@ -150,6 +140,15 @@ export default function RolesTab() {
       </div>
 
       <div className="materials-card">
+        <div className="module-card-head">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          <div className="module-card-head-text">
+            <strong>Role Management</strong>
+            <span>Create roles, choose the modules they can access, and assign them from the Users screen.</span>
+          </div>
+        </div>
         <div className="admin-toolbar">
           <div>
             <p className="section-note">

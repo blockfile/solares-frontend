@@ -14,7 +14,7 @@ export default function ConfirmModal({
   if (!open) return null;
 
   return (
-    <div className="modal-backdrop" role="presentation" onClick={busy ? undefined : onCancel}>
+    <div className="modal-backdrop" role="presentation">
       <div
         className="modal-card"
         role="dialog"

@@ -125,6 +125,7 @@ function SidebarIcon({ icon }) {
 export default function Dashboard() {
   const [tab, setTab] = useState("calendar");
   const [now, setNow] = useState(new Date());
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [summary, setSummary] = useState({
     events: 0,
     templates: 0,
@@ -250,13 +251,12 @@ export default function Dashboard() {
 
   return (
     <div className="workspace-shell page-animate">
-      <aside className="workspace-sidebar">
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      )}
+      <aside className={`workspace-sidebar${sidebarOpen ? " sidebar-open" : ""}`}>
         <div className="sidebar-brand">
           <img src={solaresLogo} alt="Solares" className="sidebar-brand-logo" />
-          <div className="sidebar-brand-text">
-            <strong>SOLARES</strong>
-            <span>Management Workspace</span>
-          </div>
         </div>
 
         <div className="sidebar-groups">
@@ -268,7 +268,7 @@ export default function Dashboard() {
                   <button
                     key={item.key}
                     className={`sidebar-link ${tab === item.key ? "active" : ""}`}
-                    onClick={() => setTab(item.key)}
+                    onClick={() => { setTab(item.key); setSidebarOpen(false); }}
                   >
                     <span className="sidebar-link-icon">
                       <SidebarIcon icon={item.icon} />
@@ -293,12 +293,15 @@ export default function Dashboard() {
             </div>
           </div>
           <button
-            className="btn btn-ghost"
+            className="btn btn-ghost sidebar-logout-btn"
             onClick={() => {
               localStorage.removeItem("token");
               window.location.href = "/login";
             }}
           >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
             Log Out
           </button>
         </div>
@@ -306,9 +309,19 @@ export default function Dashboard() {
 
       <main className="workspace-main">
         <header className="workspace-topbar">
-          <div>
-            <p className="eyebrow">{pageEyebrow}</p>
-            <h1 className="workspace-title">{activeTab.label}</h1>
+          <div className="workspace-topbar-left">
+            <button
+              className="sidebar-hamburger"
+              type="button"
+              aria-label="Toggle menu"
+              onClick={() => setSidebarOpen((v) => !v)}
+            >
+              <span /><span /><span />
+            </button>
+            <div>
+              <p className="eyebrow">{pageEyebrow}</p>
+              <h1 className="workspace-title">{activeTab.label}</h1>
+            </div>
           </div>
           <div className="workspace-datetime">
             <span>{dateLabel}</span>

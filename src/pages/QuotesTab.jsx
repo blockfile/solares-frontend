@@ -590,6 +590,7 @@ export default function QuotesTab() {
   const [loadingItems, setLoadingItems] = useState(false);
   const [packagePrices, setPackagePrices] = useState([]);
   const [packagePriceId, setPackagePriceId] = useState("");
+  const [discountRows, setDiscountRows] = useState([]);
   const [quoteError, setQuoteError] = useState("");
   const [exportError, setExportError] = useState("");
   const [creating, setCreating] = useState(false);
@@ -1041,7 +1042,8 @@ export default function QuotesTab() {
         quoteDate,
         validUntil,
         items: selectedItems,
-        packagePriceId: packagePriceId ? Number(packagePriceId) : null
+        packagePriceId: packagePriceId ? Number(packagePriceId) : null,
+        discountItems: discountRows.filter((d) => Number(d.amount) > 0).map((d) => ({ label: d.label || "Discount", amount: Number(d.amount) }))
       });
       setCreated(res.data);
       await loadRecentQuotes("", res.data?.quoteId || null);
@@ -1130,15 +1132,6 @@ export default function QuotesTab() {
 
   return (
     <div className={`quotes-page ${quoteView === "recent" ? "quotes-page-recent" : ""}`}>
-      <div className="section-head">
-        <div>
-          <h3>Quote Management</h3>
-          <p className="section-note">
-            Create a new quote or review recently saved quotations from the same screen.
-          </p>
-        </div>
-      </div>
-
       <div className="quote-mode-tabs">
         <button
           type="button"
@@ -1158,97 +1151,171 @@ export default function QuotesTab() {
 
       {quoteView === "create" ? (
       <div className="quotes-layout">
-        <div className="form-grid form-grid-tight">
-          <div className="field">
-            <label htmlFor="systemType">System Type</label>
-            <select
-              id="systemType"
-              className="select"
-              value={systemType}
-              onChange={(e) => setSystemType(e.target.value)}
-            >
-              <option value="all">All</option>
-              <option value="hybrid">Hybrid</option>
-              <option value="grid_tie">Grid Tie</option>
-            </select>
-          </div>
+        <div className="quote-form-stack">
+          <div className="quote-section-card">
+            <div className="quote-section-head">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+              </svg>
+              <strong>System Configuration</strong>
+              <span className="quote-section-head-sub">Select template and package scenario</span>
+            </div>
+            <div className="quote-section-fields">
+              <div className="field">
+                <label htmlFor="systemType">System Type</label>
+                <select
+                  id="systemType"
+                  className="select"
+                  value={systemType}
+                  onChange={(e) => setSystemType(e.target.value)}
+                >
+                  <option value="all">All</option>
+                  <option value="hybrid">Hybrid</option>
+                  <option value="grid_tie">Grid Tie</option>
+                </select>
+              </div>
 
-          <div className="field">
-            <label htmlFor="template">Template</label>
-            <select
-              id="template"
-              className="select template-group-select"
-              value={templateId}
-              onChange={(e) => setTemplateId(e.target.value)}
-            >
-              <option value="">Select Template</option>
-              {groupedTemplates.map((group) => (
-                <optgroup label={`---- ${group.label} ----`} key={group.label}>
-                  {group.rows.map((row) => (
-                    <option value={row.id} key={row.id}>
-                      {row.name}
+              <div className="field">
+                <label htmlFor="template">Template</label>
+                <select
+                  id="template"
+                  className="select template-group-select"
+                  value={templateId}
+                  onChange={(e) => setTemplateId(e.target.value)}
+                >
+                  <option value="">Select Template</option>
+                  {groupedTemplates.map((group) => (
+                    <optgroup label={`---- ${group.label} ----`} key={group.label}>
+                      {group.rows.map((row) => (
+                        <option value={row.id} key={row.id}>
+                          {row.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+
+              <div className="field">
+                <label htmlFor="packagePrice">Package Scenario</label>
+                <select
+                  id="packagePrice"
+                  className="select"
+                  value={packagePriceId}
+                  onChange={(e) => setPackagePriceId(e.target.value)}
+                >
+                  <option value="">Auto Installation Formula</option>
+                  {packagePrices.map((p) => (
+                    <option value={p.id} key={p.id}>
+                      {`${p.scenario_label} - ${formatCurrency(p.package_price)}`}
                     </option>
                   ))}
-                </optgroup>
-              ))}
-            </select>
+                </select>
+              </div>
+
+              {loadingItems && <p className="section-note">Loading package items...</p>}
+            </div>
           </div>
 
-          <div className="field">
-            <label htmlFor="packagePrice">Package Scenario</label>
-            <select
-              id="packagePrice"
-              className="select"
-              value={packagePriceId}
-              onChange={(e) => setPackagePriceId(e.target.value)}
+          <div className="quote-section-card">
+            <div className="quote-section-head">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              </svg>
+              <strong>Customer Details</strong>
+              <span className="quote-section-head-sub">Name and validity period</span>
+            </div>
+            <div className="quote-section-fields">
+              <div className="field">
+                <label htmlFor="customerName">Customer Name</label>
+                <input
+                  id="customerName"
+                  className="input"
+                  placeholder="Customer Name"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                />
+              </div>
+
+              <div className="field">
+                <label htmlFor="quoteDate">Quote Date</label>
+                <input
+                  id="quoteDate"
+                  className="input"
+                  type="date"
+                  value={quoteDate}
+                  onChange={(e) => setQuoteDate(e.target.value)}
+                />
+              </div>
+
+              <div className="field">
+                <label htmlFor="validUntil">Valid Until</label>
+                <input
+                  id="validUntil"
+                  className="input"
+                  type="date"
+                  value={validUntil}
+                  onChange={(e) => setValidUntil(e.target.value)}
+                />
+              </div>
+
+            </div>
+
+            {discountRows.length > 0 && (
+              <div className="discount-rows">
+                {discountRows.map((row) => (
+                  <div className="discount-row-item" key={row.id}>
+                    <input
+                      className="input"
+                      placeholder="e.g. Promotional Discount"
+                      value={row.label}
+                      onChange={(e) => setDiscountRows((prev) => prev.map((r) => r.id === row.id ? { ...r, label: e.target.value } : r))}
+                    />
+                    <input
+                      className="input"
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="0"
+                      value={row.amount}
+                      onChange={(e) => setDiscountRows((prev) => prev.map((r) => r.id === row.id ? { ...r, amount: e.target.value } : r))}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-ghost discount-row-remove"
+                      onClick={() => setDiscountRows((prev) => prev.filter((r) => r.id !== row.id))}
+                      aria-label="Remove discount"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="btn btn-ghost discount-add-btn"
+              onClick={() => setDiscountRows((prev) => [...prev, { id: Date.now(), label: "Promotional Discount", amount: "" }])}
             >
-              <option value="">Auto Installation Formula</option>
-              {packagePrices.map((p) => (
-                <option value={p.id} key={p.id}>
-                  {`${p.scenario_label} - ${formatCurrency(p.package_price)}`}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {loadingItems && <p className="section-note">Loading package items...</p>}
-
-          <div className="field">
-            <label htmlFor="customerName">Customer Name</label>
-            <input
-              id="customerName"
-              className="input"
-              placeholder="Customer Name"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="quoteDate">Quote Date</label>
-            <input
-              id="quoteDate"
-              className="input"
-              type="date"
-              value={quoteDate}
-              onChange={(e) => setQuoteDate(e.target.value)}
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="validUntil">Valid Until</label>
-            <input
-              id="validUntil"
-              className="input"
-              type="date"
-              value={validUntil}
-              onChange={(e) => setValidUntil(e.target.value)}
-            />
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+              </svg>
+              Add Discount
+            </button>
           </div>
 
           {steps.length > 0 && (
             <div className="items-editor">
-              <div className="items-editor-title">Customize Package Items</div>
+              <div className="items-editor-head">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+                </svg>
+                <strong>Customize Package Items</strong>
+                <span>Review and adjust quantities and prices per section</span>
+              </div>
               <div className="quote-stepper">
                 {steps.map((step, idx) => (
                   <button
@@ -1424,15 +1491,27 @@ export default function QuotesTab() {
             </div>
           )}
 
-          {quoteError && <div className="error-text">{quoteError}</div>}
-
-          <button className="btn btn-primary" disabled={!canCreate} onClick={createQuote}>
-            {creating ? "Creating..." : "Create Quote"}
-          </button>
+          <div className="quote-section-card quote-create-card">
+            {quoteError && <div className="error-text quote-create-error">{quoteError}</div>}
+            <button className="btn btn-primary quote-create-btn" disabled={!canCreate} onClick={createQuote}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+              </svg>
+              {creating ? "Creating..." : "Create Quote"}
+            </button>
+          </div>
         </div>
 
         <aside className="result-card">
-          <h4>Quote Summary</h4>
+          <div className="module-card-head result-card-head">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <div className="module-card-head-text">
+              <strong>Quote Summary</strong>
+              <span>Generated output &amp; export options</span>
+            </div>
+          </div>
           {!created && <p className="section-note">No quote generated yet.</p>}
 
           {created && (
@@ -1441,10 +1520,32 @@ export default function QuotesTab() {
                 <span>Reference</span>
                 <strong>{created.quoteRef}</strong>
               </div>
-              <div className="stat-row">
-                <span>Total</span>
-                <strong>{formatCurrency(created.total)}</strong>
-              </div>
+              {Number(created.discountAmount) > 0 ? (
+                <>
+                  <div className="stat-row">
+                    <span>Subtotal</span>
+                    <strong>{formatCurrency(created.subtotal)}</strong>
+                  </div>
+                  {(Array.isArray(created.discountItems) && created.discountItems.length > 0
+                    ? created.discountItems
+                    : [{ label: "Promotional Discount", amount: created.discountAmount }]
+                  ).map((d, i) => (
+                    <div className="stat-row stat-row-discount" key={i}>
+                      <span>{d.label}</span>
+                      <strong>-{formatCurrency(d.amount)}</strong>
+                    </div>
+                  ))}
+                  <div className="stat-row stat-row-total">
+                    <span>Total after Discount</span>
+                    <strong>{formatCurrency(created.total)}</strong>
+                  </div>
+                </>
+              ) : (
+                <div className="stat-row">
+                  <span>Total</span>
+                  <strong>{formatCurrency(created.total)}</strong>
+                </div>
+              )}
               {exportError && <div className="error-text">{exportError}</div>}
               <button
                 className="btn btn-secondary"
@@ -1706,7 +1807,6 @@ export default function QuotesTab() {
         <div
           className="modal-backdrop"
           role="presentation"
-          onClick={deletingQuoteId ? undefined : () => setConfirmState(null)}
         >
           <div
             className="modal-card quote-confirm-modal"
