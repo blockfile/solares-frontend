@@ -589,7 +589,6 @@ export default function QuotesTab() {
   const [templateItems, setTemplateItems] = useState([]);
   const [loadingItems, setLoadingItems] = useState(false);
   const [packagePrices, setPackagePrices] = useState([]);
-  const [loadingPackagePrices, setLoadingPackagePrices] = useState(false);
   const [packagePriceId, setPackagePriceId] = useState("");
   const [discountRows, setDiscountRows] = useState([]);
   const [quoteError, setQuoteError] = useState("");
@@ -721,13 +720,11 @@ export default function QuotesTab() {
 
   const loadPackagePrices = async (selectedTemplateId) => {
     if (!selectedTemplateId) {
-      setLoadingPackagePrices(false);
       setPackagePrices([]);
       setPackagePriceId("");
       return;
     }
 
-    setLoadingPackagePrices(true);
     try {
       const res = await api.get(
         `/package-prices?templateId=${Number(selectedTemplateId)}&activeOnly=1`
@@ -738,8 +735,6 @@ export default function QuotesTab() {
     } catch {
       setPackagePrices([]);
       setPackagePriceId("");
-    } finally {
-      setLoadingPackagePrices(false);
     }
   };
 
@@ -1022,11 +1017,6 @@ export default function QuotesTab() {
   const activeStep = steps[currentStep] || null;
 
   const createQuote = async () => {
-    if (!packagePriceId) {
-      setQuoteError("Select a package scenario before creating a quote.");
-      return;
-    }
-
     setCreating(true);
     setQuoteError("");
     try {
@@ -1127,13 +1117,11 @@ export default function QuotesTab() {
   };
 
   const hasIncludedItems = templateItems.some((item) => item.included);
-  const hasSelectedPackageScenario = Boolean(packagePriceId);
   const canCreate = Boolean(
     templateId &&
       customerName &&
       quoteDate &&
       validUntil &&
-      hasSelectedPackageScenario &&
       !loadingItems &&
       templateItems.length > 0 &&
       hasIncludedItems &&
@@ -1213,11 +1201,10 @@ export default function QuotesTab() {
                 <select
                   id="packagePrice"
                   className="select"
-                  disabled={!templateId || loadingPackagePrices}
                   value={packagePriceId}
                   onChange={(e) => setPackagePriceId(e.target.value)}
                 >
-                  <option value="">Select Package Scenario</option>
+                  <option value="">Auto Installation Formula</option>
                   {packagePrices.map((p) => (
                     <option value={p.id} key={p.id}>
                       {`${p.scenario_label} - ${formatCurrency(p.package_price)}`}
@@ -1226,15 +1213,6 @@ export default function QuotesTab() {
                 </select>
               </div>
 
-              {loadingPackagePrices && <p className="section-note">Loading package scenarios...</p>}
-              {templateId && !loadingPackagePrices && !packagePrices.length && (
-                <p className="section-note">
-                  No active package scenarios for this template. Add one in Package Prices before creating a quote.
-                </p>
-              )}
-              {templateId && !loadingPackagePrices && packagePrices.length > 0 && !packagePriceId && (
-                <p className="section-note">Choose a package scenario to enable quote creation.</p>
-              )}
               {loadingItems && <p className="section-note">Loading package items...</p>}
             </div>
           </div>
