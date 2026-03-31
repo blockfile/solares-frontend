@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/client";
+import useBodyScrollLock from "../hooks/useBodyScrollLock";
 
 const CATEGORY_DEFS = [
   { key: "main_system", label: "A. Main System Components" },
@@ -606,6 +607,8 @@ export default function QuotesTab() {
   const [recentQuoteError, setRecentQuoteError] = useState("");
   const [confirmState, setConfirmState] = useState(null);
   const [deletingQuoteId, setDeletingQuoteId] = useState(null);
+
+  useBodyScrollLock(Boolean(confirmState));
   const manualIdRef = useRef(-1);
 
   const selectedTemplate = useMemo(

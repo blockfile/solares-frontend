@@ -1,6 +1,7 @@
 import { useState } from "react";
 import api from "../api/client";
 import solaresLogo from "../components/assets/SOLARES.png";
+import useBodyScrollLock from "../hooks/useBodyScrollLock";
 
 export default function Login() {
   const [identifier, setIdentifier] = useState("");
@@ -13,6 +14,8 @@ export default function Login() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changeErr, setChangeErr] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
+
+  useBodyScrollLock(Boolean(pendingLogin));
 
   const finishLogin = (token) => {
     localStorage.setItem("token", token);

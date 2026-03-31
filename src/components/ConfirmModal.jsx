@@ -1,3 +1,5 @@
+import useBodyScrollLock from "../hooks/useBodyScrollLock";
+
 export default function ConfirmModal({
   open,
   title,
@@ -11,6 +13,8 @@ export default function ConfirmModal({
   onConfirm,
   onCancel
 }) {
+  useBodyScrollLock(open);
+
   if (!open) return null;
 
   return (

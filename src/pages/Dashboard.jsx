@@ -10,6 +10,7 @@ import RolesTab from "./RolesTab";
 import AuditTab from "./AuditTab";
 import solaresLogo from "../components/assets/SOLARES.png";
 import { normalizeModules, roleLabel } from "../constants/access";
+import useBodyScrollLock from "../hooks/useBodyScrollLock";
 
 const TAB_CONFIG = [
   { key: "calendar", label: "Calendar Dashboard", group: "Workspace", icon: "calendar" },
@@ -142,6 +143,8 @@ export default function Dashboard() {
     permissions: ["calendar"]
   });
 
+  useBodyScrollLock(sidebarOpen);
+
   const dateLabel = useMemo(
     () =>
       now.toLocaleDateString(undefined, {
@@ -250,7 +253,7 @@ export default function Dashboard() {
   }, [summary, user.permissions]);
 
   return (
-    <div className="workspace-shell page-animate">
+    <div className={`workspace-shell page-animate${sidebarOpen ? " sidebar-active" : ""}`}>
       {sidebarOpen && (
         <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
       )}

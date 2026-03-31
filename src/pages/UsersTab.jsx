@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../api/client";
 import { getRoleBadgeClass, normalizeRoleKey, roleLabel } from "../constants/access";
+import useBodyScrollLock from "../hooks/useBodyScrollLock";
 
 const EMPTY_FORM = {
   firstName: "",
@@ -73,6 +74,8 @@ export default function UsersTab({ currentUser }) {
   const [copyState, setCopyState] = useState("");
   const [confirmState, setConfirmState] = useState(null);
   const [deleteBlockers, setDeleteBlockers] = useState(null);
+
+  useBodyScrollLock(showEditor || Boolean(confirmState) || Boolean(deleteBlockers));
 
   const loadRoles = async () => {
     setLoadingRoles(true);

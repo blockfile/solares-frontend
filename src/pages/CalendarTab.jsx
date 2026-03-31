@@ -4,6 +4,8 @@ import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import ConfirmModal from "../components/ConfirmModal";
+import useBodyScrollLock from "../hooks/useBodyScrollLock";
+import { motion, AnimatePresence } from "framer-motion";
 
 const ACTIVITY_TYPES = [
   { key: "survey", label: "Site Survey" },
@@ -299,6 +301,9 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
     photos: []
   });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [mobileView, setMobileView] = useState("calendar");
+
+  useBodyScrollLock(showEditor || showReportModal);
 
   const canAssignAll = isAdmin(currentUser);
 
@@ -660,8 +665,15 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
       </div>
 
       <div className="calendar-ops-summary">
-        {stats.map((stat) => (
-          <article className={`calendar-ops-stat calendar-ops-stat-${stat.accent}`} key={stat.label}>
+        {stats.map((stat, index) => (
+          <motion.article
+            className={`calendar-ops-stat calendar-ops-stat-${stat.accent}`}
+            key={stat.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: index * 0.07, ease: "easeOut" }}
+            whileTap={{ scale: 0.97 }}
+          >
             <div className="calendar-stat-icon-wrap" aria-hidden="true">
               {stat.icon === "calendar" && (
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -686,12 +698,35 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
             </div>
             <strong>{stat.value}</strong>
             <span>{stat.label}</span>
-          </article>
+          </motion.article>
         ))}
       </div>
 
       <div className="calendar-ops-layout">
-        <section className="calendar-board-card">
+        <div className="cal-view-toggle">
+          <button
+            type="button"
+            className={`cal-toggle-btn${mobileView === "calendar" ? " active" : ""}`}
+            onClick={() => setMobileView("calendar")}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            Calendar
+          </button>
+          <button
+            type="button"
+            className={`cal-toggle-btn${mobileView === "list" ? " active" : ""}`}
+            onClick={() => setMobileView("list")}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+            </svg>
+            Activities
+          </button>
+        </div>
+
+        <section className={`calendar-board-card${mobileView === "list" ? " cal-mobile-hide" : ""}`}>
           <div className="calendar-board-head">
             <div>
               <h4>Activity Planner</h4>
@@ -747,7 +782,7 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
           </div>
         </section>
 
-        <aside className="calendar-sidebar-card">
+        <aside className={`calendar-sidebar-card${mobileView === "calendar" ? " cal-mobile-hide" : ""}`}>
           <div className="calendar-sidebar-top">
             <div>
               <span className="calendar-selected-label">Selected Day</span>
@@ -771,14 +806,18 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
               </div>
             )}
 
-            {selectedDateEvents.map((event) => (
-              <button
+            {selectedDateEvents.map((event, index) => (
+              <motion.button
                 key={event.id}
                 type="button"
                 className={`calendar-activity-card calendar-status-${event.status} ${
                   Number(selectedEventId || 0) === Number(event.id) ? "active" : ""
                 }`}
                 onClick={() => setSelectedEventId(Number(event.id))}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.22, delay: index * 0.05 }}
+                whileTap={{ scale: 0.98 }}
               >
                 <div className="calendar-activity-card-top">
                   <span className={`status-pill status-pill-${event.status}`}>{statusLabel(event.status)}</span>
@@ -790,7 +829,7 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                   <span>{event.customerName || "General activity"}</span>
                   <span>{event.assigneeName || event.assigneeUsername || "Unassigned"}</span>
                 </div>
-              </button>
+              </motion.button>
             ))}
           </div>
 
@@ -811,8 +850,15 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
               </div>
             )}
 
+            <AnimatePresence mode="wait">
             {selectedEvent && (
-              <>
+              <motion.div
+                key={selectedEvent.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
                 <div className="calendar-focus-title-row">
                   <div>
                     <h4>{selectedEvent.title}</h4>
@@ -915,8 +961,9 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                     Delete Activity
                   </button>
                 </div>
-              </>
+              </motion.div>
             )}
+            </AnimatePresence>
           </div>
 
           <div className="calendar-upcoming-card">
@@ -932,8 +979,8 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                 </div>
               )}
 
-              {upcomingEvents.map((event) => (
-                <button
+              {upcomingEvents.map((event, index) => (
+                <motion.button
                   key={`upcoming-${event.id}`}
                   type="button"
                   className={`calendar-upcoming-item calendar-status-${event.status}`}
@@ -941,6 +988,10 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                     setSelectedDate(toDateKey(event.startDateTime));
                     setSelectedEventId(Number(event.id));
                   }}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.22, delay: index * 0.05 }}
+                  whileTap={{ scale: 0.98 }}
                 >
                   <div className="calendar-upcoming-item-top">
                     <span className="calendar-upcoming-type">{activityTypeLabel(event.activityType)}</span>
@@ -951,21 +1002,33 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                     {event.customerName ? `${event.customerName} - ` : ""}
                     {formatShortDate(event.startDateTime)} - {formatScheduleSummary(event.startDateTime, event.endDateTime, event.allDay)}
                   </span>
-                </button>
+                </motion.button>
               ))}
             </div>
           </div>
         </aside>
       </div>
 
+      <AnimatePresence>
       {showEditor && (
-        <div className="modal-backdrop" role="presentation">
-          <div
+        <motion.div
+          className="modal-backdrop"
+          role="presentation"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <motion.div
             className="modal-card calendar-modal-card"
             role="dialog"
             aria-modal="true"
             aria-labelledby="calendar-editor-title"
             onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0, scale: 0.95, y: 32 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 32 }}
+            transition={{ type: "spring", damping: 28, stiffness: 300 }}
           >
             <div className="modal-copy">
               <h4 id="calendar-editor-title">{editingEventId ? "Edit Activity" : "Schedule Activity"}</h4>
@@ -1129,18 +1192,31 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
+      <AnimatePresence>
       {showReportModal && selectedEvent && (
-        <div className="modal-backdrop" role="presentation">
-          <div
+        <motion.div
+          className="modal-backdrop"
+          role="presentation"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <motion.div
             className="modal-card calendar-modal-card"
             role="dialog"
             aria-modal="true"
             aria-labelledby="calendar-report-title"
             onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0, scale: 0.95, y: 32 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 32 }}
+            transition={{ type: "spring", damping: 28, stiffness: 300 }}
           >
             <div className="modal-copy">
               <h4 id="calendar-report-title">Field Report</h4>
@@ -1255,9 +1331,10 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       <ConfirmModal
         open={showDeleteModal && Boolean(selectedEvent)}
