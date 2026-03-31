@@ -24,6 +24,18 @@ const STATUS_OPTIONS = [
   { key: "cancelled", label: "Cancelled" }
 ];
 
+const SCHEDULE_PRESETS = {
+  all_day: { label: "All Day", allDay: true, startTime: "00:00", endTime: "" },
+  am: { label: "AM Visit", allDay: false, startTime: "08:00", endTime: "12:00" },
+  pm: { label: "PM Visit", allDay: false, startTime: "13:00", endTime: "17:00" },
+  custom: { label: "Custom Time", allDay: false, startTime: "08:00", endTime: "" }
+};
+
+const SCHEDULE_OPTIONS = Object.entries(SCHEDULE_PRESETS).map(([key, value]) => ({
+  key,
+  label: value.label
+}));
+
 function normalizeText(value) {
   return String(value || "").trim();
 }
@@ -135,6 +147,69 @@ function formatTimeRange(startValue, endValue, allDay) {
   return `${startText} - ${endText}`;
 }
 
+function detectScheduleMode({ startDateTime, endDateTime, allDay, startTime, endTime }) {
+  if (allDay) return "all_day";
+
+  const start = normalizeText(startTime || toTimeInputValue(startDateTime));
+  const end = normalizeText(endTime || toTimeInputValue(endDateTime));
+
+  if (start === SCHEDULE_PRESETS.am.startTime && end === SCHEDULE_PRESETS.am.endTime) return "am";
+  if (start === SCHEDULE_PRESETS.pm.startTime && end === SCHEDULE_PRESETS.pm.endTime) return "pm";
+  return "custom";
+}
+
+function applyScheduleMode(form, scheduleMode) {
+  const preset = SCHEDULE_PRESETS[scheduleMode] || SCHEDULE_PRESETS.custom;
+  const next = {
+    ...form,
+    scheduleMode,
+    allDay: preset.allDay
+  };
+
+  if (scheduleMode === "custom") {
+    next.startTime = normalizeText(form.startTime) || preset.startTime;
+    next.endTime = normalizeText(form.endTime);
+    return next;
+  }
+
+  next.startTime = preset.startTime;
+  next.endTime = preset.endTime;
+  return next;
+}
+
+function formatScheduleSummary(startValue, endValue, allDay) {
+  const mode = detectScheduleMode({ startDateTime: startValue, endDateTime: endValue, allDay });
+  if (mode === "all_day") return "All day";
+  if (mode === "am") return "AM schedule";
+  if (mode === "pm") return "PM schedule";
+  return formatTimeRange(startValue, endValue, allDay);
+}
+
+function getEventCompletionPhotos(event) {
+  if (Array.isArray(event?.completionPhotos) && event.completionPhotos.length) {
+    return event.completionPhotos;
+  }
+
+  if (event?.completionPhotoUrl) {
+    return [
+      {
+        id: `${event.id || "event"}-legacy-photo`,
+        path: event.completionPhotoPath || "",
+        name: event.completionPhotoName || event.title || "Work proof photo",
+        url: event.completionPhotoUrl
+      }
+    ];
+  }
+
+  return [];
+}
+
+function formatPhotoSelectionLabel(files) {
+  if (!Array.isArray(files) || files.length === 0) return "No photos selected";
+  if (files.length === 1) return files[0]?.name || "1 photo selected";
+  return `${files.length} photos selected`;
+}
+
 function activityTypeLabel(typeKey) {
   return ACTIVITY_TYPES.find((item) => item.key === typeKey)?.label || "Other";
 }
@@ -157,12 +232,19 @@ function buildEditorForm({
   canAssignAll
 }) {
   if (event) {
+    const scheduleMode = detectScheduleMode({
+      startDateTime: event.startDateTime,
+      endDateTime: event.endDateTime,
+      allDay: Boolean(event.allDay)
+    });
+
     return {
       title: event.title || "",
       activityType: event.activityType || "site_visit",
       customerName: event.customerName || "",
       location: event.location || "",
       date: toDateInputValue(event.startDateTime) || dateKey,
+      scheduleMode,
       allDay: Boolean(event.allDay),
       startTime: toTimeInputValue(event.startDateTime) || "08:00",
       endTime: toTimeInputValue(event.endDateTime),
@@ -182,9 +264,10 @@ function buildEditorForm({
     customerName: "",
     location: "",
     date: dateKey,
-    allDay: true,
-    startTime: "08:00",
-    endTime: "",
+    scheduleMode: "am",
+    allDay: false,
+    startTime: SCHEDULE_PRESETS.am.startTime,
+    endTime: SCHEDULE_PRESETS.am.endTime,
     assigneeUserId: defaultAssignee,
     status: "planned",
     notes: ""
@@ -213,7 +296,7 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
   const [reportForm, setReportForm] = useState({
     status: "completed",
     completionNotes: "",
-    photo: null
+    photos: []
   });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
@@ -349,6 +432,7 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
     selectedEvent &&
       (canAssignAll || Number(selectedEvent.assigneeUserId) === Number(currentUser?.id || 0))
   );
+  const selectedEventPhotos = getEventCompletionPhotos(selectedEvent);
 
   const openCreateModal = (dateKey = selectedDate) => {
     setEditingEventId(null);
@@ -391,7 +475,7 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
             ? "completed"
             : "completed",
       completionNotes: event.completionNotes || "",
-      photo: null
+      photos: []
     });
     setShowReportModal(true);
   };
@@ -407,7 +491,7 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
     if (reportBusy) return;
     setShowReportModal(false);
     setReportError("");
-    setReportForm({ status: "completed", completionNotes: "", photo: null });
+    setReportForm({ status: "completed", completionNotes: "", photos: [] });
   };
 
   const saveActivity = async (e) => {
@@ -420,15 +504,19 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
       return;
     }
 
-    if (!editorForm.allDay && !normalizeText(editorForm.startTime)) {
+    const scheduledAllDay = editorForm.scheduleMode === "all_day";
+    const startTime = scheduledAllDay ? "00:00" : normalizeText(editorForm.startTime);
+    const endTime = scheduledAllDay ? "" : normalizeText(editorForm.endTime);
+
+    if (!scheduledAllDay && !startTime) {
       setEditorError("Start time is required for timed activities.");
       return;
     }
 
     if (
-      !editorForm.allDay &&
-      normalizeText(editorForm.endTime) &&
-      normalizeText(editorForm.endTime) <= normalizeText(editorForm.startTime)
+      !scheduledAllDay &&
+      endTime &&
+      endTime <= startTime
     ) {
       setEditorError("End time must be later than start time.");
       return;
@@ -439,12 +527,12 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
       activityType: editorForm.activityType,
       customerName: editorForm.customerName,
       location: editorForm.location,
-      startDateTime: toApiDateTime(date, editorForm.allDay ? "00:00" : editorForm.startTime),
+      startDateTime: toApiDateTime(date, startTime || "00:00"),
       endDateTime:
-        editorForm.allDay || !normalizeText(editorForm.endTime)
+        scheduledAllDay || !endTime
           ? null
-          : toApiDateTime(date, editorForm.endTime),
-      allDay: editorForm.allDay,
+          : toApiDateTime(date, endTime),
+      allDay: scheduledAllDay,
       assigneeUserId: canAssignAll
         ? Number(editorForm.assigneeUserId || 0) || Number(currentUser?.id || 0)
         : Number(currentUser?.id || 0),
@@ -476,22 +564,26 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
     e.preventDefault();
     if (!selectedEvent) return;
 
-    if (!normalizeText(reportForm.completionNotes) && !reportForm.photo) {
-      setReportError("Add notes or upload a picture before submitting the field report.");
+    if (
+      !normalizeText(reportForm.completionNotes) &&
+      reportForm.photos.length === 0 &&
+      selectedEventPhotos.length === 0
+    ) {
+      setReportError("Add notes or upload at least one picture before submitting the field report.");
       return;
     }
 
     const formData = new FormData();
     formData.append("status", reportForm.status);
     formData.append("completionNotes", reportForm.completionNotes);
-    if (reportForm.photo) formData.append("photo", reportForm.photo);
+    reportForm.photos.forEach((photo) => formData.append("photos", photo));
 
     setReportBusy(true);
     setReportError("");
     try {
       const res = await api.post(`/events/${selectedEvent.id}/report`, formData);
       setShowReportModal(false);
-      setReportForm({ status: "completed", completionNotes: "", photo: null });
+      setReportForm({ status: "completed", completionNotes: "", photos: [] });
       await loadEvents();
       setSelectedEventId(Number(res.data?.id || selectedEvent.id));
       await onActivityChange?.();
@@ -525,6 +617,9 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
       <div className={`calendar-event-chip calendar-event-chip-${status}`}>
         <span className="calendar-event-chip-type">
           {activityTypeLabel(arg.event.extendedProps.activityType)}
+        </span>
+        <span className="calendar-event-chip-schedule">
+          {formatScheduleSummary(arg.event.start, arg.event.end, arg.event.allDay)}
         </span>
         <strong>{arg.event.title}</strong>
       </div>
@@ -691,7 +786,7 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                 </div>
                 <strong>{event.title}</strong>
                 <div className="calendar-activity-meta">
-                  <span>{formatTimeRange(event.startDateTime, event.endDateTime, event.allDay)}</span>
+                  <span>{formatScheduleSummary(event.startDateTime, event.endDateTime, event.allDay)}</span>
                   <span>{event.customerName || "General activity"}</span>
                   <span>{event.assigneeName || event.assigneeUsername || "Unassigned"}</span>
                 </div>
@@ -749,7 +844,7 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                   <div className="calendar-detail-item">
                     <span>Time</span>
                     <strong>
-                      {formatTimeRange(
+                      {formatScheduleSummary(
                         selectedEvent.startDateTime,
                         selectedEvent.endDateTime,
                         selectedEvent.allDay
@@ -779,23 +874,26 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                   )}
                 </div>
 
-                {selectedEvent.completionPhotoUrl && (
+                {selectedEventPhotos.length > 0 && (
                   <div className="calendar-proof-card">
                     <div className="calendar-sidebar-section-head">
-                      <strong>Work Proof Photo</strong>
-                      <a
-                        href={selectedEvent.completionPhotoUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="calendar-inline-link"
-                      >
-                        Open
-                      </a>
+                      <strong>Work Proof Photos</strong>
+                      <span>{selectedEventPhotos.length} file{selectedEventPhotos.length === 1 ? "" : "s"}</span>
                     </div>
-                    <img
-                      src={selectedEvent.completionPhotoUrl}
-                      alt={selectedEvent.completionPhotoName || selectedEvent.title}
-                    />
+                    <div className="calendar-proof-grid">
+                      {selectedEventPhotos.map((photo) => (
+                        <a
+                          key={photo.id || photo.url}
+                          href={photo.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="calendar-proof-thumb"
+                        >
+                          <img src={photo.url} alt={photo.name || selectedEvent.title} />
+                          <span>{photo.name || "Open photo"}</span>
+                        </a>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -850,8 +948,8 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                   </div>
                   <strong>{event.title}</strong>
                   <span>
-                    {event.customerName ? `${event.customerName} · ` : ""}
-                    {formatShortDate(event.startDateTime)}
+                    {event.customerName ? `${event.customerName} - ` : ""}
+                    {formatShortDate(event.startDateTime)} - {formatScheduleSummary(event.startDateTime, event.endDateTime, event.allDay)}
                   </span>
                 </button>
               ))}
@@ -949,23 +1047,21 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                 </label>
 
                 <label className="field">
-                  <span>All Day</span>
+                  <span>Schedule</span>
                   <select
                     className="select"
-                    value={editorForm.allDay ? "1" : "0"}
-                    onChange={(e) =>
-                      setEditorForm((prev) => ({
-                        ...prev,
-                        allDay: e.target.value === "1"
-                      }))
-                    }
+                    value={editorForm.scheduleMode}
+                    onChange={(e) => setEditorForm((prev) => applyScheduleMode(prev, e.target.value))}
                   >
-                    <option value="1">Yes</option>
-                    <option value="0">No</option>
+                    {SCHEDULE_OPTIONS.map((option) => (
+                      <option value={option.key} key={option.key}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
                 </label>
 
-                {!editorForm.allDay && (
+                {editorForm.scheduleMode === "custom" && (
                   <>
                     <label className="field">
                       <span>Start Time</span>
@@ -1049,7 +1145,7 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
             <div className="modal-copy">
               <h4 id="calendar-report-title">Field Report</h4>
               <p>
-                Add completion notes and an optional proof photo for <strong>{selectedEvent.title}</strong>.
+                Add completion notes and optional proof photos for <strong>{selectedEvent.title}</strong>.
               </p>
             </div>
 
@@ -1073,43 +1169,65 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                 </label>
 
                 <div className="field calendar-field-span-2">
-                  <span>Work Proof Photo</span>
+                  <span>Work Proof Photos</span>
                   <label className="calendar-upload-shell">
                     <input
                       className="calendar-upload-input"
                       type="file"
                       accept="image/*"
+                      multiple
                       onChange={(e) =>
                         setReportForm((prev) => ({
                           ...prev,
-                          photo: e.target.files?.[0] || null
+                          photos: Array.from(e.target.files || [])
                         }))
                       }
                     />
                     <span className="calendar-upload-button">
-                      {reportForm.photo
-                        ? "Change Photo"
-                        : selectedEvent.completionPhotoName
-                          ? "Replace Photo"
-                          : "Choose Photo"}
+                      {reportForm.photos.length > 0
+                        ? "Change Photos"
+                        : selectedEventPhotos.length > 0
+                          ? "Add More Photos"
+                          : "Choose Photos"}
                     </span>
-                    <span className={`calendar-upload-name ${reportForm.photo ? "is-selected" : ""}`}>
-                      {reportForm.photo
-                        ? reportForm.photo.name
-                        : selectedEvent.completionPhotoName
-                          ? `Current: ${selectedEvent.completionPhotoName}`
-                          : "No photo selected"}
+                    <span className={`calendar-upload-name ${reportForm.photos.length > 0 ? "is-selected" : ""}`}>
+                      {reportForm.photos.length > 0
+                        ? formatPhotoSelectionLabel(reportForm.photos)
+                        : selectedEventPhotos.length > 0
+                          ? `${selectedEventPhotos.length} current photo${selectedEventPhotos.length === 1 ? "" : "s"}`
+                          : "No photos selected"}
                     </span>
                   </label>
-                  {selectedEvent.completionPhotoUrl && !reportForm.photo && (
-                    <a
-                      href={selectedEvent.completionPhotoUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="calendar-inline-link calendar-upload-link"
-                    >
-                      Open current photo
-                    </a>
+                  {reportForm.photos.length > 0 && (
+                    <div className="calendar-upload-list">
+                      {reportForm.photos.map((photo) => (
+                        <span className="calendar-upload-pill" key={`${photo.name}-${photo.lastModified}`}>
+                          {photo.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {selectedEventPhotos.length > 0 && (
+                    <div className="calendar-proof-card calendar-proof-card-inline">
+                      <div className="calendar-sidebar-section-head">
+                        <strong>Current Photos</strong>
+                        <span>{selectedEventPhotos.length} file{selectedEventPhotos.length === 1 ? "" : "s"}</span>
+                      </div>
+                      <div className="calendar-proof-grid">
+                        {selectedEventPhotos.map((photo) => (
+                          <a
+                            key={photo.id || photo.url}
+                            href={photo.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="calendar-proof-thumb"
+                          >
+                            <img src={photo.url} alt={photo.name || selectedEvent.title} />
+                            <span>{photo.name || "Open photo"}</span>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -1146,7 +1264,7 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
         title="Delete Activity"
         message={
           selectedEvent
-            ? `Delete ${selectedEvent.title}? This removes the activity schedule and any submitted report photo.`
+            ? `Delete ${selectedEvent.title}? This removes the activity schedule and any submitted report photos.`
             : ""
         }
         confirmLabel="Delete Activity"

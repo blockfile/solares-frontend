@@ -976,6 +976,12 @@ select {
   opacity: 0.92;
 }
 
+.calendar-event-chip-schedule {
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.9;
+}
+
 .calendar-event-chip-planned {
   background: linear-gradient(135deg, #194d90, #0f3c75);
 }
@@ -1240,6 +1246,33 @@ select {
   border: 1px solid var(--border);
 }
 
+.calendar-proof-card-inline {
+  margin-top: 6px;
+}
+
+.calendar-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.calendar-proof-thumb {
+  display: grid;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.calendar-proof-thumb img {
+  height: 160px;
+}
+
+.calendar-proof-thumb span {
+  color: #145b96;
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
 .calendar-inline-link {
   color: #145b96;
   font-size: 12px;
@@ -1262,6 +1295,8 @@ select {
   width: 100%;
   min-width: min(700px, calc(100vw - 48px));
   max-width: 860px;
+  max-height: min(90vh, 860px);
+  overflow: auto;
 }
 
 .calendar-form-grid {
@@ -1338,6 +1373,26 @@ select {
 
 .calendar-upload-link {
   justify-self: start;
+}
+
+.calendar-upload-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.calendar-upload-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid #d7e2f1;
+  background: #f5f8fd;
+  color: #21466f;
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .calendar-upcoming-item span {
@@ -2770,6 +2825,7 @@ select {
   padding: 20px;
   z-index: 1000;
   backdrop-filter: blur(2px);
+  overflow-y: auto;
 }
 
 .modal-card {
@@ -3009,6 +3065,16 @@ select {
 
   .user-editor-modal {
     padding: 20px;
+  }
+
+  .modal-backdrop {
+    place-items: start center;
+    padding: 12px;
+  }
+
+  .user-editor-modal,
+  .calendar-modal-card {
+    max-height: none;
   }
 
   .user-modal-header h4 {
