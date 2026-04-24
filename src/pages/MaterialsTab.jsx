@@ -1,5 +1,6 @@
 import { useDeferredValue, useEffect, useState } from "react";
 import api from "../api/client";
+import { getSupplierTextStyle } from "../constants/supplierColors";
 
 function toNumber(value, fallback = 0) {
   const n = Number(value);
@@ -54,8 +55,11 @@ export default function MaterialsTab() {
   const [replaceExisting, setReplaceExisting] = useState(true);
   const [markPreferred, setMarkPreferred] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [syncingTemplateCatalog, setSyncingTemplateCatalog] = useState(false);
   const [supplierFileInputKey, setSupplierFileInputKey] = useState(0);
   const [savingSupplierId, setSavingSupplierId] = useState(null);
+  const [deletingSupplierId, setDeletingSupplierId] = useState(null);
+  const [deletingManualCatalog, setDeletingManualCatalog] = useState(false);
   const [selectingPriceKey, setSelectingPriceKey] = useState("");
 
   const loadAll = async ({ background = false } = {}) => {
@@ -132,7 +136,8 @@ export default function MaterialsTab() {
       material.unit,
       material.category,
       material.subgroup,
-      match?.activeSupplierName
+      match?.activeSupplierName,
+      ...(match?.supplierPrices || []).map((entry) => entry.supplierName)
     ].some((value) => String(value || "").toLowerCase().includes(needle));
   });
 
@@ -146,6 +151,8 @@ export default function MaterialsTab() {
       row.supplierPrices.some((entry) => String(entry.supplierName || "").toLowerCase().includes(needle))
     );
   });
+
+  const manualCatalogMaterials = materials.filter((material) => !material.active_supplier_id);
 
   const clearMaterialForm = () => {
     setMaterialName("");
@@ -245,6 +252,23 @@ export default function MaterialsTab() {
     }
   };
 
+  const syncTemplateCatalog = async () => {
+    setSyncingTemplateCatalog(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await api.post("/materials/sync-template-catalog");
+      setSuccess(
+        `Template catalog synced. Linked ${res.data?.linkedCount || 0} items and refreshed ${res.data?.priceUpdatedCount || 0} prices.`
+      );
+      await loadAll({ background: true });
+    } catch (err) {
+      setError(err?.response?.data?.message || "Failed to sync template catalog links");
+    } finally {
+      setSyncingTemplateCatalog(false);
+    }
+  };
+
   const updateSupplierPreference = async (supplier, nextPreferred) => {
     setSavingSupplierId(supplier.id);
     setError("");
@@ -261,6 +285,48 @@ export default function MaterialsTab() {
       setError(err?.response?.data?.message || "Failed to update supplier");
     } finally {
       setSavingSupplierId(null);
+    }
+  };
+
+  const removeSupplier = async (supplier) => {
+    const materialCount = Number(supplier.material_count || 0);
+    const message = materialCount
+      ? `Delete ${supplier.supplier_name} and its ${materialCount} supplier material price${materialCount === 1 ? "" : "s"}?`
+      : `Delete ${supplier.supplier_name}?`;
+    if (!window.confirm(message)) return;
+
+    setDeletingSupplierId(supplier.id);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await api.delete(`/materials/suppliers/${supplier.id}`);
+      const removedCount = Number(res.data?.deletedMaterialCount || 0);
+      setSuccess(`${supplier.supplier_name} deleted. Removed ${removedCount} supplier price row${removedCount === 1 ? "" : "s"}.`);
+      await loadAll({ background: true });
+    } catch (err) {
+      setError(err?.response?.data?.message || "Failed to delete supplier");
+    } finally {
+      setDeletingSupplierId(null);
+    }
+  };
+
+  const removeManualCatalog = async () => {
+    const count = manualCatalogMaterials.length;
+    if (!count) return;
+    if (!window.confirm(`Delete ${count} manual catalog material${count === 1 ? "" : "s"}?`)) return;
+
+    setDeletingManualCatalog(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await api.delete("/materials/manual-catalog");
+      const deletedCount = Number(res.data?.deletedCount || 0);
+      setSuccess(`Manual catalog deleted. Removed ${deletedCount} material${deletedCount === 1 ? "" : "s"}.`);
+      await loadAll({ background: true });
+    } catch (err) {
+      setError(err?.response?.data?.message || "Failed to delete manual catalog");
+    } finally {
+      setDeletingManualCatalog(false);
     }
   };
 
@@ -392,6 +458,14 @@ export default function MaterialsTab() {
                   >
                     {uploading ? "Uploading..." : "Upload Price List"}
                   </button>
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    disabled={syncingTemplateCatalog}
+                    onClick={syncTemplateCatalog}
+                  >
+                    {syncingTemplateCatalog ? "Syncing..." : "Sync Template Links"}
+                  </button>
                   <span className="section-note">Supported: PDF, XLSX, XLS, CSV, JSON</span>
                 </div>
                 <div className="materials-file-pill">
@@ -410,28 +484,61 @@ export default function MaterialsTab() {
                 Preferred suppliers are prioritized when the system auto-selects the active catalog price.
               </p>
               <div className="materials-supplier-list">
+                {manualCatalogMaterials.length > 0 && (
+                  <div className="materials-supplier-row">
+                    <div>
+                      <strong>Manual Catalog</strong>
+                      <div className="section-note">
+                        {manualCatalogMaterials.length} material{manualCatalogMaterials.length === 1 ? "" : "s"}
+                      </div>
+                    </div>
+                    <div className="materials-supplier-actions">
+                      <span className="section-note">Manual</span>
+                      <button
+                        className="btn btn-ghost"
+                        type="button"
+                        disabled={deletingManualCatalog}
+                        onClick={removeManualCatalog}
+                      >
+                        {deletingManualCatalog ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {suppliers.map((supplier) => (
                 <div className="materials-supplier-row" key={supplier.id}>
                   <div>
-                    <strong>{supplier.supplier_name}</strong>
+                    <strong className="supplier-color-text" style={getSupplierTextStyle(supplier.supplier_name)}>
+                      {supplier.supplier_name}
+                    </strong>
                     <div className="section-note">
                       {supplier.material_count || 0} materials
                       {" - "}
                       Last upload: {formatDateTime(supplier.latest_uploaded_at)}
                     </div>
                   </div>
-                  <label className="materials-toggle">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(supplier.is_preferred)}
-                      disabled={savingSupplierId === supplier.id}
-                      onChange={(e) => updateSupplierPreference(supplier, e.target.checked)}
-                    />
-                    <span>{Boolean(supplier.is_preferred) ? "Preferred" : "Standard"}</span>
-                  </label>
+                  <div className="materials-supplier-actions">
+                    <label className="materials-toggle">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(supplier.is_preferred)}
+                        disabled={savingSupplierId === supplier.id || deletingSupplierId === supplier.id}
+                        onChange={(e) => updateSupplierPreference(supplier, e.target.checked)}
+                      />
+                      <span>{Boolean(supplier.is_preferred) ? "Preferred" : "Standard"}</span>
+                    </label>
+                    <button
+                      className="btn btn-ghost"
+                      type="button"
+                      disabled={deletingSupplierId === supplier.id}
+                      onClick={() => removeSupplier(supplier)}
+                    >
+                      {deletingSupplierId === supplier.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
                 </div>
                 ))}
-                {!suppliers.length && !loading && <div className="section-note">No suppliers yet. Upload the first price list to create one.</div>}
+                {!suppliers.length && !manualCatalogMaterials.length && !loading && <div className="section-note">No suppliers yet. Upload the first price list to create one.</div>}
               </div>
             </div>
           </div>
@@ -493,7 +600,9 @@ export default function MaterialsTab() {
               {recentImports.map((row) => (
                 <div className="materials-supplier-row" key={row.id}>
                   <div>
-                    <strong>{row.supplier_name}</strong>
+                    <strong className="supplier-color-text" style={getSupplierTextStyle(row.supplier_name)}>
+                      {row.supplier_name}
+                    </strong>
                     <div className="section-note">{row.source_filename}</div>
                   </div>
                   <div className="materials-import-meta">
@@ -555,7 +664,15 @@ export default function MaterialsTab() {
                         </div>
                       )}
                     </td>
-                    <td>{match?.activeSupplierName || "Manual catalog"}</td>
+                    <td>
+                      {match?.activeSupplierName ? (
+                        <span className="supplier-color-text" style={getSupplierTextStyle(match.activeSupplierName)}>
+                          {match.activeSupplierName}
+                        </span>
+                      ) : (
+                        "Manual catalog"
+                      )}
+                    </td>
                     <td>
                       {editingId === row.id ? (
                         <select className="select" value={editCategory} onChange={(e) => setEditCategory(e.target.value)}>
@@ -627,7 +744,15 @@ export default function MaterialsTab() {
                     <div className="section-note">{row.subgroup || row.category || "other"}</div>
                   </td>
                   <td>{row.inCatalog ? formatMoney(row.activePrice) : "Not in catalog"}</td>
-                  <td>{row.activeSupplierName || "Manual catalog"}</td>
+                  <td>
+                    {row.activeSupplierName ? (
+                      <span className="supplier-color-text" style={getSupplierTextStyle(row.activeSupplierName)}>
+                        {row.activeSupplierName}
+                      </span>
+                    ) : (
+                      "Manual catalog"
+                    )}
+                  </td>
                   <td>{row.bestPrice == null ? "-" : formatMoney(row.bestPrice)}</td>
                   <td>
                     <div className="materials-supplier-price-list">
@@ -636,7 +761,9 @@ export default function MaterialsTab() {
                         return (
                           <div className={`materials-supplier-price-pill${price.isActive ? " active" : ""}`} key={price.supplierPriceId}>
                             <div>
-                              <strong>{price.supplierName}</strong>
+                              <strong className="supplier-color-text" style={getSupplierTextStyle(price.supplierName)}>
+                                {price.supplierName}
+                              </strong>
                               <div className="section-note">
                                 PHP {formatMoney(price.basePrice)}
                                 {price.isPreferred ? " - Preferred" : ""}

@@ -2245,6 +2245,18 @@ select {
   background: rgba(255, 255, 255, 0.95);
 }
 
+.materials-supplier-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.supplier-color-text {
+  font-weight: 800;
+}
+
 .materials-import-meta {
   display: grid;
   gap: 4px;
@@ -3445,6 +3457,10 @@ select {
   .materials-inline-actions {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .materials-supplier-actions {
+    justify-content: flex-start;
   }
 
   .materials-import-meta {

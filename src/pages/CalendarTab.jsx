@@ -182,8 +182,8 @@ function applyScheduleMode(form, scheduleMode) {
 function formatScheduleSummary(startValue, endValue, allDay) {
   const mode = detectScheduleMode({ startDateTime: startValue, endDateTime: endValue, allDay });
   if (mode === "all_day") return "All day";
-  if (mode === "am") return "AM schedule";
-  if (mode === "pm") return "PM schedule";
+  if (mode === "am") return `AM Visit - ${formatTimeRange(startValue, endValue, allDay)}`;
+  if (mode === "pm") return `PM Visit - ${formatTimeRange(startValue, endValue, allDay)}`;
   return formatTimeRange(startValue, endValue, allDay);
 }
 
@@ -1124,7 +1124,7 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                   </select>
                 </label>
 
-                {editorForm.scheduleMode === "custom" && (
+                {editorForm.scheduleMode !== "all_day" && (
                   <>
                     <label className="field">
                       <span>Start Time</span>
