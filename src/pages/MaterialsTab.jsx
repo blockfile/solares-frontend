@@ -47,6 +47,9 @@ export default function MaterialsTab() {
   const [editSubgroup, setEditSubgroup] = useState("");
   const [subgroupFilter, setSubgroupFilter] = useState("all");
   const [materialFilter, setMaterialFilter] = useState("");
+  const [materialCategoryFilter, setMaterialCategoryFilter] = useState("all");
+  const [materialSubgroupFilter, setMaterialSubgroupFilter] = useState("all");
+  const [materialSourceFilter, setMaterialSourceFilter] = useState("all");
   const [comparisonFilter, setComparisonFilter] = useState("");
 
   const [supplierName, setSupplierName] = useState("");
@@ -125,11 +128,38 @@ export default function MaterialsTab() {
     new Set(materials.map((m) => String(m.subgroup || "").trim()).filter(Boolean))
   ).sort((a, b) => a.localeCompare(b));
 
+  const materialCategoryOptions = Array.from(
+    new Set(materials.map((m) => String(m.category || "other").trim() || "other"))
+  ).sort((a, b) => a.localeCompare(b));
+
+  const materialSubgroupOptions = Array.from(
+    new Set(materials.map((m) => String(m.subgroup || "").trim()).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+
+  const activeSourceOptions = Array.from(
+    new Set(
+      materials.map((material) => {
+        const match = comparisonByMaterialId[material.id];
+        return String(match?.activeSupplierName || "Manual catalog").trim();
+      })
+    )
+  ).sort((a, b) => {
+    if (a === "Manual catalog") return -1;
+    if (b === "Manual catalog") return 1;
+    return a.localeCompare(b);
+  });
+
   const visibleMaterials = materials.filter((material) => {
     if (subgroupFilter !== "all" && String(material.subgroup || "") !== subgroupFilter) return false;
-    if (!deferredMaterialFilter.trim()) return true;
+    if (materialCategoryFilter !== "all" && String(material.category || "other") !== materialCategoryFilter) return false;
+    if (materialSubgroupFilter !== "all" && String(material.subgroup || "") !== materialSubgroupFilter) return false;
 
     const match = comparisonByMaterialId[material.id];
+    const activeSourceName = String(match?.activeSupplierName || "Manual catalog").trim();
+    if (materialSourceFilter !== "all" && activeSourceName !== materialSourceFilter) return false;
+
+    if (!deferredMaterialFilter.trim()) return true;
+
     const needle = deferredMaterialFilter.trim().toLowerCase();
     return [
       material.material_name,
@@ -319,7 +349,7 @@ export default function MaterialsTab() {
     setError("");
     setSuccess("");
     try {
-      const res = await api.delete("/materials/manual-catalog");
+      const res = await api.delete("/materials/bulk/manual-catalog");
       const deletedCount = Number(res.data?.deletedCount || 0);
       setSuccess(`Manual catalog deleted. Removed ${deletedCount} material${deletedCount === 1 ? "" : "s"}.`);
       await loadAll({ background: true });
@@ -626,12 +656,53 @@ export default function MaterialsTab() {
             <strong>Active Material Prices</strong>
             <span>Search the catalog used by quotes and templates.</span>
           </div>
-          <input
-            className="input"
-            placeholder="Search material name, unit, subgroup, supplier..."
-            value={materialFilter}
-            onChange={(e) => setMaterialFilter(e.target.value)}
-          />
+          <div className="materials-active-filters">
+            <label className="materials-filter-field">
+              <span>Category</span>
+              <select
+                className="select"
+                value={materialCategoryFilter}
+                onChange={(e) => setMaterialCategoryFilter(e.target.value)}
+              >
+                <option value="all">All Categories</option>
+                {materialCategoryOptions.map((option) => (
+                  <option value={option} key={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+            <label className="materials-filter-field">
+              <span>Subgroup</span>
+              <select
+                className="select"
+                value={materialSubgroupFilter}
+                onChange={(e) => setMaterialSubgroupFilter(e.target.value)}
+              >
+                <option value="all">All Subgroups</option>
+                {materialSubgroupOptions.map((option) => (
+                  <option value={option} key={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+            <label className="materials-filter-field">
+              <span>Active Source</span>
+              <select
+                className="select"
+                value={materialSourceFilter}
+                onChange={(e) => setMaterialSourceFilter(e.target.value)}
+              >
+                <option value="all">All Sources</option>
+                {activeSourceOptions.map((option) => (
+                  <option value={option} key={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+            <input
+              className="input materials-filter-search"
+              placeholder="Search material name, unit, subgroup, supplier..."
+              value={materialFilter}
+              onChange={(e) => setMaterialFilter(e.target.value)}
+            />
+          </div>
         </div>
 
         <div className="materials-table-wrap">

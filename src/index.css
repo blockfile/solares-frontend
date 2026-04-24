@@ -2535,6 +2535,36 @@ textarea.input::placeholder {
   width: min(100%, 360px);
 }
 
+.materials-active-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 190px)) minmax(240px, 360px);
+  gap: 10px;
+  align-items: end;
+}
+
+.materials-filter-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.materials-filter-field span {
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.materials-active-filters .select,
+.materials-active-filters .input {
+  width: 100%;
+}
+
+.materials-filter-search {
+  align-self: end;
+}
+
 @media (max-width: 1240px) {
   .materials-upload-grid,
   .materials-option-grid {
@@ -4272,6 +4302,11 @@ button {
   .calendar-sidebar-card {
     order: 2;
   }
+
+  .materials-active-filters {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+    width: 100%;
+  }
 }
 
 @media (max-width: 900px) {
@@ -4478,6 +4513,10 @@ button {
   .materials-table-toolbar {
     display: grid;
     gap: 10px;
+  }
+
+  .materials-active-filters {
+    grid-template-columns: 1fr !important;
   }
 }
 
