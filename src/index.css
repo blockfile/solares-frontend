@@ -308,6 +308,7 @@ select {
   border-radius: 10px;
   padding: 11px 12px;
   color: var(--text);
+  text-align: left;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -1461,14 +1462,14 @@ select {
 
 @media (max-width: 640px) {
   .modal-backdrop {
-    align-items: start;
-    place-items: start center;
-    padding: 10px;
+    align-items: safe center;
+    justify-items: center;
+    padding: 12px;
   }
 
   .modal-card {
     max-width: 100%;
-    max-height: calc(100dvh - 20px);
+    max-height: calc(100dvh - 24px);
     border-radius: 16px;
     padding: 16px;
     gap: 14px;
@@ -1476,14 +1477,11 @@ select {
 
   .modal-copy {
     margin: -16px -16px 0 -16px;
-    padding: 16px;
+    padding: 14px 16px 12px;
     border-radius: 16px 16px 0 0;
   }
 
-  .modal-copy h4 {
-    overflow-wrap: anywhere;
-  }
-
+  .modal-copy h4,
   .modal-copy p {
     overflow-wrap: anywhere;
   }
@@ -1618,11 +1616,23 @@ select {
     max-height: 92dvh;
     border-radius: 24px 24px 0 0 !important;
     margin: 0;
+    padding-bottom: max(20px, calc(16px + env(safe-area-inset-bottom, 0px)));
   }
 
   .modal-backdrop:has(.calendar-modal-card) {
     place-items: end center;
     padding: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Single-column form grid inside bottom-sheet */
+  .calendar-modal-card .calendar-form-grid,
+  .calendar-modal-card .calendar-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-modal-card .calendar-field-span-2 {
+    grid-column: auto;
   }
 }
 
@@ -3355,14 +3365,14 @@ select {
 
 @media (max-width: 640px) {
   .modal-backdrop {
-    align-items: start;
-    place-items: start center;
-    padding: 10px;
+    align-items: safe center;
+    justify-items: center;
+    padding: 12px;
   }
 
   .modal-card {
     max-width: 100%;
-    max-height: calc(100dvh - 20px);
+    max-height: calc(100dvh - 24px);
     border-radius: 16px;
     padding: 16px;
     gap: 14px;
@@ -3370,7 +3380,7 @@ select {
 
   .modal-copy {
     margin: -16px -16px 0 -16px;
-    padding: 16px;
+    padding: 14px 16px 12px;
     border-radius: 16px 16px 0 0;
   }
 
@@ -3615,7 +3625,8 @@ select {
   }
 
   .modal-backdrop {
-    place-items: start center;
+    align-items: safe center;
+    justify-items: center;
     padding: 12px;
   }
 
@@ -3673,15 +3684,33 @@ select {
     grid-column: auto !important;
   }
 
-  .calendar-modal-card,
+  /* Calendar bottom-sheet stays edge-to-edge */
+  .calendar-modal-card {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Other modals get small side margins */
   .user-editor-modal,
   .quote-confirm-modal,
   .user-confirm-modal,
   .user-blocker-modal,
   .login-password-modal {
-    width: calc(100vw - 20px) !important;
+    width: calc(100vw - 24px) !important;
     min-width: 0 !important;
-    max-width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 24px) !important;
+  }
+
+  /* Tighter section padding inside user editor */
+  .user-modal-section,
+  .generated-password-card {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .user-modal-form {
+    gap: 12px;
   }
 
   .calendar-form-grid,
@@ -3708,6 +3737,28 @@ select {
   .modal-card textarea {
     font-size: 16px;
   }
+
+  /* Touch-friendly button heights inside modals */
+  .modal-card .btn,
+  .modal-actions .btn {
+    min-height: 48px;
+    font-size: 15px;
+  }
+
+  /* Tighter modal header on small screens */
+  .modal-copy {
+    padding: 14px 16px 12px;
+  }
+
+  .modal-copy h4 {
+    font-size: 0.95rem;
+  }
+
+  /* Better scrollable modals on iOS */
+  .modal-backdrop {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
 }
 
 @media (max-width: 680px) {
@@ -3721,6 +3772,14 @@ select {
 
   .panel {
     padding: 14px;
+  }
+
+  .login-city-card {
+    padding: 28px 20px 24px;
+  }
+
+  .login-city-shell {
+    padding: 16px;
   }
 }
 
