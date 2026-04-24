@@ -287,6 +287,7 @@ select {
 .field {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 
 .field label {
@@ -300,6 +301,8 @@ select {
 .input,
 .select {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   border: 1px solid var(--border);
   background: var(--surface-soft);
   border-radius: 10px;
@@ -3311,6 +3314,10 @@ select {
   -webkit-overflow-scrolling: touch;
 }
 
+.modal-card > * {
+  min-width: 0;
+}
+
 .modal-copy {
   display: grid;
   gap: 6px;
@@ -3647,6 +3654,59 @@ select {
   .template-inline-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+@media (max-width: 640px) {
+  .calendar-form-grid,
+  .calendar-detail-grid,
+  .user-modal-fields,
+  .user-form-grid,
+  .role-form-grid,
+  .admin-toolbar-filters,
+  .generated-password-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .calendar-field-span-2,
+  .user-field-span-2 {
+    grid-column: auto !important;
+  }
+
+  .calendar-modal-card,
+  .user-editor-modal,
+  .quote-confirm-modal,
+  .user-confirm-modal,
+  .user-blocker-modal,
+  .login-password-modal {
+    width: calc(100vw - 20px) !important;
+    min-width: 0 !important;
+    max-width: calc(100vw - 20px) !important;
+  }
+
+  .calendar-form-grid,
+  .user-modal-fields,
+  .user-form-grid,
+  .role-form-grid,
+  .login-password-form {
+    gap: 12px;
+  }
+
+  .field,
+  .field > *,
+  .calendar-form-grid > *,
+  .user-modal-fields > *,
+  .modal-card input,
+  .modal-card select,
+  .modal-card textarea {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .modal-card input,
+  .modal-card select,
+  .modal-card textarea {
+    font-size: 16px;
   }
 }
 
