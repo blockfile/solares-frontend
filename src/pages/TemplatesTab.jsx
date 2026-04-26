@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/client";
 import ConfirmModal from "../components/ConfirmModal";
+import { getSupplierTextStyle } from "../constants/supplierColors";
 
 const CATEGORY_DEFS = [
   { key: "main_system", label: "A. Main System Components" },
@@ -13,10 +14,22 @@ const CATEGORY_DEFS = [
 ];
 
 const VALID_SECTION_KEYS = new Set(CATEGORY_DEFS.map((def) => def.key));
+const TEMPLATE_VAT_RATE = 0.12;
+const TEMPLATE_VAT_LABEL = `${Math.round(TEMPLATE_VAT_RATE * 100)}% VAT Included`;
+const TEMPLATE_BRAND_STYLES = {
+  DEYE: { color: "#1f5f9e", fontWeight: 700 },
+  SOLIS: { color: "#b04712", fontWeight: 700 },
+  GROWATT: { color: "#2f6f3e", fontWeight: 700 }
+};
 
 function toNumber(value, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function toVatInclusivePrice(value) {
+  const base = Math.max(0, toNumber(value, 0));
+  return base * (1 + TEMPLATE_VAT_RATE);
 }
 
 function normalizeText(value) {
@@ -77,6 +90,25 @@ function getTemplateGroupLabel(name) {
   return "Other";
 }
 
+function inferTemplateBrand(name) {
+  const text = normalizeText(name);
+  if (text.includes("deye")) return "DEYE";
+  if (text.includes("solis")) return "SOLIS";
+  if (text.includes("growatt")) return "GROWATT";
+  return "OTHER";
+}
+
+function getTemplateBrandOrder(brand) {
+  if (brand === "DEYE") return 0;
+  if (brand === "SOLIS") return 1;
+  if (brand === "GROWATT") return 2;
+  return 9;
+}
+
+function getTemplateBrandStyle(brand) {
+  return TEMPLATE_BRAND_STYLES[String(brand || "").toUpperCase()] || undefined;
+}
+
 function getTemplateSystemRank(name) {
   const text = normalizeText(name);
   if (text.includes("hybrid")) return 0;
@@ -105,23 +137,6 @@ function compareTemplatesBySize(a, b) {
   }
 
   return String(a.name || "").localeCompare(String(b.name || ""));
-}
-
-function compareTemplateGroups(a, b) {
-  const aFirst = a.rows[0];
-  const bFirst = b.rows[0];
-  const systemRankDiff = getTemplateSystemRank(aFirst?.name) - getTemplateSystemRank(bFirst?.name);
-  if (systemRankDiff !== 0) return systemRankDiff;
-
-  const ahA = parseTemplateBatteryAh(aFirst?.name || "");
-  const ahB = parseTemplateBatteryAh(bFirst?.name || "");
-  if (ahA != null || ahB != null) {
-    if (ahA == null) return 1;
-    if (ahB == null) return -1;
-    if (ahA !== ahB) return ahA - ahB;
-  }
-
-  return String(a.label || "").localeCompare(String(b.label || ""));
 }
 
 function inferMaterialBrand(material) {
@@ -213,20 +228,45 @@ function sortMaterialsInGroup(a, b) {
   return String(a.material_name || "").localeCompare(String(b.material_name || ""));
 }
 
+function getMaterialSupplierName(material) {
+  const supplier = String(material?.active_supplier_name || "").trim();
+  return supplier || "Manual catalog";
+}
+
 function buildMaterialGroups(source) {
   const grouped = new Map();
   for (const material of source) {
-    const label = getMaterialGroupLabel(material);
-    if (!grouped.has(label)) grouped.set(label, []);
-    grouped.get(label).push(material);
+    const supplierName = getMaterialSupplierName(material);
+    const groupLabel = getMaterialGroupLabel(material);
+    const groupKey = `${supplierName}||${groupLabel}`;
+    if (!grouped.has(groupKey)) {
+      grouped.set(groupKey, {
+        supplierName,
+        groupLabel,
+        options: []
+      });
+    }
+    grouped.get(groupKey).options.push(material);
   }
 
-  return Array.from(grouped.entries())
-    .map(([label, options]) => ({
-      label,
-      options: [...options].sort(sortMaterialsInGroup)
-    }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+  return Array.from(grouped.values())
+    .sort((a, b) => {
+      const supplierOrderA =
+        String(a.supplierName || "").toLowerCase() === "manual catalog"
+          ? "zzz-manual catalog"
+          : String(a.supplierName || "").toLowerCase();
+      const supplierOrderB =
+        String(b.supplierName || "").toLowerCase() === "manual catalog"
+          ? "zzz-manual catalog"
+          : String(b.supplierName || "").toLowerCase();
+      const supplierDiff = supplierOrderA.localeCompare(supplierOrderB);
+      if (supplierDiff !== 0) return supplierDiff;
+      return String(a.groupLabel || "").localeCompare(String(b.groupLabel || ""));
+    })
+    .map((group) => ({
+      label: `${group.supplierName} • ${group.groupLabel}`,
+      options: [...group.options].sort(sortMaterialsInGroup)
+    }));
 }
 
 function resolveSectionKey(sectionKey, description, subgroup, category) {
@@ -289,6 +329,191 @@ function buildEmptyItemForm() {
   };
 }
 
+function SearchableSelect({
+  groups,
+  selectedOption,
+  onSelectOption,
+  getOptionLabel,
+  getOptionKey,
+  getOptionSearchText,
+  getOptionStyle,
+  placeholder = "Select option",
+  searchPlaceholder = "Search inside dropdown...",
+  emptyMessage = "No options found.",
+  allowClear = false,
+  clearLabel = "Clear selection",
+  showGroupLabels = true
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef(null);
+  const resolveOptionKey = (option) => {
+    if (typeof getOptionKey === "function") return String(getOptionKey(option));
+    if (option && typeof option === "object") {
+      if (option.id != null) return String(option.id);
+      if (option.value != null) return String(option.value);
+    }
+    return String(getOptionLabel(option));
+  };
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (!rootRef.current || rootRef.current.contains(event.target)) return;
+      setOpen(false);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+    };
+  }, [open]);
+
+  const filteredGroups = useMemo(() => {
+    const q = normalizeText(query).trim();
+    if (!q) return groups;
+
+    return groups
+      .map((group) => ({
+        ...group,
+        options: group.options.filter((option) =>
+          normalizeText(
+            `${getOptionLabel(option)} ${getOptionSearchText ? getOptionSearchText(option) : ""}`
+          ).includes(q)
+        )
+      }))
+      .filter((group) => group.options.length > 0);
+  }, [groups, query, getOptionLabel, getOptionSearchText]);
+
+  const selectedKey = selectedOption ? resolveOptionKey(selectedOption) : "";
+  const selectedLabel = selectedOption ? getOptionLabel(selectedOption) : placeholder;
+  const selectedStyle = selectedOption ? getOptionStyle?.(selectedOption) : undefined;
+  const hasAnyOption = filteredGroups.some((group) => group.options.length > 0);
+  const showClear = allowClear && (!query.trim() || normalizeText(clearLabel).includes(normalizeText(query).trim()));
+
+  return (
+    <div className={`searchable-picker${open ? " open" : ""}`} ref={rootRef}>
+      <button
+        type="button"
+        className="searchable-picker-trigger"
+        onClick={() => {
+          setOpen((prev) => !prev);
+          if (open) setQuery("");
+        }}
+        style={selectedStyle}
+      >
+        <span>{selectedLabel}</span>
+        <svg
+          className="searchable-picker-caret"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M5 7.5 10 12.5 15 7.5" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="searchable-picker-menu">
+          <input
+            className="input searchable-picker-input"
+            placeholder={searchPlaceholder}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setOpen(false);
+              }
+            }}
+            autoFocus
+          />
+
+          <div className="searchable-picker-options">
+            {showClear && (
+              <button
+                type="button"
+                className={`searchable-picker-option searchable-picker-clear${!selectedOption ? " selected" : ""}`}
+                onClick={() => {
+                  onSelectOption(null);
+                  setOpen(false);
+                }}
+              >
+                {clearLabel}
+              </button>
+            )}
+            {hasAnyOption ? (
+              filteredGroups.map((group) => (
+                <div className="searchable-picker-group" key={group.key || group.label}>
+                  {showGroupLabels && (
+                    <div className="searchable-picker-group-label" style={group.style}>
+                      {group.label}
+                    </div>
+                  )}
+                  {group.options.map((option) => {
+                    const optionKey = resolveOptionKey(option);
+                    const isSelected = selectedKey !== "" && selectedKey === optionKey;
+                    return (
+                      <button
+                        type="button"
+                        className={`searchable-picker-option${isSelected ? " selected" : ""}`}
+                        key={optionKey}
+                        style={getOptionStyle?.(option)}
+                        onClick={() => {
+                          onSelectOption(option);
+                          setOpen(false);
+                        }}
+                      >
+                        {getOptionLabel(option)}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))
+            ) : (
+              <div className="searchable-picker-empty">{emptyMessage}</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SearchableMaterialPicker({
+  groups,
+  selectedMaterial,
+  onSelectMaterial,
+  getOptionLabel,
+  getOptionStyle,
+  placeholder = "Pick From Materials Database"
+}) {
+  return (
+    <SearchableSelect
+      groups={groups}
+      selectedOption={selectedMaterial}
+      onSelectOption={onSelectMaterial}
+      getOptionLabel={getOptionLabel}
+      getOptionSearchText={(material) =>
+        `${material.material_name || ""} ${material.source_section || ""} ${material.subgroup || ""} ${
+          material.category || ""
+        } ${material.active_supplier_name || ""}`
+      }
+      getOptionStyle={getOptionStyle}
+      placeholder={placeholder}
+      searchPlaceholder="Search materials inside dropdown..."
+      emptyMessage="No materials found."
+    />
+  );
+}
+
 export default function TemplatesTab() {
   const [templates, setTemplates] = useState([]);
   const [materials, setMaterials] = useState([]);
@@ -305,13 +530,14 @@ export default function TemplatesTab() {
   const [deletingTemplate, setDeletingTemplate] = useState(false);
   const [exportingTemplate, setExportingTemplate] = useState(false);
   const [exportingAllTemplates, setExportingAllTemplates] = useState(false);
+  const [templateExportVatMode, setTemplateExportVatMode] = useState("incl");
   const [duplicateTemplateName, setDuplicateTemplateName] = useState("");
 
   const [newItem, setNewItem] = useState(buildEmptyItemForm());
-  const [newItemMaterialSearch, setNewItemMaterialSearch] = useState("");
+  const [newItemSupplierFilter, setNewItemSupplierFilter] = useState("all");
   const [editingItemId, setEditingItemId] = useState(null);
   const [editItem, setEditItem] = useState(buildEmptyItemForm());
-  const [editItemMaterialSearch, setEditItemMaterialSearch] = useState("");
+  const [editItemSupplierFilter, setEditItemSupplierFilter] = useState("all");
   const [activeSectionKey, setActiveSectionKey] = useState(CATEGORY_DEFS[0].key);
   const [confirmModal, setConfirmModal] = useState(null);
   const [modalBusy, setModalBusy] = useState(false);
@@ -368,6 +594,7 @@ export default function TemplatesTab() {
           row.catalog_category
         ),
         catalog_material_id: Number(row.catalog_material_id || 0) || null,
+        catalog_base_price: Number(row.base_price || 0),
         base_price:
           row.original_base_price != null
             ? Number(row.original_base_price || 0)
@@ -397,7 +624,7 @@ export default function TemplatesTab() {
   useEffect(() => {
     setEditingItemId(null);
     setEditItem(buildEmptyItemForm());
-    setEditItemMaterialSearch("");
+    setEditItemSupplierFilter("all");
     setActiveSectionKey(CATEGORY_DEFS[0].key);
     loadItems(templateId);
   }, [templateId]);
@@ -407,22 +634,62 @@ export default function TemplatesTab() {
     [templates, templateId]
   );
 
-  const groupedTemplates = useMemo(() => {
+  const templatePickerGroups = useMemo(() => {
     const groups = new Map();
 
     for (const row of templates) {
-      const label = getTemplateGroupLabel(row.name);
-      if (!groups.has(label)) groups.set(label, []);
-      groups.get(label).push(row);
+      const brand = inferTemplateBrand(row.name);
+      const sectionLabel = getTemplateGroupLabel(row.name);
+      const groupKey = `${brand}||${sectionLabel}`;
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, {
+          key: groupKey,
+          brand,
+          sectionLabel,
+          options: []
+        });
+      }
+      groups.get(groupKey).options.push(row);
     }
 
-    return Array.from(groups.entries())
-      .map(([label, rows]) => ({
-        label,
-        rows: [...rows].sort(compareTemplatesBySize)
+    return Array.from(groups.values())
+      .map((group) => ({
+        ...group,
+        label: `${group.brand} - ${group.sectionLabel}`,
+        options: [...group.options].sort(compareTemplatesBySize),
+        style: getTemplateBrandStyle(group.brand)
       }))
-      .sort(compareTemplateGroups);
+      .sort((a, b) => {
+        const brandDiff = getTemplateBrandOrder(a.brand) - getTemplateBrandOrder(b.brand);
+        if (brandDiff !== 0) return brandDiff;
+
+        const systemDiff =
+          getTemplateSystemRank(a.options[0]?.name || "") - getTemplateSystemRank(b.options[0]?.name || "");
+        if (systemDiff !== 0) return systemDiff;
+
+        const ahA = parseTemplateBatteryAh(a.options[0]?.name || "");
+        const ahB = parseTemplateBatteryAh(b.options[0]?.name || "");
+        if (ahA != null || ahB != null) {
+          if (ahA == null) return 1;
+          if (ahB == null) return -1;
+          if (ahA !== ahB) return ahA - ahB;
+        }
+
+        return String(a.label || "").localeCompare(String(b.label || ""));
+      });
   }, [templates]);
+
+  const templateVatModeOptions = useMemo(
+    () => [
+      { value: "incl", label: "With VAT (12%)" },
+      { value: "excl", label: "Without VAT" }
+    ],
+    []
+  );
+  const selectedTemplateVatModeOption = useMemo(
+    () => templateVatModeOptions.find((option) => option.value === templateExportVatMode) || null,
+    [templateVatModeOptions, templateExportVatMode]
+  );
 
   const steps = useMemo(
     () =>
@@ -443,18 +710,12 @@ export default function TemplatesTab() {
     [materials]
   );
 
-  const filterMaterialsBySearch = (source, query) => {
-    const q = normalizeText(query).trim();
-    if (!q) return source;
-
-    return source.filter((material) => {
-      const haystack = normalizeText(
-        `${material.material_name || ""} ${material.source_section || ""} ${material.subgroup || ""} ${
-          material.category || ""
-        } ${getMaterialGroupLabel(material)}`
-      );
-      return haystack.includes(q);
-    });
+  const filterMaterialsBySupplier = (source, supplierFilter = "all") => {
+    const scopedSource =
+      supplierFilter && supplierFilter !== "all"
+        ? source.filter((material) => getMaterialSupplierName(material) === supplierFilter)
+        : source;
+    return scopedSource;
   };
 
   const getFilenameFromDisposition = (contentDisposition, fallback) => {
@@ -469,35 +730,160 @@ export default function TemplatesTab() {
   };
 
   const filteredCreateMaterials = useMemo(
-    () => filterMaterialsBySearch(visibleMaterials, newItemMaterialSearch),
-    [visibleMaterials, newItemMaterialSearch]
+    () => filterMaterialsBySupplier(visibleMaterials, newItemSupplierFilter),
+    [visibleMaterials, newItemSupplierFilter]
   );
 
   const filteredEditMaterials = useMemo(
-    () => filterMaterialsBySearch(visibleMaterials, editItemMaterialSearch),
-    [visibleMaterials, editItemMaterialSearch]
+    () => filterMaterialsBySupplier(visibleMaterials, editItemSupplierFilter),
+    [visibleMaterials, editItemSupplierFilter]
   );
+
+  const createMatchCount = filteredCreateMaterials.length;
+  const editMatchCount = filteredEditMaterials.length;
+
+  const supplierFilterOptions = useMemo(() => {
+    const suppliers = new Set(visibleMaterials.map((material) => getMaterialSupplierName(material)));
+    return Array.from(suppliers).sort((a, b) => {
+      const left = String(a || "").toLowerCase();
+      const right = String(b || "").toLowerCase();
+      if (left === "manual catalog") return 1;
+      if (right === "manual catalog") return -1;
+      return left.localeCompare(right);
+    });
+  }, [visibleMaterials]);
+
+  const supplierPickerGroups = useMemo(
+    () => [
+      {
+        key: "supplier-group",
+        label: "Suppliers",
+        options: [
+          { value: "all", label: "All suppliers" },
+          ...supplierFilterOptions.map((supplier) => ({
+            value: supplier,
+            label: supplier
+          }))
+        ]
+      }
+    ],
+    [supplierFilterOptions]
+  );
+
+  const selectedNewSupplierOption = useMemo(
+    () =>
+      supplierPickerGroups[0]?.options.find((option) => option.value === newItemSupplierFilter) ||
+      supplierPickerGroups[0]?.options[0] ||
+      null,
+    [supplierPickerGroups, newItemSupplierFilter]
+  );
+
+  const selectedEditSupplierOption = useMemo(
+    () =>
+      supplierPickerGroups[0]?.options.find((option) => option.value === editItemSupplierFilter) ||
+      supplierPickerGroups[0]?.options[0] ||
+      null,
+    [supplierPickerGroups, editItemSupplierFilter]
+  );
+
+  const sectionPickerGroups = useMemo(
+    () => [
+      {
+        key: "section-group",
+        label: "Template Sections",
+        options: CATEGORY_DEFS.map((def) => ({ value: def.key, label: def.label }))
+      }
+    ],
+    []
+  );
+
+  const selectedSectionOption = useMemo(
+    () =>
+      sectionPickerGroups[0]?.options.find((option) => option.value === editItem.sectionKey) ||
+      sectionPickerGroups[0]?.options[0] ||
+      null,
+    [sectionPickerGroups, editItem.sectionKey]
+  );
+
+  const materialsById = useMemo(() => {
+    const map = new Map();
+    for (const row of materials) {
+      map.set(Number(row.id), row);
+    }
+    return map;
+  }, [materials]);
 
   const createMaterialGroups = useMemo(
     () => buildMaterialGroups(filteredCreateMaterials),
     [filteredCreateMaterials]
   );
 
+  const selectedCreateMaterial = useMemo(
+    () => materials.find((row) => Number(row.id) === Number(newItem.catalogMaterialId || 0)) || null,
+    [materials, newItem.catalogMaterialId]
+  );
+
+  const selectedEditMaterial = useMemo(
+    () => materials.find((row) => Number(row.id) === Number(editItem.catalogMaterialId || 0)) || null,
+    [materials, editItem.catalogMaterialId]
+  );
+
+  const templateOptionLabel = (template) =>
+    `${template.name} (${template.item_count || 0} item${Number(template.item_count || 0) === 1 ? "" : "s"})`;
+
+  const templateOptionSearchText = (template) =>
+    `${template.name || ""} ${inferTemplateBrand(template.name)} ${getTemplateGroupLabel(template.name)}`;
+
+  const templateOptionStyle = (template) => getTemplateBrandStyle(inferTemplateBrand(template.name));
+
   const materialOptionLabel = (material) =>
-    `${material.material_name} | ${Number(material.base_price || 0).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })}${material.unit ? ` / ${material.unit}` : ""}${
+    `${material.material_name} | Base ${formatMoney(material.base_price || 0)} -> VAT Incl. ${formatMoney(
+      toVatInclusivePrice(material.base_price || 0)
+    )}${material.unit ? ` / ${material.unit}` : ""} | Supplier: ${
+      String(material.active_supplier_name || "").trim() || "Manual catalog"
+    }${
       material.source_section ? ` | ${material.source_section}` : ""
     }`;
+
+  const resolveVatInclusivePayloadPrice = (catalogMaterialId, enteredPrice) => {
+    const material = materialsById.get(Number(catalogMaterialId || 0));
+    if (!material) return Math.max(0, toNumber(enteredPrice, 0));
+    return toVatInclusivePrice(material.base_price || 0);
+  };
+
+  const resolveRowPriceReference = (row) => {
+    const catalogMaterial = materialsById.get(Number(row.catalog_material_id || 0));
+    if (catalogMaterial) {
+      const base = Number(catalogMaterial.base_price || 0);
+      return {
+        fromCatalog: true,
+        basePrice: base,
+        vatInclusivePrice: toVatInclusivePrice(base)
+      };
+    }
+
+    const fallbackBase = Number(row.catalog_base_price || row.base_price || 0);
+    return {
+      fromCatalog: false,
+      basePrice: fallbackBase,
+      vatInclusivePrice: toVatInclusivePrice(fallbackBase)
+    };
+  };
 
   const applyMaterialToForm = (material, prev = {}) => ({
     ...prev,
     catalogMaterialId: String(material?.id || ""),
     description: String(material?.material_name || ""),
     unit: String(material?.unit || ""),
-    basePrice: String(material?.base_price ?? 0)
+    basePrice: String(toVatInclusivePrice(material?.base_price ?? 0))
   });
+
+  const vatReferenceLabel = (material) =>
+    material
+      ? `Base: ${formatMoney(material.base_price || 0)} | VAT incl. (used): ${formatMoney(
+          toVatInclusivePrice(material.base_price || 0)
+        )}`
+      : "Base price is manual.";
 
   const editMaterialGroups = useMemo(
     () => buildMaterialGroups(filteredEditMaterials),
@@ -569,7 +955,10 @@ export default function TemplatesTab() {
     setError("");
     try {
       const res = await api.get(`/templates/${templateId}/export/excel`, {
-        responseType: "blob"
+        responseType: "blob",
+        params: {
+          vatMode: templateExportVatMode
+        }
       });
 
       const blob = new Blob([res.data], {
@@ -602,7 +991,10 @@ export default function TemplatesTab() {
     setError("");
     try {
       const res = await api.get(`/templates/${templateId}/export/excel-all`, {
-        responseType: "blob"
+        responseType: "blob",
+        params: {
+          vatMode: templateExportVatMode
+        }
       });
 
       const blob = new Blob([res.data], {
@@ -666,12 +1058,12 @@ export default function TemplatesTab() {
         description: newItem.description.trim(),
         unit: newItem.unit.trim(),
         qty: Math.max(0, toNumber(newItem.qty, 1)),
-        basePrice: Math.max(0, toNumber(newItem.basePrice, 0)),
+        basePrice: resolveVatInclusivePayloadPrice(newItem.catalogMaterialId, newItem.basePrice),
         sectionKey: activeSectionKey,
         catalogMaterialId: newItem.catalogMaterialId || null
       });
       setNewItem(buildEmptyItemForm());
-      setNewItemMaterialSearch("");
+      setNewItemSupplierFilter("all");
       await Promise.all([loadItems(templateId), loadTemplates(templateId)]);
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to create template item");
@@ -679,6 +1071,8 @@ export default function TemplatesTab() {
   };
 
   const startEditItem = (row) => {
+    const selectedMaterial =
+      materials.find((entry) => Number(entry.id) === Number(row.catalog_material_id || 0)) || null;
     setEditingItemId(Number(row.id));
     setEditItem({
       itemNo: String(row.item_no ?? ""),
@@ -689,13 +1083,13 @@ export default function TemplatesTab() {
       basePrice: String(row.base_price ?? 0),
       sectionKey: String(row.section_key || CATEGORY_DEFS[0].key)
     });
-    setEditItemMaterialSearch("");
+    setEditItemSupplierFilter(selectedMaterial ? getMaterialSupplierName(selectedMaterial) : "all");
   };
 
   const cancelEditItem = () => {
     setEditingItemId(null);
     setEditItem(buildEmptyItemForm());
-    setEditItemMaterialSearch("");
+    setEditItemSupplierFilter("all");
   };
 
   const saveItem = async (itemId) => {
@@ -708,7 +1102,7 @@ export default function TemplatesTab() {
         description: editItem.description.trim(),
         unit: editItem.unit.trim(),
         qty: Math.max(0, toNumber(editItem.qty, 0)),
-        basePrice: Math.max(0, toNumber(editItem.basePrice, 0)),
+        basePrice: resolveVatInclusivePayloadPrice(editItem.catalogMaterialId, editItem.basePrice),
         sectionKey: editItem.sectionKey,
         catalogMaterialId: editItem.catalogMaterialId || null
       });
@@ -862,23 +1256,20 @@ export default function TemplatesTab() {
               </svg>
               Open Existing Template
             </div>
-            <select
-              id="manageTemplate"
-              className="select template-group-select"
-              value={templateId}
-              onChange={(e) => setTemplateId(e.target.value)}
-            >
-              <option value="">— Select a template —</option>
-              {groupedTemplates.map((group) => (
-                <optgroup label={`---- ${group.label} ----`} key={group.label}>
-                  {group.rows.map((row) => (
-                    <option value={row.id} key={row.id}>
-                      {`${row.name} (${row.item_count || 0} items)`}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+            <SearchableSelect
+              groups={templatePickerGroups}
+              selectedOption={selectedTemplate}
+              onSelectOption={(template) => setTemplateId(template ? String(template.id) : "")}
+              getOptionKey={(template) => String(template.id)}
+              getOptionLabel={templateOptionLabel}
+              getOptionSearchText={templateOptionSearchText}
+              getOptionStyle={templateOptionStyle}
+              placeholder="-- Select a template --"
+              searchPlaceholder="Search templates..."
+              emptyMessage="No templates found."
+              allowClear
+              clearLabel="-- Select a template --"
+            />
           </div>
         </div>
 
@@ -936,6 +1327,27 @@ export default function TemplatesTab() {
                 >
                   {exportingAllTemplates ? "Bundling..." : "Export All Tabs"}
                 </button>
+                <label className="field template-export-vat-field">
+                  <span>Export VAT</span>
+                  <SearchableSelect
+                    groups={[
+                      {
+                        key: "template-vat-mode",
+                        label: "Export VAT",
+                        options: templateVatModeOptions
+                      }
+                    ]}
+                    selectedOption={selectedTemplateVatModeOption}
+                    onSelectOption={(option) => setTemplateExportVatMode(option?.value || "incl")}
+                    getOptionKey={(option) => option.value}
+                    getOptionLabel={(option) => option.label}
+                    getOptionSearchText={(option) => option.label}
+                    placeholder="Select VAT mode"
+                    searchPlaceholder="Search VAT mode..."
+                    emptyMessage="No VAT mode found."
+                    showGroupLabels={false}
+                  />
+                </label>
                 <button
                   className="btn btn-ghost"
                   type="button"
@@ -985,45 +1397,41 @@ export default function TemplatesTab() {
               <div className="add-item-card-head">
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="8"/><path d="M10 6v8M6 10h8"/></svg>
                 <strong>Add Item to Section</strong>
+                <span className="add-item-card-sub">{TEMPLATE_VAT_LABEL}</span>
               </div>
 
               <div className="add-item-picker-row">
                 <label className="field">
-                  <span>Search & Filter</span>
-                  <input
-                    className="input"
-                    placeholder="Type to filter materials..."
-                    value={newItemMaterialSearch}
-                    onChange={(e) => setNewItemMaterialSearch(e.target.value)}
+                  <span>Supplier Filter</span>
+                  <SearchableSelect
+                    groups={supplierPickerGroups}
+                    selectedOption={selectedNewSupplierOption}
+                    onSelectOption={(option) => setNewItemSupplierFilter(option?.value || "all")}
+                    getOptionKey={(option) => option.value}
+                    getOptionLabel={(option) => option.label}
+                    getOptionSearchText={(option) => option.label}
+                    getOptionStyle={(option) =>
+                      option.value === "all" ? undefined : getSupplierTextStyle(option.label)
+                    }
+                    placeholder="All suppliers"
+                    searchPlaceholder="Search supplier..."
+                    emptyMessage="No supplier found."
+                    showGroupLabels={false}
                   />
                 </label>
                 <label className="field">
-                  <span>Pick from Materials Database</span>
-                  <select
-                    className="select"
-                    value={newItem.catalogMaterialId}
-                    onChange={(e) => {
-                      const selectedId = Number(e.target.value || 0);
-                      const material = materials.find((row) => Number(row.id) === selectedId);
-                      if (!material) {
-                        setNewItem((prev) => ({ ...prev, catalogMaterialId: "" }));
-                        return;
-                      }
+                  <span>Pick from Materials Database ({createMatchCount} match{createMatchCount === 1 ? "" : "es"})</span>
+                  <SearchableMaterialPicker
+                    groups={createMaterialGroups}
+                    selectedMaterial={selectedCreateMaterial}
+                    onSelectMaterial={(material) => {
                       setNewItem((prev) => applyMaterialToForm(material, prev));
-                      setNewItemMaterialSearch(material.material_name || "");
+                      setNewItemSupplierFilter(getMaterialSupplierName(material));
                     }}
-                  >
-                    <option value="">— Select material —</option>
-                    {createMaterialGroups.map((group) => (
-                      <optgroup label={group.label} key={group.label}>
-                        {group.options.map((material) => (
-                          <option value={material.id} key={material.id}>
-                            {materialOptionLabel(material)}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
+                    getOptionLabel={materialOptionLabel}
+                    getOptionStyle={(material) => getSupplierTextStyle(material.active_supplier_name)}
+                    placeholder="— Select material —"
+                  />
                 </label>
                 <label className="field add-item-desc-field">
                   <span>Manual Description</span>
@@ -1077,7 +1485,7 @@ export default function TemplatesTab() {
                   />
                 </label>
                 <label className="field">
-                  <span>Base Price</span>
+                  <span>Price (VAT Incl. Used)</span>
                   <input
                     className="input"
                     type="number"
@@ -1098,6 +1506,7 @@ export default function TemplatesTab() {
                   Add to Section
                 </button>
               </div>
+              <p className="template-vat-row-note">{vatReferenceLabel(selectedCreateMaterial)}</p>
             </div>
 
             {loadingItems && <p className="section-note">Loading template items...</p>}
@@ -1110,13 +1519,18 @@ export default function TemplatesTab() {
                     <th>Description</th>
                     <th>Unit</th>
                     <th>Qty</th>
-                    <th>Base Price</th>
+                    <th>Price Reference</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(activeStep?.items || []).map((row) => (
-                    <tr key={row.id}>
+                  {(activeStep?.items || []).map((row) => {
+                    const priceRef = resolveRowPriceReference(row);
+                    return (
+                    <tr
+                      key={row.id}
+                      className={editingItemId === row.id ? "template-item-row editing" : "template-item-row"}
+                    >
                       <td>
                         {editingItemId === row.id ? (
                           <input
@@ -1136,56 +1550,52 @@ export default function TemplatesTab() {
                       <td>
                         {editingItemId === row.id ? (
                           <div className="template-edit-stack">
-                            <input
-                              className="input"
-                              placeholder="Search materials"
-                              value={editItemMaterialSearch}
-                              onChange={(e) => setEditItemMaterialSearch(e.target.value)}
+                            <SearchableSelect
+                              groups={supplierPickerGroups}
+                              selectedOption={selectedEditSupplierOption}
+                              onSelectOption={(option) => setEditItemSupplierFilter(option?.value || "all")}
+                              getOptionKey={(option) => option.value}
+                              getOptionLabel={(option) => option.label}
+                              getOptionSearchText={(option) => option.label}
+                              getOptionStyle={(option) =>
+                                option.value === "all" ? undefined : getSupplierTextStyle(option.label)
+                              }
+                              placeholder="All suppliers"
+                              searchPlaceholder="Search supplier..."
+                              emptyMessage="No supplier found."
+                              showGroupLabels={false}
                             />
                             <div className="template-picker-separator">
-                              <span>Pick From Materials Database</span>
+                              <span>Pick From Materials Database ({editMatchCount} match{editMatchCount === 1 ? "" : "es"})</span>
                             </div>
-                            <select
-                              className="select"
-                              value={editItem.catalogMaterialId || ""}
-                              onChange={(e) => {
-                                const selectedId = Number(e.target.value || 0);
-                                const material = materials.find((entry) => Number(entry.id) === selectedId);
-                                if (!material) {
-                                  setEditItem((prev) => ({ ...prev, catalogMaterialId: "" }));
-                                  return;
-                                }
+                            <SearchableMaterialPicker
+                              groups={editMaterialGroups}
+                              selectedMaterial={selectedEditMaterial}
+                              onSelectMaterial={(material) => {
                                 setEditItem((prev) => applyMaterialToForm(material, prev));
-                                setEditItemMaterialSearch(material.material_name || "");
+                                setEditItemSupplierFilter(getMaterialSupplierName(material));
                               }}
-                            >
-                              <option value="">Pick From Materials Database</option>
-                              {editMaterialGroups.map((group) => (
-                                <optgroup label={group.label} key={group.label}>
-                                  {group.options.map((material) => (
-                                    <option value={material.id} key={material.id}>
-                                      {materialOptionLabel(material)}
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              ))}
-                            </select>
+                              getOptionLabel={materialOptionLabel}
+                              getOptionStyle={(material) => getSupplierTextStyle(material.active_supplier_name)}
+                              placeholder="Pick From Materials Database"
+                            />
                             <div className="template-picker-separator">
                               <span>Or Manual Description</span>
                             </div>
-                            <select
-                              className="select"
-                              value={editItem.sectionKey}
-                              onChange={(e) =>
-                                setEditItem((prev) => ({ ...prev, sectionKey: e.target.value }))
+                            <SearchableSelect
+                              groups={sectionPickerGroups}
+                              selectedOption={selectedSectionOption}
+                              onSelectOption={(option) =>
+                                setEditItem((prev) => ({ ...prev, sectionKey: option?.value || prev.sectionKey }))
                               }
-                            >
-                              {CATEGORY_DEFS.map((def) => (
-                                <option value={def.key} key={def.key}>
-                                  {def.label}
-                                </option>
-                              ))}
-                            </select>
+                              getOptionKey={(option) => option.value}
+                              getOptionLabel={(option) => option.label}
+                              getOptionSearchText={(option) => option.label}
+                              placeholder="Select section"
+                              searchPlaceholder="Search section..."
+                              emptyMessage="No section found."
+                              showGroupLabels={false}
+                            />
                             <input
                               className="input"
                               value={editItem.description}
@@ -1197,6 +1607,7 @@ export default function TemplatesTab() {
                                 }))
                               }
                             />
+                            <span className="template-vat-reference">{vatReferenceLabel(selectedEditMaterial)}</span>
                           </div>
                         ) : (
                           <div className="template-row-description">
@@ -1251,7 +1662,19 @@ export default function TemplatesTab() {
                             }
                           />
                         ) : (
-                          formatMoney(row.base_price)
+                          <div className="template-vat-price">
+                            {priceRef.fromCatalog ? (
+                              <>
+                                <strong>Base: {formatMoney(priceRef.basePrice)}</strong>
+                                <span>VAT incl. used: {formatMoney(priceRef.vatInclusivePrice)}</span>
+                              </>
+                            ) : (
+                              <>
+                                <strong>Used: {formatMoney(row.base_price)}</strong>
+                                <span>Manual item</span>
+                              </>
+                            )}
+                          </div>
                         )}
                       </td>
                       <td>
@@ -1290,7 +1713,7 @@ export default function TemplatesTab() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )})}
 
                   {!(activeStep?.items || []).length && !loadingItems && (
                     <tr>

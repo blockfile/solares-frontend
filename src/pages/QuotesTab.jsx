@@ -596,6 +596,7 @@ export default function QuotesTab() {
   const [exportError, setExportError] = useState("");
   const [creating, setCreating] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [quoteExportVatMode, setQuoteExportVatMode] = useState("incl");
   const [currentStep, setCurrentStep] = useState(0);
   const [created, setCreated] = useState(null);
   const [recentSearch, setRecentSearch] = useState("");
@@ -1064,7 +1065,10 @@ export default function QuotesTab() {
     setExportError("");
     try {
       const res = await api.get(`/quotes/${quoteId}/export/${endpoint}`, {
-        responseType: "blob"
+        responseType: "blob",
+        params: {
+          vatMode: quoteExportVatMode
+        }
       });
 
       const blob = new Blob([res.data], {
@@ -1550,6 +1554,17 @@ export default function QuotesTab() {
                 </div>
               )}
               {exportError && <div className="error-text">{exportError}</div>}
+              <label className="field quote-export-vat-field">
+                <span>Export VAT</span>
+                <select
+                  className="select"
+                  value={quoteExportVatMode}
+                  onChange={(e) => setQuoteExportVatMode(e.target.value)}
+                >
+                  <option value="incl">With VAT (12%)</option>
+                  <option value="excl">Without VAT</option>
+                </select>
+              </label>
               <button
                 className="btn btn-secondary"
                 onClick={() => exportQuote({ endpoint: "customer-excel", fallbackExt: "xlsx" })}
@@ -1726,6 +1741,17 @@ export default function QuotesTab() {
                 </div>
 
                 {exportError && <div className="error-text">{exportError}</div>}
+                <label className="field quote-export-vat-field">
+                  <span>Export VAT</span>
+                  <select
+                    className="select"
+                    value={quoteExportVatMode}
+                    onChange={(e) => setQuoteExportVatMode(e.target.value)}
+                  >
+                    <option value="incl">With VAT (12%)</option>
+                    <option value="excl">Without VAT</option>
+                  </select>
+                </label>
 
                 <button
                   className="btn btn-secondary"
