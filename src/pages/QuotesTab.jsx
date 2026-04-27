@@ -419,6 +419,55 @@ function formatCurrency(value) {
   }).format(amount);
 }
 
+function roundPeso(value) {
+  return Math.round(Number(value || 0));
+}
+
+function normalizeRate(rate, fallback) {
+  const parsed = Number(rate);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function applyMarkup(basePrice, markupRate) {
+  return roundPeso(Number(basePrice || 0) * (1 + normalizeRate(markupRate, 0)));
+}
+
+function parsePanelWatt(text) {
+  const match = String(text || "").match(/(\d{3,4})\s*w\b/i);
+  return match ? Number(match[1]) : 0;
+}
+
+function resolveMarginBucket(item) {
+  const description = String(item?.description || "");
+  const subgroup = String(item?.subgroup || "").toLowerCase();
+  const section = String(item?.section || "").toLowerCase();
+  const category = String(item?.category || "").toLowerCase();
+
+  if (isPanelDescription(description) || subgroup === "panel") return "panel";
+  if (subgroup === "inverter") return "inverter";
+  if (subgroup === "battery") return "battery";
+  if (section === "mounting_structural" || subgroup === "mounting" || category === "mounting") {
+    return "mounting";
+  }
+  return "safety";
+}
+
+function getMarginRateForBucket(bucket, marginTemplate, fallbackRate) {
+  if (!marginTemplate) return normalizeRate(fallbackRate, 0);
+  if (bucket === "inverter") return normalizeRate(marginTemplate.inverterMargin, fallbackRate);
+  if (bucket === "panel") return normalizeRate(marginTemplate.panelMargin, fallbackRate);
+  if (bucket === "battery") return normalizeRate(marginTemplate.batteryMargin, fallbackRate);
+  if (bucket === "mounting") return normalizeRate(marginTemplate.mountingMargin, fallbackRate);
+  return normalizeRate(marginTemplate.safetyMargin, fallbackRate);
+}
+
+function applyMarginTemplateToItems(items, marginTemplate, fallbackRate) {
+  return items.map((item) => ({
+    ...item,
+    marginRate: getMarginRateForBucket(resolveMarginBucket(item), marginTemplate, fallbackRate)
+  }));
+}
+
 function formatDateLabel(value) {
   if (!value) return "-";
   const date = new Date(value);
@@ -599,6 +648,8 @@ export default function QuotesTab() {
   const [quoteExportVatMode, setQuoteExportVatMode] = useState("incl");
   const [currentStep, setCurrentStep] = useState(0);
   const [created, setCreated] = useState(null);
+  const [marginTemplates, setMarginTemplates] = useState([]);
+  const [selectedMarginTemplateId, setSelectedMarginTemplateId] = useState("");
   const [recentSearch, setRecentSearch] = useState("");
   const [recentQuotes, setRecentQuotes] = useState([]);
   const [loadingRecentQuotes, setLoadingRecentQuotes] = useState(false);
@@ -608,6 +659,12 @@ export default function QuotesTab() {
   const [recentQuoteError, setRecentQuoteError] = useState("");
   const [confirmState, setConfirmState] = useState(null);
   const [deletingQuoteId, setDeletingQuoteId] = useState(null);
+  const [pricingConfig, setPricingConfig] = useState({
+    materialMarkupRate: 0.1165,
+    installationMarkupRate: 0.112,
+    installationRatePerWatt: 9
+  });
+  const [installationMarginRate, setInstallationMarginRate] = useState(0.112);
 
   useBodyScrollLock(Boolean(confirmState));
   const manualIdRef = useRef(-1);
@@ -625,6 +682,10 @@ export default function QuotesTab() {
   const selectedRecentQuoteMeta = useMemo(
     () => recentQuotes.find((quote) => Number(quote.id) === Number(selectedRecentQuoteId || 0)) || null,
     [recentQuotes, selectedRecentQuoteId]
+  );
+  const selectedMarginTemplate = useMemo(
+    () => marginTemplates.find((row) => Number(row.id) === Number(selectedMarginTemplateId || 0)) || null,
+    [marginTemplates, selectedMarginTemplateId]
   );
 
   const loadTemplates = async () => {
@@ -644,6 +705,34 @@ export default function QuotesTab() {
     } catch (err) {
       setMaterials([]);
       setQuoteError(err?.response?.data?.message || "Failed to load materials");
+    }
+  };
+
+  const loadPricingConfig = async () => {
+    try {
+      const res = await api.get("/quotes/config");
+      setPricingConfig({
+        materialMarkupRate: normalizeRate(res?.data?.materialMarkupRate, 0.1165),
+        installationMarkupRate: normalizeRate(res?.data?.installationMarkupRate, 0.112),
+        installationRatePerWatt: Number(res?.data?.installationRatePerWatt || 9) || 9
+      });
+      setInstallationMarginRate(normalizeRate(res?.data?.installationMarkupRate, 0.112));
+    } catch {
+      setPricingConfig({
+        materialMarkupRate: 0.1165,
+        installationMarkupRate: 0.112,
+        installationRatePerWatt: 9
+      });
+      setInstallationMarginRate(0.112);
+    }
+  };
+
+  const loadMarginTemplates = async () => {
+    try {
+      const res = await api.get("/margin-templates", { params: { activeOnly: 1 } });
+      setMarginTemplates(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setMarginTemplates([]);
     }
   };
 
@@ -677,6 +766,7 @@ export default function QuotesTab() {
             category,
             section: resolveStoredSectionKey(it.section_key) || detectSection(description, subgroup, category),
             subgroup,
+            marginRate: pricingConfig.materialMarkupRate,
             catalogMaterialId: Number(it.catalog_material_id || 0) || null,
             isPanel: isPanelDescription(description),
             isManual: false,
@@ -713,7 +803,11 @@ export default function QuotesTab() {
         });
       }
 
-      setTemplateItems(recomputePanelDependent(mapped));
+      setTemplateItems(
+        recomputePanelDependent(
+          applyMarginTemplateToItems(mapped, selectedMarginTemplate, pricingConfig.materialMarkupRate)
+        )
+      );
     } catch (err) {
       setTemplateItems([]);
       setQuoteError(err?.response?.data?.message || "Failed to load template items");
@@ -818,6 +912,11 @@ export default function QuotesTab() {
         category,
         section: sectionKey,
         subgroup: "accessory",
+        marginRate: getMarginRateForBucket(
+          resolveMarginBucket({ description: "", subgroup: "accessory", section: sectionKey, category }),
+          selectedMarginTemplate,
+          pricingConfig.materialMarkupRate
+        ),
         catalogMaterialId: null,
         isPanel: false,
         isManual: true,
@@ -909,6 +1008,16 @@ export default function QuotesTab() {
       basePrice: Number(hit.base_price || 0),
       category: toStepCategory(hit.category, hit.material_name),
       subgroup: resolveItemSubgroup(hit.subgroup, hit.material_name),
+      marginRate: getMarginRateForBucket(
+        resolveMarginBucket({
+          description: String(hit.material_name || ""),
+          subgroup: resolveItemSubgroup(hit.subgroup, hit.material_name),
+          section: null,
+          category: toStepCategory(hit.category, hit.material_name)
+        }),
+        selectedMarginTemplate,
+        pricingConfig.materialMarkupRate
+      ),
       isPanel: isPanelDescription(String(hit.material_name || "")),
       formulaKey: detectMountingFormulaKey(String(hit.material_name || "")),
       catalogMaterialId: Number(hit.id)
@@ -929,7 +1038,24 @@ export default function QuotesTab() {
   useEffect(() => {
     loadTemplates();
     loadMaterials();
+    loadPricingConfig();
+    loadMarginTemplates();
   }, []);
+
+  useEffect(() => {
+    setTemplateItems((prev) =>
+      recomputePanelDependent(
+        applyMarginTemplateToItems(prev, selectedMarginTemplate, pricingConfig.materialMarkupRate)
+      )
+    );
+    if (selectedMarginTemplate) {
+      setInstallationMarginRate(
+        normalizeRate(selectedMarginTemplate.installationMargin, pricingConfig.installationMarkupRate)
+      );
+    } else {
+      setInstallationMarginRate(pricingConfig.installationMarkupRate);
+    }
+  }, [selectedMarginTemplate, pricingConfig.installationMarkupRate, pricingConfig.materialMarkupRate]);
 
   useEffect(() => {
     if (quoteView !== "recent") return;
@@ -968,6 +1094,7 @@ export default function QuotesTab() {
     setCurrentStep(0);
     loadTemplateItems(templateId);
     loadPackagePrices(templateId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateId]);
 
   useEffect(() => {
@@ -1033,6 +1160,7 @@ export default function QuotesTab() {
           unit: item.unit,
           qty: Number(item.qty || 0),
           basePrice: Number(item.basePrice || 0),
+          marginRate: normalizeRate(item.marginRate, pricingConfig.materialMarkupRate),
           included: item.included,
           autoFromPanel: item.autoFromPanel,
           panelRatio: item.panelRatio,
@@ -1047,7 +1175,8 @@ export default function QuotesTab() {
         validUntil,
         items: selectedItems,
         packagePriceId: packagePriceId ? Number(packagePriceId) : null,
-        discountItems: discountRows.filter((d) => Number(d.amount) > 0).map((d) => ({ label: d.label || "Discount", amount: Number(d.amount) }))
+        discountItems: discountRows.filter((d) => Number(d.amount) > 0).map((d) => ({ label: d.label || "Discount", amount: Number(d.amount) })),
+        installationMarginRate
       });
       setCreated(res.data);
       await loadRecentQuotes("", res.data?.quoteId || null);
@@ -1124,6 +1253,59 @@ export default function QuotesTab() {
   };
 
   const hasIncludedItems = templateItems.some((item) => item.included);
+  const selectedPackagePrice = useMemo(
+    () => packagePrices.find((p) => Number(p.id) === Number(packagePriceId || 0)) || null,
+    [packagePrices, packagePriceId]
+  );
+  const includedItems = useMemo(
+    () => templateItems.filter((item) => item.included),
+    [templateItems]
+  );
+  const estimatedMaterialSubtotal = useMemo(
+    () =>
+      includedItems.reduce(
+        (sum, item) =>
+          sum +
+          applyMarkup(Number(item.basePrice || 0), normalizeRate(item.marginRate, pricingConfig.materialMarkupRate)) *
+            Number(item.qty || 0),
+        0
+      ),
+    [includedItems, pricingConfig.materialMarkupRate]
+  );
+  const estimatedInstallationTotal = useMemo(() => {
+    if (selectedPackagePrice) {
+      return Math.max(0, roundPeso(Number(selectedPackagePrice.package_price || 0) - estimatedMaterialSubtotal));
+    }
+
+    const panelItem = includedItems.find((item) => item.isPanel);
+    if (!panelItem) return 0;
+
+    const panelQty = Number(panelItem.qty || 0);
+    const panelWatt = parsePanelWatt(panelItem.description);
+    const baseInstallation = roundPeso(panelQty * panelWatt * Number(pricingConfig.installationRatePerWatt || 9));
+    return applyMarkup(baseInstallation, installationMarginRate);
+  }, [
+    includedItems,
+    estimatedMaterialSubtotal,
+    pricingConfig.installationRatePerWatt,
+    installationMarginRate,
+    selectedPackagePrice
+  ]);
+  const estimatedSubtotal = useMemo(
+    () =>
+      selectedPackagePrice
+        ? roundPeso(Number(selectedPackagePrice.package_price || 0))
+        : roundPeso(estimatedMaterialSubtotal + estimatedInstallationTotal),
+    [estimatedInstallationTotal, estimatedMaterialSubtotal, selectedPackagePrice]
+  );
+  const estimatedDiscountTotal = useMemo(
+    () => discountRows.reduce((sum, row) => sum + Number(row.amount || 0), 0),
+    [discountRows]
+  );
+  const estimatedTotalAfterDiscount = useMemo(
+    () => Math.max(0, roundPeso(estimatedSubtotal - estimatedDiscountTotal)),
+    [estimatedDiscountTotal, estimatedSubtotal]
+  );
   const canCreate = Boolean(
     templateId &&
       customerName &&
@@ -1215,6 +1397,23 @@ export default function QuotesTab() {
                   {packagePrices.map((p) => (
                     <option value={p.id} key={p.id}>
                       {`${p.scenario_label} - ${formatCurrency(p.package_price)}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="field">
+                <label htmlFor="marginTemplate">Margin Template</label>
+                <select
+                  id="marginTemplate"
+                  className="select"
+                  value={selectedMarginTemplateId}
+                  onChange={(e) => setSelectedMarginTemplateId(e.target.value)}
+                >
+                  <option value="">Default Margins</option>
+                  {marginTemplates.map((row) => (
+                    <option value={row.id} key={row.id}>
+                      {row.name}
                     </option>
                   ))}
                 </select>
@@ -1360,7 +1559,9 @@ export default function QuotesTab() {
                     <div>Description</div>
                     <div>Qty</div>
                     <div>Unit</div>
-                    <div>Base Price</div>
+                    <div>Base Cost</div>
+                    <div>Margin %</div>
+                    <div>Quote Price</div>
                   </div>
 
                   {!activeStep.items.length && (
@@ -1415,14 +1616,29 @@ export default function QuotesTab() {
                           className="input"
                           value={item.description}
                           onChange={(e) =>
-                            updateItemById(item.templateItemId, {
-                              description: e.target.value,
-                              category: detectCategory(e.target.value),
-                              subgroup: detectItemSubgroup(e.target.value),
-                              formulaKey: detectMountingFormulaKey(e.target.value),
-                              catalogMaterialId: null,
-                              isPanel: isPanelDescription(e.target.value)
-                            })
+                            updateItemById(item.templateItemId, (() => {
+                              const nextDescription = e.target.value;
+                              const nextCategory = detectCategory(nextDescription);
+                              const nextSubgroup = detectItemSubgroup(nextDescription);
+                              return {
+                                description: nextDescription,
+                                category: nextCategory,
+                                subgroup: nextSubgroup,
+                                marginRate: getMarginRateForBucket(
+                                  resolveMarginBucket({
+                                    description: nextDescription,
+                                    subgroup: nextSubgroup,
+                                    section: item.section,
+                                    category: nextCategory
+                                  }),
+                                  selectedMarginTemplate,
+                                  pricingConfig.materialMarkupRate
+                                ),
+                                formulaKey: detectMountingFormulaKey(nextDescription),
+                                catalogMaterialId: null,
+                                isPanel: isPanelDescription(nextDescription)
+                              };
+                            })())
                           }
                         />
                       </div>
@@ -1465,6 +1681,30 @@ export default function QuotesTab() {
                               basePrice: Number(e.target.value || 0)
                             })
                           }
+                        />
+                      </div>
+                      <div>
+                        <input
+                          className="input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={(Number(item.marginRate || 0) * 100).toFixed(2)}
+                          onChange={(e) =>
+                            updateItemById(item.templateItemId, {
+                              marginRate: Math.max(0, Number(e.target.value || 0) / 100)
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <input
+                          className="input"
+                          value={applyMarkup(
+                            Number(item.basePrice || 0),
+                            normalizeRate(item.marginRate, pricingConfig.materialMarkupRate)
+                          )}
+                          readOnly
                         />
                       </div>
                     </div>
@@ -1519,7 +1759,46 @@ export default function QuotesTab() {
               <span>Generated output &amp; export options</span>
             </div>
           </div>
-          {!created && <p className="section-note">No quote generated yet.</p>}
+          {!created && (
+            <>
+              <div className="stat-row">
+                <span>Estimated Materials</span>
+                <strong>{formatCurrency(estimatedMaterialSubtotal)}</strong>
+              </div>
+              <div className="stat-row">
+                <span>Estimated Installation</span>
+                <strong>{formatCurrency(estimatedInstallationTotal)}</strong>
+              </div>
+              <label className="field quote-export-vat-field">
+                <span>Installation Margin %</span>
+                <input
+                  className="input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={(Number(installationMarginRate || 0) * 100).toFixed(2)}
+                  disabled={Boolean(selectedPackagePrice)}
+                  onChange={(e) =>
+                    setInstallationMarginRate(Math.max(0, Number(e.target.value || 0) / 100))
+                  }
+                />
+              </label>
+              <div className="stat-row">
+                <span>Estimated Subtotal</span>
+                <strong>{formatCurrency(estimatedSubtotal)}</strong>
+              </div>
+              {estimatedDiscountTotal > 0 && (
+                <div className="stat-row stat-row-discount">
+                  <span>Estimated Discount</span>
+                  <strong>-{formatCurrency(estimatedDiscountTotal)}</strong>
+                </div>
+              )}
+              <div className="stat-row stat-row-total">
+                <span>Estimated Total</span>
+                <strong>{formatCurrency(estimatedTotalAfterDiscount)}</strong>
+              </div>
+            </>
+          )}
 
           {created && (
             <>

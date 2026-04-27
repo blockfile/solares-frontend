@@ -2107,7 +2107,7 @@ textarea.input::placeholder {
 
 .items-grid {
   display: grid;
-  grid-template-columns: 48px 54px minmax(220px, 1fr) 100px 110px 140px;
+  grid-template-columns: 48px 54px minmax(220px, 1fr) 92px 98px 126px 108px 126px;
   gap: 8px;
   align-items: center;
 }
@@ -3968,7 +3968,9 @@ textarea.input::placeholder {
 
   .items-grid-row > :nth-child(4),
   .items-grid-row > :nth-child(5),
-  .items-grid-row > :nth-child(6) {
+  .items-grid-row > :nth-child(6),
+  .items-grid-row > :nth-child(7),
+  .items-grid-row > :nth-child(8) {
     grid-column: 1 / -1;
   }
 

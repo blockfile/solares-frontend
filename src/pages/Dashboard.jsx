@@ -4,6 +4,7 @@ import CalendarTab from "./CalendarTab";
 import QuotesTab from "./QuotesTab";
 import MaterialsTab from "./MaterialsTab";
 import PackagePricesTab from "./PackagePricesTab";
+import MarginTemplatesTab from "./MarginTemplatesTab";
 import TemplatesTab from "./TemplatesTab";
 import UsersTab from "./UsersTab";
 import RolesTab from "./RolesTab";
@@ -18,6 +19,7 @@ const TAB_CONFIG = [
   { key: "templates", label: "Template Manager", group: "Catalog", icon: "templates" },
   { key: "materials", label: "Material Prices", group: "Catalog", icon: "materials" },
   { key: "packages", label: "Package Prices", group: "Catalog", icon: "packages" },
+  { key: "margins", label: "Margin Setup", group: "Catalog", icon: "margins" },
   { key: "users", label: "Users", group: "System Admin", icon: "users" },
   { key: "roles", label: "Roles", group: "System Admin", icon: "roles" },
   { key: "audit", label: "Audit", group: "System Admin", icon: "audit" }
@@ -90,6 +92,15 @@ function SidebarIcon({ icon }) {
           <path d="M12 11.5v8.1" />
         </svg>
       );
+    case "margins":
+      return (
+        <svg {...common}>
+          <path d="M4 18h16" />
+          <path d="M7 18V9" />
+          <path d="M12 18V6" />
+          <path d="M17 18v-4" />
+        </svg>
+      );
     case "users":
       return (
         <svg {...common}>
@@ -132,6 +143,8 @@ export default function Dashboard() {
     templates: 0,
     materials: 0,
     packages: 0
+    ,
+    margins: 0
   });
   const [user, setUser] = useState({
     id: null,
@@ -202,18 +215,20 @@ export default function Dashboard() {
       permissions: nextPermissions.length ? nextPermissions : ["calendar"]
     });
 
-    const [eventsRes, templatesRes, materialsRes, packagesRes] = await Promise.allSettled([
+    const [eventsRes, templatesRes, materialsRes, packagesRes, marginsRes] = await Promise.allSettled([
       nextPermissions.includes("calendar") ? api.get("/events") : Promise.resolve({ data: [] }),
       nextPermissions.includes("templates") ? api.get("/templates?includeAll=1") : Promise.resolve({ data: [] }),
       nextPermissions.includes("materials") ? api.get("/materials") : Promise.resolve({ data: [] }),
-      nextPermissions.includes("packages") ? api.get("/package-prices?activeOnly=1") : Promise.resolve({ data: [] })
+      nextPermissions.includes("packages") ? api.get("/package-prices?activeOnly=1") : Promise.resolve({ data: [] }),
+      nextPermissions.includes("margins") ? api.get("/margin-templates?activeOnly=1") : Promise.resolve({ data: [] })
     ]);
 
     setSummary({
       events: eventsRes.status === "fulfilled" ? toCount(eventsRes.value.data) : 0,
       templates: templatesRes?.status === "fulfilled" ? toCount(templatesRes.value.data) : 0,
       materials: materialsRes?.status === "fulfilled" ? toCount(materialsRes.value.data) : 0,
-      packages: packagesRes?.status === "fulfilled" ? toCount(packagesRes.value.data) : 0
+      packages: packagesRes?.status === "fulfilled" ? toCount(packagesRes.value.data) : 0,
+      margins: marginsRes?.status === "fulfilled" ? toCount(marginsRes.value.data) : 0
     });
   };
 
@@ -248,6 +263,9 @@ export default function Dashboard() {
     }
     if (user.permissions.includes("packages")) {
       items.push({ label: "Active Packages", value: summary.packages });
+    }
+    if (user.permissions.includes("margins")) {
+      items.push({ label: "Margin Templates", value: summary.margins });
     }
     return items;
   }, [summary, user.permissions]);
@@ -349,6 +367,7 @@ export default function Dashboard() {
           {tab === "templates" && <TemplatesTab />}
           {tab === "materials" && <MaterialsTab />}
           {tab === "packages" && <PackagePricesTab />}
+          {tab === "margins" && <MarginTemplatesTab />}
           {tab === "users" && <UsersTab currentUser={user} />}
           {tab === "roles" && <RolesTab />}
           {tab === "audit" && <AuditTab />}
