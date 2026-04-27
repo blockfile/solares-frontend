@@ -437,6 +437,13 @@ function parsePanelWatt(text) {
   return match ? Number(match[1]) : 0;
 }
 
+const QUOTE_VAT_RATE = 0.12;
+
+function toVatInclusivePrice(value) {
+  const base = Math.max(0, Number(value || 0));
+  return base * (1 + QUOTE_VAT_RATE);
+}
+
 function resolveMarginBucket(item) {
   const description = String(item?.description || "");
   const subgroup = String(item?.subgroup || "").toLowerCase();
@@ -751,7 +758,9 @@ export default function QuotesTab() {
           const description = String(it.description || "");
           const category = toStepCategory(it.catalog_category, description);
           const subgroup = resolveItemSubgroup(it.catalog_subgroup, description);
-          const basePrice = Number(it.base_price || 0);
+          const basePrice = Number(it.catalog_material_id || 0) > 0
+            ? toVatInclusivePrice(it.base_price || 0)
+            : Number(it.base_price || 0);
           const qty = Number(it.qty || 1);
           return {
             templateItemId: Number(it.id),
@@ -1005,7 +1014,7 @@ export default function QuotesTab() {
     updateItemById(templateItemId, {
       description: String(hit.material_name || ""),
       unit: String(hit.unit || ""),
-      basePrice: Number(hit.base_price || 0),
+      basePrice: Number(toVatInclusivePrice(hit.base_price || 0)),
       category: toStepCategory(hit.category, hit.material_name),
       subgroup: resolveItemSubgroup(hit.subgroup, hit.material_name),
       marginRate: getMarginRateForBucket(
@@ -1559,7 +1568,7 @@ export default function QuotesTab() {
                     <div>Description</div>
                     <div>Qty</div>
                     <div>Unit</div>
-                    <div>Base Cost</div>
+                    <div>Base Cost (VAT Incl.)</div>
                     <div>Margin %</div>
                     <div>Quote Price</div>
                   </div>
@@ -1604,7 +1613,9 @@ export default function QuotesTab() {
                             <optgroup label={group.label} key={group.label}>
                               {group.options.map((mat) => (
                                 <option value={mat.id} key={mat.id}>
-                                  {`${mat.material_name} | ${formatCurrency(mat.base_price)}${
+                                  {`${mat.material_name} | Base ${formatCurrency(mat.base_price)} -> VAT Incl. ${formatCurrency(
+                                    toVatInclusivePrice(mat.base_price)
+                                  )}${
                                     mat.unit ? ` / ${mat.unit}` : ""
                                   }${mat.source_section ? ` | ${mat.source_section}` : ""}`}
                                 </option>
