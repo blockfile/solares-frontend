@@ -674,13 +674,6 @@ export default function QuotesTab() {
   const [recentQuoteError, setRecentQuoteError] = useState("");
   const [confirmState, setConfirmState] = useState(null);
   const [deletingQuoteId, setDeletingQuoteId] = useState(null);
-
-  // ---- INLINE EDIT STATE for Recent Quotes review ----
-  // Map of itemId -> patch object holding edited fields (description, qty, unit_price, unit, item_no)
-  const [reviewItemEdits, setReviewItemEdits] = useState({});
-  const [savingReviewItemId, setSavingReviewItemId] = useState(null);
-  const [reviewSaveError, setReviewSaveError] = useState("");
-
   const [pricingConfig, setPricingConfig] = useState({
     materialMarkupRate: 0.1165,
     installationMarkupRate: 0.112,
@@ -900,8 +893,6 @@ export default function QuotesTab() {
 
     setLoadingSelectedRecentQuote(true);
     setRecentQuoteError("");
-    setReviewItemEdits({});
-    setReviewSaveError("");
     try {
       const res = await api.get(`/quotes/${quoteId}`);
       setSelectedRecentQuote(res.data || null);
@@ -1290,79 +1281,6 @@ export default function QuotesTab() {
         }
       }
     });
-  };
-
-  // ---- INLINE EDIT helpers for Recent Quotes review ----
-  const getReviewItemValue = (item, field) => {
-    const edits = reviewItemEdits[item.id];
-    if (edits && Object.prototype.hasOwnProperty.call(edits, field)) {
-      return edits[field];
-    }
-    return item[field];
-  };
-
-  const setReviewItemField = (itemId, field, value) => {
-    setReviewItemEdits((prev) => ({
-      ...prev,
-      [itemId]: { ...(prev[itemId] || {}), [field]: value }
-    }));
-  };
-
-  const isReviewItemDirty = (itemId) => {
-    const edits = reviewItemEdits[itemId];
-    return edits && Object.keys(edits).length > 0;
-  };
-
-  const cancelReviewItemEdit = (itemId) => {
-    setReviewItemEdits((prev) => {
-      if (!prev[itemId]) return prev;
-      const next = { ...prev };
-      delete next[itemId];
-      return next;
-    });
-  };
-
-  const saveReviewItemEdit = async (item) => {
-    const quoteId = Number(selectedRecentQuoteMeta?.id || selectedRecentQuoteId || 0);
-    if (!quoteId || !item?.id) return;
-
-    const edits = reviewItemEdits[item.id] || {};
-    const payload = {};
-
-    if (Object.prototype.hasOwnProperty.call(edits, "description")) {
-      payload.description = String(edits.description || "");
-    }
-    if (Object.prototype.hasOwnProperty.call(edits, "unit")) {
-      payload.unit = String(edits.unit || "");
-    }
-    if (Object.prototype.hasOwnProperty.call(edits, "qty")) {
-      payload.qty = Math.max(0, Number(edits.qty || 0));
-    }
-    if (Object.prototype.hasOwnProperty.call(edits, "unit_price")) {
-      payload.unitPrice = Math.max(0, Number(edits.unit_price || 0));
-    }
-    if (Object.prototype.hasOwnProperty.call(edits, "item_no")) {
-      payload.itemNo = Math.max(0, Number(edits.item_no || 0));
-    }
-
-    if (!Object.keys(payload).length) {
-      cancelReviewItemEdit(item.id);
-      return;
-    }
-
-    setSavingReviewItemId(Number(item.id));
-    setReviewSaveError("");
-    try {
-      await api.patch(`/quotes/${quoteId}/items/${item.id}`, payload);
-      // reload detail + list (totals may change)
-      await loadRecentQuoteDetail(quoteId);
-      await loadRecentQuotes(recentSearch, quoteId);
-      cancelReviewItemEdit(item.id);
-    } catch (err) {
-      setReviewSaveError(err?.response?.data?.message || "Failed to save changes");
-    } finally {
-      setSavingReviewItemId(null);
-    }
   };
 
   const hasIncludedItems = templateItems.some((item) => item.included);
@@ -2094,10 +2012,7 @@ export default function QuotesTab() {
           </div>
 
           <aside className="result-card quote-review-card">
-            {/* Title fixed: explicit dark color so it stays visible regardless of theme */}
-            <h4 className="quote-review-title" style={{ color: "#0f172a", margin: "0 0 12px" }}>
-              Quote Review
-            </h4>
+            <h4>Quote Review</h4>
 
             {!selectedRecentQuoteId && !loadingSelectedRecentQuote && (
               <p className="section-note">Select a saved quote to review it again.</p>
@@ -2139,7 +2054,6 @@ export default function QuotesTab() {
                 </div>
 
                 {exportError && <div className="error-text">{exportError}</div>}
-                {reviewSaveError && <div className="error-text">{reviewSaveError}</div>}
 
                 <button
                   className="btn btn-secondary"
@@ -2193,157 +2107,26 @@ export default function QuotesTab() {
                 </button>
 
                 <div className="quote-review-items">
-                  <div className="items-editor-title" style={{ color: "#0f172a" }}>
+                  <div className="items-editor-title">
                     Items ({reviewedQuoteItems.length || Number(selectedRecentQuoteMeta.itemCount || 0)})
                   </div>
                   {!reviewedQuote && !loadingSelectedRecentQuote && (
                     <p className="section-note">No detailed item data loaded.</p>
                   )}
-                  {reviewedQuoteItems.map((item) => {
-                    const dirty = isReviewItemDirty(item.id);
-                    const saving = savingReviewItemId === Number(item.id);
-                    const desc = getReviewItemValue(item, "description") ?? "";
-                    const qty = getReviewItemValue(item, "qty") ?? 0;
-                    const unit = getReviewItemValue(item, "unit") ?? "";
-                    const unitPrice = getReviewItemValue(item, "unit_price") ?? 0;
-                    const itemNo = getReviewItemValue(item, "item_no") ?? 0;
-                    const lineTotal = Number(qty || 0) * Number(unitPrice || 0);
-                    const isInstallation = Number(item.is_installation) === 1;
-
-                    return (
-                      <div
-                        className="quote-review-item"
-                        key={item.id}
-                        style={{
-                          background: "#fff",
-                          border: "1px solid #e2e8f0",
-                          borderRadius: 8,
-                          padding: 12,
-                          marginBottom: 10
-                        }}
-                      >
-                        <div
-                          className="quote-review-item-top"
-                          style={{
-                            display: "flex",
-                            gap: 8,
-                            alignItems: "center",
-                            marginBottom: 8
-                          }}
-                        >
-                          <input
-                            className="input"
-                            style={{ flex: 1, color: "#0f172a" }}
-                            value={desc}
-                            disabled={isInstallation}
-                            placeholder="Description"
-                            onChange={(e) =>
-                              setReviewItemField(item.id, "description", e.target.value)
-                            }
-                          />
-                          <strong style={{ color: "#0f172a", whiteSpace: "nowrap" }}>
-                            {formatCurrency(lineTotal)}
-                          </strong>
-                        </div>
-
-                        <div
-                          className="quote-review-item-meta"
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-                            gap: 8
-                          }}
-                        >
-                          <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                            <span style={{ fontSize: 11, color: "#475569" }}>No.</span>
-                            <input
-                              className="input"
-                              style={{ color: "#0f172a" }}
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={itemNo}
-                              disabled={isInstallation}
-                              onChange={(e) =>
-                                setReviewItemField(item.id, "item_no", Number(e.target.value || 0))
-                              }
-                            />
-                          </label>
-
-                          <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                            <span style={{ fontSize: 11, color: "#475569" }}>Qty</span>
-                            <input
-                              className="input"
-                              style={{ color: "#0f172a" }}
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={qty}
-                              onChange={(e) =>
-                                setReviewItemField(item.id, "qty", Number(e.target.value || 0))
-                              }
-                            />
-                          </label>
-
-                          <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                            <span style={{ fontSize: 11, color: "#475569" }}>Unit</span>
-                            <input
-                              className="input"
-                              style={{ color: "#0f172a" }}
-                              value={unit}
-                              disabled={isInstallation}
-                              onChange={(e) =>
-                                setReviewItemField(item.id, "unit", e.target.value)
-                              }
-                            />
-                          </label>
-
-                          <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                            <span style={{ fontSize: 11, color: "#475569" }}>Unit Price</span>
-                            <input
-                              className="input"
-                              style={{ color: "#0f172a" }}
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={unitPrice}
-                              onChange={(e) =>
-                                setReviewItemField(item.id, "unit_price", Number(e.target.value || 0))
-                              }
-                            />
-                          </label>
-                        </div>
-
-                        {dirty && (
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: 8,
-                              justifyContent: "flex-end",
-                              marginTop: 8
-                            }}
-                          >
-                            <button
-                              type="button"
-                              className="btn btn-ghost"
-                              disabled={saving}
-                              onClick={() => cancelReviewItemEdit(item.id)}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-primary"
-                              disabled={saving}
-                              onClick={() => saveReviewItemEdit(item)}
-                            >
-                              {saving ? "Saving..." : "Save"}
-                            </button>
-                          </div>
-                        )}
+                  {reviewedQuoteItems.map((item) => (
+                    <div className="quote-review-item" key={item.id}>
+                      <div className="quote-review-item-top">
+                        <strong>{item.description}</strong>
+                        <span>{formatCurrency(item.line_total)}</span>
                       </div>
-                    );
-                  })}
+                      <div className="quote-review-item-meta">
+                        <span>No. {item.item_no}</span>
+                        <span>Qty: {item.qty}</span>
+                        <span>{item.unit || "-"}</span>
+                        <span>Unit Price: {formatCurrency(item.unit_price)}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </>
             )}

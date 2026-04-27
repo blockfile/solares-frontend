@@ -36,6 +36,19 @@ function createEmptyForm() {
   };
 }
 
+function rowToEditState(row) {
+  return {
+    name: row.name || "",
+    inverterMargin: percentInputValue(row.inverterMargin),
+    panelMargin: percentInputValue(row.panelMargin),
+    batteryMargin: percentInputValue(row.batteryMargin),
+    safetyMargin: percentInputValue(row.safetyMargin),
+    mountingMargin: percentInputValue(row.mountingMargin),
+    installationMargin: percentInputValue(row.installationMargin),
+    isActive: Boolean(row.isActive)
+  };
+}
+
 const MARGIN_FIELDS = [
   {
     key: "inverterMargin",
@@ -69,12 +82,42 @@ const MARGIN_FIELDS = [
   }
 ];
 
+// Compact inline cell input — stays small to fit inside the table row.
+const inlineInputStyle = {
+  width: "78px",
+  minWidth: "60px",
+  padding: "6px 8px",
+  fontSize: "13px",
+  color: "#0f172a",
+  background: "#fff",
+  border: "1.5px solid #cbd5e1",
+  borderRadius: "8px"
+};
+
+const inlineNameInputStyle = {
+  width: "100%",
+  minWidth: "180px",
+  padding: "6px 8px",
+  fontSize: "13px",
+  color: "#0f172a",
+  background: "#fff",
+  border: "1.5px solid #cbd5e1",
+  borderRadius: "8px"
+};
+
 export default function MarginTemplatesTab() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState(createEmptyForm());
+
+  // Top form is for CREATE ONLY now.
+  const [createForm, setCreateForm] = useState(createEmptyForm());
+  const [creating, setCreating] = useState(false);
+
+  // Inline edit state for the row being edited (only one row at a time).
   const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const loadRows = async () => {
     setLoading(true);
@@ -94,46 +137,58 @@ export default function MarginTemplatesTab() {
     loadRows();
   }, []);
 
-  const resetForm = () => {
-    setForm(createEmptyForm());
-    setEditingId(null);
+  const resetCreateForm = () => {
+    setCreateForm(createEmptyForm());
   };
 
-  const submit = async () => {
-    if (!form.name.trim()) return;
+  const submitCreate = async () => {
+    if (!createForm.name.trim()) return;
     setError("");
+    setCreating(true);
     try {
-      if (editingId) {
-        await api.put(`/margin-templates/${editingId}`, toPayload(form));
-      } else {
-        await api.post("/margin-templates", toPayload(form));
-      }
-      resetForm();
+      await api.post("/margin-templates", toPayload(createForm));
+      resetCreateForm();
       await loadRows();
     } catch (err) {
-      setError(err?.response?.data?.message || "Failed to save margin template");
+      setError(err?.response?.data?.message || "Failed to create margin template");
+    } finally {
+      setCreating(false);
     }
   };
 
-  const startEdit = (row) => {
+  const startEditRow = (row) => {
     setEditingId(Number(row.id));
-    setForm({
-      name: row.name || "",
-      inverterMargin: percentInputValue(row.inverterMargin),
-      panelMargin: percentInputValue(row.panelMargin),
-      batteryMargin: percentInputValue(row.batteryMargin),
-      safetyMargin: percentInputValue(row.safetyMargin),
-      mountingMargin: percentInputValue(row.mountingMargin),
-      installationMargin: percentInputValue(row.installationMargin),
-      isActive: Boolean(row.isActive)
-    });
+    setEditForm(rowToEditState(row));
+    setError("");
+  };
+
+  const cancelEditRow = () => {
+    setEditingId(null);
+    setEditForm(null);
+  };
+
+  const saveEditRow = async () => {
+    if (!editingId || !editForm) return;
+    if (!editForm.name.trim()) return;
+    setError("");
+    setSavingEdit(true);
+    try {
+      await api.put(`/margin-templates/${editingId}`, toPayload(editForm));
+      setEditingId(null);
+      setEditForm(null);
+      await loadRows();
+    } catch (err) {
+      setError(err?.response?.data?.message || "Failed to save margin template");
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const remove = async (id) => {
     setError("");
     try {
       await api.delete(`/margin-templates/${id}`);
-      if (Number(editingId) === Number(id)) resetForm();
+      if (Number(editingId) === Number(id)) cancelEditRow();
       await loadRows();
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to delete margin template");
@@ -153,18 +208,22 @@ export default function MarginTemplatesTab() {
           </div>
         </div>
 
+        {/* CREATE-ONLY top form. Editing happens inline in the table below. */}
         <div className="add-item-card margin-setup-editor">
           <div className="margin-setup-editor-head">
             <div className="margin-setup-editor-copy">
-              <strong>{editingId ? "Edit Margin Template" : "Create Margin Template"}</strong>
-              <span>Set percentage margins for system hardware, protection, mounting, and installation.</span>
+              <strong style={{ color: "#fff" }}>Create Margin Template</strong>
+              <span style={{ color: "rgba(255,255,255,0.72)" }}>
+                Set percentage margins for system hardware, protection, mounting, and installation.
+                Existing templates can be edited inline in the table below.
+              </span>
             </div>
             <label className="margin-setup-status">
               <span>Active Template</span>
               <input
                 type="checkbox"
-                checked={form.isActive}
-                onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))}
+                checked={createForm.isActive}
+                onChange={(e) => setCreateForm((prev) => ({ ...prev, isActive: e.target.checked }))}
               />
             </label>
           </div>
@@ -174,8 +233,8 @@ export default function MarginTemplatesTab() {
               <span>Template Name</span>
               <input
                 className="input"
-                value={form.name}
-                onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                value={createForm.name}
+                onChange={(e) => setCreateForm((prev) => ({ ...prev, name: e.target.value }))}
                 placeholder="e.g. Standard Hybrid 19%"
               />
             </label>
@@ -195,8 +254,10 @@ export default function MarginTemplatesTab() {
                     type="number"
                     min="0"
                     step="0.01"
-                    value={form[field.key]}
-                    onChange={(e) => setForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                    value={createForm[field.key]}
+                    onChange={(e) =>
+                      setCreateForm((prev) => ({ ...prev, [field.key]: e.target.value }))
+                    }
                   />
                 </label>
               </div>
@@ -204,14 +265,22 @@ export default function MarginTemplatesTab() {
           </div>
 
           <div className="materials-actions margin-setup-actions">
-            <button className="btn btn-primary" type="button" onClick={submit} disabled={!form.name.trim()}>
-              {editingId ? "Save Template" : "Add Template"}
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={submitCreate}
+              disabled={!createForm.name.trim() || creating}
+            >
+              {creating ? "Adding..." : "Add Template"}
             </button>
-            {editingId ? (
-              <button className="btn btn-ghost" type="button" onClick={resetForm}>
-                Cancel Edit
-              </button>
-            ) : null}
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={resetCreateForm}
+              disabled={creating}
+            >
+              Reset
+            </button>
           </div>
         </div>
 
@@ -234,35 +303,135 @@ export default function MarginTemplatesTab() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={row.id}>
-                  <td>{row.name}</td>
-                  <td>{percentInputValue(row.inverterMargin)}%</td>
-                  <td>{percentInputValue(row.panelMargin)}%</td>
-                  <td>{percentInputValue(row.batteryMargin)}%</td>
-                  <td>{percentInputValue(row.safetyMargin)}%</td>
-                  <td>{percentInputValue(row.mountingMargin)}%</td>
-                  <td>{percentInputValue(row.installationMargin)}%</td>
-                  <td>
-                    <span className={`status-pill ${row.isActive ? "status-active" : "status-inactive"}`}>
-                      {row.isActive ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="materials-actions">
-                      <button className="btn btn-ghost" type="button" onClick={() => startEdit(row)}>
-                        Edit
-                      </button>
-                      <button className="btn btn-danger" type="button" onClick={() => remove(row.id)}>
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {rows.map((row) => {
+                const isEditing = Number(editingId) === Number(row.id);
+
+                if (!isEditing) {
+                  // Static read-only row
+                  return (
+                    <tr key={row.id}>
+                      <td>{row.name}</td>
+                      <td>{percentInputValue(row.inverterMargin)}%</td>
+                      <td>{percentInputValue(row.panelMargin)}%</td>
+                      <td>{percentInputValue(row.batteryMargin)}%</td>
+                      <td>{percentInputValue(row.safetyMargin)}%</td>
+                      <td>{percentInputValue(row.mountingMargin)}%</td>
+                      <td>{percentInputValue(row.installationMargin)}%</td>
+                      <td>
+                        <span
+                          className={`status-pill ${row.isActive ? "status-active" : "status-inactive"}`}
+                        >
+                          {row.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="materials-actions">
+                          <button
+                            className="btn btn-ghost"
+                            type="button"
+                            onClick={() => startEditRow(row)}
+                            disabled={Boolean(editingId)}
+                            title={editingId ? "Finish editing the current row first" : "Edit"}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn btn-danger"
+                            type="button"
+                            onClick={() => remove(row.id)}
+                            disabled={Boolean(editingId)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
+
+                // Inline-editing row
+                return (
+                  <tr key={row.id} style={{ background: "#fffbe6" }}>
+                    <td>
+                      <input
+                        style={inlineNameInputStyle}
+                        value={editForm?.name || ""}
+                        onChange={(e) =>
+                          setEditForm((prev) => ({ ...(prev || {}), name: e.target.value }))
+                        }
+                        placeholder="Template name"
+                      />
+                    </td>
+                    {MARGIN_FIELDS.slice(0, 6).map((field) => (
+                      <td key={field.key}>
+                        <input
+                          style={inlineInputStyle}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={editForm?.[field.key] ?? ""}
+                          onChange={(e) =>
+                            setEditForm((prev) => ({
+                              ...(prev || {}),
+                              [field.key]: e.target.value
+                            }))
+                          }
+                        />
+                      </td>
+                    ))}
+                    <td>
+                      <label
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: "#0f172a",
+                          whiteSpace: "nowrap"
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={Boolean(editForm?.isActive)}
+                          onChange={(e) =>
+                            setEditForm((prev) => ({
+                              ...(prev || {}),
+                              isActive: e.target.checked
+                            }))
+                          }
+                        />
+                        {editForm?.isActive ? "Active" : "Inactive"}
+                      </label>
+                    </td>
+                    <td>
+                      <div className="materials-actions">
+                        <button
+                          className="btn btn-primary"
+                          type="button"
+                          onClick={saveEditRow}
+                          disabled={savingEdit || !editForm?.name?.trim()}
+                        >
+                          {savingEdit ? "Saving..." : "Save"}
+                        </button>
+                        <button
+                          className="btn btn-ghost"
+                          type="button"
+                          onClick={cancelEditRow}
+                          disabled={savingEdit}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {!rows.length && !loading && (
                 <tr>
-                  <td colSpan="9" className="section-note">No margin templates yet.</td>
+                  <td colSpan="9" className="section-note">
+                    No margin templates yet.
+                  </td>
                 </tr>
               )}
             </tbody>
