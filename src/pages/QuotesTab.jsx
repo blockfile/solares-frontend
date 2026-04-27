@@ -444,6 +444,14 @@ function toVatInclusivePrice(value) {
   return base * (1 + QUOTE_VAT_RATE);
 }
 
+function normalizeVatMode(value) {
+  return String(value || "").trim().toLowerCase() === "excl" ? "excl" : "incl";
+}
+
+function resolveCatalogDisplayPrice(value, vatMode = "incl") {
+  return normalizeVatMode(vatMode) === "incl" ? toVatInclusivePrice(value) : Number(value || 0);
+}
+
 function resolveMarginBucket(item) {
   const description = String(item?.description || "");
   const subgroup = String(item?.subgroup || "").toLowerCase();
@@ -652,7 +660,7 @@ export default function QuotesTab() {
   const [exportError, setExportError] = useState("");
   const [creating, setCreating] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [quoteExportVatMode, setQuoteExportVatMode] = useState("incl");
+  const [quoteVatMode, setQuoteVatMode] = useState("incl");
   const [currentStep, setCurrentStep] = useState(0);
   const [created, setCreated] = useState(null);
   const [marginTemplates, setMarginTemplates] = useState([]);
@@ -758,8 +766,9 @@ export default function QuotesTab() {
           const description = String(it.description || "");
           const category = toStepCategory(it.catalog_category, description);
           const subgroup = resolveItemSubgroup(it.catalog_subgroup, description);
+          const catalogBasePrice = Number(it.base_price || 0);
           const basePrice = Number(it.catalog_material_id || 0) > 0
-            ? toVatInclusivePrice(it.base_price || 0)
+            ? resolveCatalogDisplayPrice(catalogBasePrice, quoteVatMode)
             : Number(it.base_price || 0);
           const qty = Number(it.qty || 1);
           return {
@@ -775,6 +784,7 @@ export default function QuotesTab() {
             category,
             section: resolveStoredSectionKey(it.section_key) || detectSection(description, subgroup, category),
             subgroup,
+            catalogBasePrice,
             marginRate: pricingConfig.materialMarkupRate,
             catalogMaterialId: Number(it.catalog_material_id || 0) || null,
             isPanel: isPanelDescription(description),
@@ -926,6 +936,7 @@ export default function QuotesTab() {
           selectedMarginTemplate,
           pricingConfig.materialMarkupRate
         ),
+        catalogBasePrice: null,
         catalogMaterialId: null,
         isPanel: false,
         isManual: true,
@@ -1014,7 +1025,8 @@ export default function QuotesTab() {
     updateItemById(templateItemId, {
       description: String(hit.material_name || ""),
       unit: String(hit.unit || ""),
-      basePrice: Number(toVatInclusivePrice(hit.base_price || 0)),
+      basePrice: Number(resolveCatalogDisplayPrice(hit.base_price || 0, quoteVatMode)),
+      catalogBasePrice: Number(hit.base_price || 0),
       category: toStepCategory(hit.category, hit.material_name),
       subgroup: resolveItemSubgroup(hit.subgroup, hit.material_name),
       marginRate: getMarginRateForBucket(
@@ -1050,6 +1062,18 @@ export default function QuotesTab() {
     loadPricingConfig();
     loadMarginTemplates();
   }, []);
+
+  useEffect(() => {
+    setTemplateItems((prev) =>
+      prev.map((item) => {
+        if (!Number(item.catalogMaterialId || 0) || item.catalogBasePrice == null) return item;
+        return {
+          ...item,
+          basePrice: resolveCatalogDisplayPrice(item.catalogBasePrice, quoteVatMode)
+        };
+      })
+    );
+  }, [quoteVatMode]);
 
   useEffect(() => {
     setTemplateItems((prev) =>
@@ -1185,7 +1209,8 @@ export default function QuotesTab() {
         items: selectedItems,
         packagePriceId: packagePriceId ? Number(packagePriceId) : null,
         discountItems: discountRows.filter((d) => Number(d.amount) > 0).map((d) => ({ label: d.label || "Discount", amount: Number(d.amount) })),
-        installationMarginRate
+        installationMarginRate,
+        quoteVatMode
       });
       setCreated(res.data);
       await loadRecentQuotes("", res.data?.quoteId || null);
@@ -1203,10 +1228,7 @@ export default function QuotesTab() {
     setExportError("");
     try {
       const res = await api.get(`/quotes/${quoteId}/export/${endpoint}`, {
-        responseType: "blob",
-        params: {
-          vatMode: quoteExportVatMode
-        }
+        responseType: "blob"
       });
 
       const blob = new Blob([res.data], {
@@ -1428,6 +1450,19 @@ export default function QuotesTab() {
                 </select>
               </div>
 
+              <div className="field">
+                <label htmlFor="quoteVatMode">Material VAT</label>
+                <select
+                  id="quoteVatMode"
+                  className="select"
+                  value={quoteVatMode}
+                  onChange={(e) => setQuoteVatMode(e.target.value)}
+                >
+                  <option value="incl">With VAT (12%)</option>
+                  <option value="excl">Without VAT</option>
+                </select>
+              </div>
+
               {loadingItems && <p className="section-note">Loading package items...</p>}
             </div>
           </div>
@@ -1568,7 +1603,7 @@ export default function QuotesTab() {
                     <div>Description</div>
                     <div>Qty</div>
                     <div>Unit</div>
-                    <div>Base Cost (VAT Incl.)</div>
+                    <div>{normalizeVatMode(quoteVatMode) === "incl" ? "Base Cost (VAT Incl.)" : "Base Cost"}</div>
                     <div>Margin %</div>
                     <div>Quote Price</div>
                   </div>
@@ -1615,7 +1650,7 @@ export default function QuotesTab() {
                                 <option value={mat.id} key={mat.id}>
                                   {`${mat.material_name} | Base ${formatCurrency(mat.base_price)} -> VAT Incl. ${formatCurrency(
                                     toVatInclusivePrice(mat.base_price)
-                                  )}${
+                                  )} | Used ${formatCurrency(resolveCatalogDisplayPrice(mat.base_price, quoteVatMode))}${
                                     mat.unit ? ` / ${mat.unit}` : ""
                                   }${mat.source_section ? ` | ${mat.source_section}` : ""}`}
                                 </option>
@@ -1844,17 +1879,6 @@ export default function QuotesTab() {
                 </div>
               )}
               {exportError && <div className="error-text">{exportError}</div>}
-              <label className="field quote-export-vat-field">
-                <span>Export VAT</span>
-                <select
-                  className="select"
-                  value={quoteExportVatMode}
-                  onChange={(e) => setQuoteExportVatMode(e.target.value)}
-                >
-                  <option value="incl">With VAT (12%)</option>
-                  <option value="excl">Without VAT</option>
-                </select>
-              </label>
               <button
                 className="btn btn-secondary"
                 onClick={() => exportQuote({ endpoint: "customer-excel", fallbackExt: "xlsx" })}
@@ -2031,17 +2055,6 @@ export default function QuotesTab() {
                 </div>
 
                 {exportError && <div className="error-text">{exportError}</div>}
-                <label className="field quote-export-vat-field">
-                  <span>Export VAT</span>
-                  <select
-                    className="select"
-                    value={quoteExportVatMode}
-                    onChange={(e) => setQuoteExportVatMode(e.target.value)}
-                  >
-                    <option value="incl">With VAT (12%)</option>
-                    <option value="excl">Without VAT</option>
-                  </select>
-                </label>
 
                 <button
                   className="btn btn-secondary"
