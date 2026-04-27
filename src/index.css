@@ -3403,18 +3403,53 @@ textarea.input::placeholder {
 
 .margin-setup-topbar {
   display: grid;
-  grid-template-columns: minmax(260px, 1.2fr) 220px;
-  gap: 14px;
-  align-items: end;
+  grid-template-columns: minmax(320px, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.margin-setup-editor {
+  display: grid;
+  gap: 16px;
+  padding: 16px 18px 18px;
+  align-content: start;
+}
+
+.margin-setup-editor-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.margin-setup-editor-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.margin-setup-editor-copy strong {
+  font-size: 14px;
+  color: #fff;
+}
+
+.margin-setup-editor-copy span {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .margin-setup-status {
-  display: grid;
+  display: inline-flex;
+  align-items: center;
   gap: 10px;
-  align-content: end;
   font-size: 12px;
   font-weight: 700;
-  color: var(--text-soft);
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 8px 12px;
+  white-space: nowrap;
 }
 
 .margin-setup-status input {
@@ -3433,9 +3468,9 @@ textarea.input::placeholder {
   border: 1px solid var(--border);
   border-radius: 14px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  padding: 14px;
+  padding: 14px 14px 12px;
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .margin-setup-card-head {
@@ -3452,6 +3487,25 @@ textarea.input::placeholder {
   font-size: 12px;
   color: var(--text-soft);
   line-height: 1.45;
+}
+
+.margin-setup-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 12px;
+  margin-top: 2px;
+  border-top: 1px solid var(--border);
+}
+
+.margin-setup-actions .btn {
+  width: auto;
+  min-width: 132px;
+}
+
+.margin-setup-table {
+  margin-top: 2px;
 }
 
 /* ── Row-auto: flexible 3-col details row ───────────── */
@@ -3471,6 +3525,39 @@ textarea.input::placeholder {
   .margin-setup-topbar,
   .margin-setup-grid {
     grid-template-columns: 1fr;
+  }
+
+  .margin-setup-editor-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .margin-setup-status {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .margin-setup-editor {
+    padding: 14px;
+  }
+
+  .margin-setup-actions {
+    justify-content: stretch;
+  }
+
+  .margin-setup-actions .btn {
+    width: 100%;
+  }
+}
+
+@media (min-width: 1400px) {
+  .margin-setup-editor {
+    max-width: 1320px;
+    margin: 0 auto;
+  }
+
+  .margin-setup-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

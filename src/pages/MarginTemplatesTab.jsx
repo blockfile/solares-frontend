@@ -153,13 +153,20 @@ export default function MarginTemplatesTab() {
           </div>
         </div>
 
-        <div className="add-item-card">
-          <div className="add-item-card-head">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
-            </svg>
-            <strong>{editingId ? "Edit Margin Template" : "Create Margin Template"}</strong>
-            <span className="add-item-card-sub">Set percentage margins for system hardware, protection, mounting, and installation.</span>
+        <div className="add-item-card margin-setup-editor">
+          <div className="margin-setup-editor-head">
+            <div className="margin-setup-editor-copy">
+              <strong>{editingId ? "Edit Margin Template" : "Create Margin Template"}</strong>
+              <span>Set percentage margins for system hardware, protection, mounting, and installation.</span>
+            </div>
+            <label className="margin-setup-status">
+              <span>Active Template</span>
+              <input
+                type="checkbox"
+                checked={form.isActive}
+                onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))}
+              />
+            </label>
           </div>
 
           <div className="margin-setup-topbar">
@@ -170,14 +177,6 @@ export default function MarginTemplatesTab() {
                 value={form.name}
                 onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
                 placeholder="e.g. Standard Hybrid 19%"
-              />
-            </label>
-            <label className="margin-setup-status">
-              <span>Active Template</span>
-              <input
-                type="checkbox"
-                checked={form.isActive}
-                onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))}
               />
             </label>
           </div>
@@ -204,7 +203,7 @@ export default function MarginTemplatesTab() {
             ))}
           </div>
 
-          <div className="materials-actions">
+          <div className="materials-actions margin-setup-actions">
             <button className="btn btn-primary" type="button" onClick={submit} disabled={!form.name.trim()}>
               {editingId ? "Save Template" : "Add Template"}
             </button>
@@ -219,7 +218,7 @@ export default function MarginTemplatesTab() {
         {error && <div className="error-text">{error}</div>}
         {loading && <p className="section-note">Loading margin templates...</p>}
 
-        <div className="materials-table-wrap">
+        <div className="materials-table-wrap margin-setup-table">
           <table className="materials-table">
             <thead>
               <tr>
