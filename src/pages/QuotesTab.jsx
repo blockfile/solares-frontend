@@ -674,6 +674,13 @@ export default function QuotesTab() {
   const [recentQuoteError, setRecentQuoteError] = useState("");
   const [confirmState, setConfirmState] = useState(null);
   const [deletingQuoteId, setDeletingQuoteId] = useState(null);
+
+  // ---- INLINE EDIT STATE for Recent Quotes review ----
+  // Map of itemId -> patch object holding edited fields (description, qty, unit_price, unit, item_no)
+  const [reviewItemEdits, setReviewItemEdits] = useState({});
+  const [savingReviewItemId, setSavingReviewItemId] = useState(null);
+  const [reviewSaveError, setReviewSaveError] = useState("");
+
   const [pricingConfig, setPricingConfig] = useState({
     materialMarkupRate: 0.1165,
     installationMarkupRate: 0.112,
@@ -893,6 +900,8 @@ export default function QuotesTab() {
 
     setLoadingSelectedRecentQuote(true);
     setRecentQuoteError("");
+    setReviewItemEdits({});
+    setReviewSaveError("");
     try {
       const res = await api.get(`/quotes/${quoteId}`);
       setSelectedRecentQuote(res.data || null);
@@ -1283,6 +1292,79 @@ export default function QuotesTab() {
     });
   };
 
+  // ---- INLINE EDIT helpers for Recent Quotes review ----
+  const getReviewItemValue = (item, field) => {
+    const edits = reviewItemEdits[item.id];
+    if (edits && Object.prototype.hasOwnProperty.call(edits, field)) {
+      return edits[field];
+    }
+    return item[field];
+  };
+
+  const setReviewItemField = (itemId, field, value) => {
+    setReviewItemEdits((prev) => ({
+      ...prev,
+      [itemId]: { ...(prev[itemId] || {}), [field]: value }
+    }));
+  };
+
+  const isReviewItemDirty = (itemId) => {
+    const edits = reviewItemEdits[itemId];
+    return edits && Object.keys(edits).length > 0;
+  };
+
+  const cancelReviewItemEdit = (itemId) => {
+    setReviewItemEdits((prev) => {
+      if (!prev[itemId]) return prev;
+      const next = { ...prev };
+      delete next[itemId];
+      return next;
+    });
+  };
+
+  const saveReviewItemEdit = async (item) => {
+    const quoteId = Number(selectedRecentQuoteMeta?.id || selectedRecentQuoteId || 0);
+    if (!quoteId || !item?.id) return;
+
+    const edits = reviewItemEdits[item.id] || {};
+    const payload = {};
+
+    if (Object.prototype.hasOwnProperty.call(edits, "description")) {
+      payload.description = String(edits.description || "");
+    }
+    if (Object.prototype.hasOwnProperty.call(edits, "unit")) {
+      payload.unit = String(edits.unit || "");
+    }
+    if (Object.prototype.hasOwnProperty.call(edits, "qty")) {
+      payload.qty = Math.max(0, Number(edits.qty || 0));
+    }
+    if (Object.prototype.hasOwnProperty.call(edits, "unit_price")) {
+      payload.unitPrice = Math.max(0, Number(edits.unit_price || 0));
+    }
+    if (Object.prototype.hasOwnProperty.call(edits, "item_no")) {
+      payload.itemNo = Math.max(0, Number(edits.item_no || 0));
+    }
+
+    if (!Object.keys(payload).length) {
+      cancelReviewItemEdit(item.id);
+      return;
+    }
+
+    setSavingReviewItemId(Number(item.id));
+    setReviewSaveError("");
+    try {
+      await api.patch(`/quotes/${quoteId}/items/${item.id}`, payload);
+      // reload detail + list (totals may change)
+      await loadRecentQuoteDetail(quoteId);
+      await loadRecentQuotes(recentSearch, quoteId);
+      cancelReviewItemEdit(item.id);
+    } catch (err) {
+      setReviewSaveError(err?.response?.data?.message || "Failed to save changes");
+    } finally {
+      setSavingReviewItemId(null);
+    }
+  };
+
   const hasIncludedItems = templateItems.some((item) => item.included);
   const selectedPackagePrice = useMemo(
     () => packagePrices.find((p) => Number(p.id) === Number(packagePriceId || 0)) || null,
@@ -1298,7 +1380,7 @@ export default function QuotesTab() {
         (sum, item) =>
           sum +
           applyMarkup(Number(item.basePrice || 0), normalizeRate(item.marginRate, pricingConfig.materialMarkupRate)) *
-            Number(item.qty || 0),
+          Number(item.qty || 0),
         0
       ),
     [includedItems, pricingConfig.materialMarkupRate]
@@ -1339,13 +1421,13 @@ export default function QuotesTab() {
   );
   const canCreate = Boolean(
     templateId &&
-      customerName &&
-      quoteDate &&
-      validUntil &&
-      !loadingItems &&
-      templateItems.length > 0 &&
-      hasIncludedItems &&
-      !creating
+    customerName &&
+    quoteDate &&
+    validUntil &&
+    !loadingItems &&
+    templateItems.length > 0 &&
+    hasIncludedItems &&
+    !creating
   );
   const reviewedQuote = selectedRecentQuote?.quote || null;
   const reviewedQuoteItems = Array.isArray(selectedRecentQuote?.items) ? selectedRecentQuote.items : [];
@@ -1370,540 +1452,539 @@ export default function QuotesTab() {
       </div>
 
       {quoteView === "create" ? (
-      <div className="quotes-layout">
-        <div className="quote-form-stack">
-          <div className="quote-section-card">
-            <div className="quote-section-head">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
-              </svg>
-              <strong>System Configuration</strong>
-              <span className="quote-section-head-sub">Select template and package scenario</span>
+        <div className="quotes-layout">
+          <div className="quote-form-stack">
+            <div className="quote-section-card">
+              <div className="quote-section-head">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" />
+                </svg>
+                <strong>System Configuration</strong>
+                <span className="quote-section-head-sub">Select template and package scenario</span>
+              </div>
+              <div className="quote-section-fields">
+                <div className="field">
+                  <label htmlFor="systemType">System Type</label>
+                  <select
+                    id="systemType"
+                    className="select"
+                    value={systemType}
+                    onChange={(e) => setSystemType(e.target.value)}
+                  >
+                    <option value="all">All</option>
+                    <option value="hybrid">Hybrid</option>
+                    <option value="grid_tie">Grid Tie</option>
+                  </select>
+                </div>
+
+                <div className="field">
+                  <label htmlFor="template">Template</label>
+                  <select
+                    id="template"
+                    className="select template-group-select"
+                    value={templateId}
+                    onChange={(e) => setTemplateId(e.target.value)}
+                  >
+                    <option value="">Select Template</option>
+                    {groupedTemplates.map((group) => (
+                      <optgroup label={`---- ${group.label} ----`} key={group.label}>
+                        {group.rows.map((row) => (
+                          <option value={row.id} key={row.id}>
+                            {row.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="field">
+                  <label htmlFor="packagePrice">Package Scenario</label>
+                  <select
+                    id="packagePrice"
+                    className="select"
+                    value={packagePriceId}
+                    onChange={(e) => setPackagePriceId(e.target.value)}
+                  >
+                    <option value="">Auto Installation Formula</option>
+                    {packagePrices.map((p) => (
+                      <option value={p.id} key={p.id}>
+                        {`${p.scenario_label} - ${formatCurrency(p.package_price)}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="field">
+                  <label htmlFor="marginTemplate">Margin Template</label>
+                  <select
+                    id="marginTemplate"
+                    className="select"
+                    value={selectedMarginTemplateId}
+                    onChange={(e) => setSelectedMarginTemplateId(e.target.value)}
+                  >
+                    <option value="">Default Margins</option>
+                    {marginTemplates.map((row) => (
+                      <option value={row.id} key={row.id}>
+                        {row.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="field">
+                  <label htmlFor="quoteVatMode">Material VAT</label>
+                  <select
+                    id="quoteVatMode"
+                    className="select"
+                    value={quoteVatMode}
+                    onChange={(e) => setQuoteVatMode(e.target.value)}
+                  >
+                    <option value="incl">With VAT (12%)</option>
+                    <option value="excl">Without VAT</option>
+                  </select>
+                </div>
+
+                {loadingItems && <p className="section-note">Loading package items...</p>}
+              </div>
             </div>
-            <div className="quote-section-fields">
-              <div className="field">
-                <label htmlFor="systemType">System Type</label>
-                <select
-                  id="systemType"
-                  className="select"
-                  value={systemType}
-                  onChange={(e) => setSystemType(e.target.value)}
-                >
-                  <option value="all">All</option>
-                  <option value="hybrid">Hybrid</option>
-                  <option value="grid_tie">Grid Tie</option>
-                </select>
+
+            <div className="quote-section-card">
+              <div className="quote-section-head">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+                </svg>
+                <strong>Customer Details</strong>
+                <span className="quote-section-head-sub">Name and validity period</span>
+              </div>
+              <div className="quote-section-fields">
+                <div className="field">
+                  <label htmlFor="customerName">Customer Name</label>
+                  <input
+                    id="customerName"
+                    className="input"
+                    placeholder="Customer Name"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="quoteDate">Quote Date</label>
+                  <input
+                    id="quoteDate"
+                    className="input"
+                    type="date"
+                    value={quoteDate}
+                    onChange={(e) => setQuoteDate(e.target.value)}
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="validUntil">Valid Until</label>
+                  <input
+                    id="validUntil"
+                    className="input"
+                    type="date"
+                    value={validUntil}
+                    onChange={(e) => setValidUntil(e.target.value)}
+                  />
+                </div>
+
               </div>
 
-              <div className="field">
-                <label htmlFor="template">Template</label>
-                <select
-                  id="template"
-                  className="select template-group-select"
-                  value={templateId}
-                  onChange={(e) => setTemplateId(e.target.value)}
-                >
-                  <option value="">Select Template</option>
-                  {groupedTemplates.map((group) => (
-                    <optgroup label={`---- ${group.label} ----`} key={group.label}>
-                      {group.rows.map((row) => (
-                        <option value={row.id} key={row.id}>
-                          {row.name}
-                        </option>
-                      ))}
-                    </optgroup>
+              {discountRows.length > 0 && (
+                <div className="discount-rows">
+                  {discountRows.map((row) => (
+                    <div className="discount-row-item" key={row.id}>
+                      <input
+                        className="input"
+                        placeholder="e.g. Promotional Discount"
+                        value={row.label}
+                        onChange={(e) => setDiscountRows((prev) => prev.map((r) => r.id === row.id ? { ...r, label: e.target.value } : r))}
+                      />
+                      <input
+                        className="input"
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="0"
+                        value={row.amount}
+                        onChange={(e) => setDiscountRows((prev) => prev.map((r) => r.id === row.id ? { ...r, amount: e.target.value } : r))}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-ghost discount-row-remove"
+                        onClick={() => setDiscountRows((prev) => prev.filter((r) => r.id !== row.id))}
+                        aria-label="Remove discount"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </div>
                   ))}
-                </select>
-              </div>
+                </div>
+              )}
 
-              <div className="field">
-                <label htmlFor="packagePrice">Package Scenario</label>
-                <select
-                  id="packagePrice"
-                  className="select"
-                  value={packagePriceId}
-                  onChange={(e) => setPackagePriceId(e.target.value)}
-                >
-                  <option value="">Auto Installation Formula</option>
-                  {packagePrices.map((p) => (
-                    <option value={p.id} key={p.id}>
-                      {`${p.scenario_label} - ${formatCurrency(p.package_price)}`}
-                    </option>
+              <button
+                type="button"
+                className="btn btn-ghost discount-add-btn"
+                onClick={() => setDiscountRows((prev) => [...prev, { id: Date.now(), label: "Promotional Discount", amount: "" }])}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
+                </svg>
+                Add Discount
+              </button>
+            </div>
+
+            {steps.length > 0 && (
+              <div className="items-editor">
+                <div className="items-editor-head">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+                  </svg>
+                  <strong>Customize Package Items</strong>
+                  <span>Review and adjust quantities and prices per section</span>
+                </div>
+                <div className="quote-stepper">
+                  {steps.map((step, idx) => (
+                    <button
+                      key={step.key}
+                      type="button"
+                      className={`step-pill ${idx === currentStep ? "active" : ""}`}
+                      disabled={!step.items.length}
+                      title={step.items.length ? "" : "No items in this section for this package"}
+                      onClick={() => {
+                        if (!step.items.length) return;
+                        setCurrentStep(idx);
+                      }}
+                    >
+                      {idx + 1}. {step.label}
+                    </button>
                   ))}
-                </select>
-              </div>
+                </div>
 
-              <div className="field">
-                <label htmlFor="marginTemplate">Margin Template</label>
-                <select
-                  id="marginTemplate"
-                  className="select"
-                  value={selectedMarginTemplateId}
-                  onChange={(e) => setSelectedMarginTemplateId(e.target.value)}
-                >
-                  <option value="">Default Margins</option>
-                  {marginTemplates.map((row) => (
-                    <option value={row.id} key={row.id}>
-                      {row.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="field">
-                <label htmlFor="quoteVatMode">Material VAT</label>
-                <select
-                  id="quoteVatMode"
-                  className="select"
-                  value={quoteVatMode}
-                  onChange={(e) => setQuoteVatMode(e.target.value)}
-                >
-                  <option value="incl">With VAT (12%)</option>
-                  <option value="excl">Without VAT</option>
-                </select>
-              </div>
-
-              {loadingItems && <p className="section-note">Loading package items...</p>}
-            </div>
-          </div>
-
-          <div className="quote-section-card">
-            <div className="quote-section-head">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-              </svg>
-              <strong>Customer Details</strong>
-              <span className="quote-section-head-sub">Name and validity period</span>
-            </div>
-            <div className="quote-section-fields">
-              <div className="field">
-                <label htmlFor="customerName">Customer Name</label>
-                <input
-                  id="customerName"
-                  className="input"
-                  placeholder="Customer Name"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                />
-              </div>
-
-              <div className="field">
-                <label htmlFor="quoteDate">Quote Date</label>
-                <input
-                  id="quoteDate"
-                  className="input"
-                  type="date"
-                  value={quoteDate}
-                  onChange={(e) => setQuoteDate(e.target.value)}
-                />
-              </div>
-
-              <div className="field">
-                <label htmlFor="validUntil">Valid Until</label>
-                <input
-                  id="validUntil"
-                  className="input"
-                  type="date"
-                  value={validUntil}
-                  onChange={(e) => setValidUntil(e.target.value)}
-                />
-              </div>
-
-            </div>
-
-            {discountRows.length > 0 && (
-              <div className="discount-rows">
-                {discountRows.map((row) => (
-                  <div className="discount-row-item" key={row.id}>
-                    <input
-                      className="input"
-                      placeholder="e.g. Promotional Discount"
-                      value={row.label}
-                      onChange={(e) => setDiscountRows((prev) => prev.map((r) => r.id === row.id ? { ...r, label: e.target.value } : r))}
-                    />
-                    <input
-                      className="input"
-                      type="number"
-                      min="0"
-                      step="1"
-                      placeholder="0"
-                      value={row.amount}
-                      onChange={(e) => setDiscountRows((prev) => prev.map((r) => r.id === row.id ? { ...r, amount: e.target.value } : r))}
-                    />
+                {activeStep && (
+                  <>
+                    <div className="items-editor-note">
+                      {activeStep.label} ({activeStep.items.length} items)
+                    </div>
                     <button
                       type="button"
-                      className="btn btn-ghost discount-row-remove"
-                      onClick={() => setDiscountRows((prev) => prev.filter((r) => r.id !== row.id))}
-                      aria-label="Remove discount"
+                      className="btn btn-ghost"
+                      onClick={() => addManualItemToSection(activeStep.key)}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                      </svg>
+                      Add Item
                     </button>
-                  </div>
-                ))}
-              </div>
-            )}
 
-            <button
-              type="button"
-              className="btn btn-ghost discount-add-btn"
-              onClick={() => setDiscountRows((prev) => [...prev, { id: Date.now(), label: "Promotional Discount", amount: "" }])}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
-              </svg>
-              Add Discount
-            </button>
-          </div>
+                    <div className="items-grid items-grid-head">
+                      <div>Use</div>
+                      <div>No.</div>
+                      <div>Description</div>
+                      <div>Qty</div>
+                      <div>Unit</div>
+                      <div>{normalizeVatMode(quoteVatMode) === "incl" ? "Base Cost (VAT Incl.)" : "Base Cost"}</div>
+                      <div>Margin %</div>
+                      <div>Quote Price</div>
+                    </div>
 
-          {steps.length > 0 && (
-            <div className="items-editor">
-              <div className="items-editor-head">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
-                </svg>
-                <strong>Customize Package Items</strong>
-                <span>Review and adjust quantities and prices per section</span>
-              </div>
-              <div className="quote-stepper">
-                {steps.map((step, idx) => (
-                  <button
-                    key={step.key}
-                    type="button"
-                    className={`step-pill ${idx === currentStep ? "active" : ""}`}
-                    disabled={!step.items.length}
-                    title={step.items.length ? "" : "No items in this section for this package"}
-                    onClick={() => {
-                      if (!step.items.length) return;
-                      setCurrentStep(idx);
-                    }}
-                  >
-                    {idx + 1}. {step.label}
-                  </button>
-                ))}
-              </div>
+                    {!activeStep.items.length && (
+                      <p className="section-note">No items assigned to this section.</p>
+                    )}
 
-              {activeStep && (
-                <>
-                  <div className="items-editor-note">
-                    {activeStep.label} ({activeStep.items.length} items)
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    onClick={() => addManualItemToSection(activeStep.key)}
-                  >
-                    Add Item
-                  </button>
-
-                  <div className="items-grid items-grid-head">
-                    <div>Use</div>
-                    <div>No.</div>
-                    <div>Description</div>
-                    <div>Qty</div>
-                    <div>Unit</div>
-                    <div>{normalizeVatMode(quoteVatMode) === "incl" ? "Base Cost (VAT Incl.)" : "Base Cost"}</div>
-                    <div>Margin %</div>
-                    <div>Quote Price</div>
-                  </div>
-
-                  {!activeStep.items.length && (
-                    <p className="section-note">No items assigned to this section.</p>
-                  )}
-
-                  {activeStep.items.map((item) => (
-                    <div className="items-grid items-grid-row" key={item.templateItemId}>
-                      <div>
-                        <input
-                          type="checkbox"
-                          checked={item.included}
-                          onChange={(e) =>
-                            updateItemById(item.templateItemId, { included: e.target.checked })
-                          }
-                        />
-                      </div>
-                      <div className="item-no-col">
-                        <span>{item.itemNo}</span>
-                        {item.isManual && (
-                          <button
-                            type="button"
-                            className="link-mini"
-                            onClick={() => removeManualItem(item.templateItemId)}
+                    {activeStep.items.map((item) => (
+                      <div className="items-grid items-grid-row" key={item.templateItemId}>
+                        <div>
+                          <input
+                            type="checkbox"
+                            checked={item.included}
+                            onChange={(e) =>
+                              updateItemById(item.templateItemId, { included: e.target.checked })
+                            }
+                          />
+                        </div>
+                        <div className="item-no-col">
+                          <span>{item.itemNo}</span>
+                          {item.isManual && (
+                            <button
+                              type="button"
+                              className="link-mini"
+                              onClick={() => removeManualItem(item.templateItemId)}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                        <div>
+                          <select
+                            className="select material-pick-select"
+                            value={item.catalogMaterialId || ""}
+                            onChange={(e) =>
+                              applyMaterialSelection(item.templateItemId, e.target.value)
+                            }
                           >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                      <div>
-                        <select
-                          className="select material-pick-select"
-                          value={item.catalogMaterialId || ""}
-                          onChange={(e) =>
-                            applyMaterialSelection(item.templateItemId, e.target.value)
-                          }
-                        >
-                          <option value="">Pick from price list</option>
-                          {getMaterialOptionGroupsForItem(item).map((group) => (
-                            <optgroup label={group.label} key={group.label}>
-                              {group.options.map((mat) => (
-                                <option value={mat.id} key={mat.id}>
-                                  {`${mat.material_name} | Base ${formatCurrency(mat.base_price)} -> VAT Incl. ${formatCurrency(
-                                    toVatInclusivePrice(mat.base_price)
-                                  )} | Used ${formatCurrency(resolveCatalogDisplayPrice(mat.base_price, quoteVatMode))}${
-                                    mat.unit ? ` / ${mat.unit}` : ""
-                                  }${mat.source_section ? ` | ${mat.source_section}` : ""}`}
-                                </option>
-                              ))}
-                            </optgroup>
-                          ))}
-                        </select>
-                        <input
-                          className="input"
-                          value={item.description}
-                          onChange={(e) =>
-                            updateItemById(item.templateItemId, (() => {
-                              const nextDescription = e.target.value;
-                              const nextCategory = detectCategory(nextDescription);
-                              const nextSubgroup = detectItemSubgroup(nextDescription);
-                              return {
-                                description: nextDescription,
-                                category: nextCategory,
-                                subgroup: nextSubgroup,
-                                marginRate: getMarginRateForBucket(
-                                  resolveMarginBucket({
-                                    description: nextDescription,
-                                    subgroup: nextSubgroup,
-                                    section: item.section,
-                                    category: nextCategory
-                                  }),
-                                  selectedMarginTemplate,
-                                  pricingConfig.materialMarkupRate
-                                ),
-                                formulaKey: detectMountingFormulaKey(nextDescription),
-                                catalogMaterialId: null,
-                                isPanel: isPanelDescription(nextDescription)
-                              };
-                            })())
-                          }
-                        />
-                      </div>
-                      <div>
-                        <div className="qty-wrap">
+                            <option value="">Pick from price list</option>
+                            {getMaterialOptionGroupsForItem(item).map((group) => (
+                              <optgroup label={group.label} key={group.label}>
+                                {group.options.map((mat) => (
+                                  <option value={mat.id} key={mat.id}>
+                                    {`${mat.material_name} | Base ${formatCurrency(mat.base_price)} -> VAT Incl. ${formatCurrency(
+                                      toVatInclusivePrice(mat.base_price)
+                                    )} | Used ${formatCurrency(resolveCatalogDisplayPrice(mat.base_price, quoteVatMode))}${mat.unit ? ` / ${mat.unit}` : ""
+                                      }${mat.source_section ? ` | ${mat.source_section}` : ""}`}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            ))}
+                          </select>
+                          <input
+                            className="input"
+                            value={item.description}
+                            onChange={(e) =>
+                              updateItemById(item.templateItemId, (() => {
+                                const nextDescription = e.target.value;
+                                const nextCategory = detectCategory(nextDescription);
+                                const nextSubgroup = detectItemSubgroup(nextDescription);
+                                return {
+                                  description: nextDescription,
+                                  category: nextCategory,
+                                  subgroup: nextSubgroup,
+                                  marginRate: getMarginRateForBucket(
+                                    resolveMarginBucket({
+                                      description: nextDescription,
+                                      subgroup: nextSubgroup,
+                                      section: item.section,
+                                      category: nextCategory
+                                    }),
+                                    selectedMarginTemplate,
+                                    pricingConfig.materialMarkupRate
+                                  ),
+                                  formulaKey: detectMountingFormulaKey(nextDescription),
+                                  catalogMaterialId: null,
+                                  isPanel: isPanelDescription(nextDescription)
+                                };
+                              })())
+                            }
+                          />
+                        </div>
+                        <div>
+                          <div className="qty-wrap">
+                            <input
+                              className="input"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.qty}
+                              disabled={item.autoFromPanel}
+                              onChange={(e) =>
+                                updateItemById(item.templateItemId, {
+                                  qty: Number(e.target.value || 0)
+                                })
+                              }
+                            />
+                            {item.autoFromPanel && <span className="auto-chip">Auto</span>}
+                          </div>
+                        </div>
+                        <div>
+                          <input
+                            className="input"
+                            value={item.unit}
+                            onChange={(e) =>
+                              updateItemById(item.templateItemId, { unit: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div>
                           <input
                             className="input"
                             type="number"
                             min="0"
                             step="0.01"
-                            value={item.qty}
-                            disabled={item.autoFromPanel}
+                            value={item.basePrice}
                             onChange={(e) =>
                               updateItemById(item.templateItemId, {
-                                qty: Number(e.target.value || 0)
+                                basePrice: Number(e.target.value || 0)
                               })
                             }
                           />
-                          {item.autoFromPanel && <span className="auto-chip">Auto</span>}
+                        </div>
+                        <div>
+                          <input
+                            className="input"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={(Number(item.marginRate || 0) * 100).toFixed(2)}
+                            onChange={(e) =>
+                              updateItemById(item.templateItemId, {
+                                marginRate: Math.max(0, Number(e.target.value || 0) / 100)
+                              })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <input
+                            className="input"
+                            value={applyMarkup(
+                              Number(item.basePrice || 0),
+                              normalizeRate(item.marginRate, pricingConfig.materialMarkupRate)
+                            )}
+                            readOnly
+                          />
                         </div>
                       </div>
-                      <div>
-                        <input
-                          className="input"
-                          value={item.unit}
-                          onChange={(e) =>
-                            updateItemById(item.templateItemId, { unit: e.target.value })
-                          }
-                        />
-                      </div>
-                      <div>
-                        <input
-                          className="input"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.basePrice}
-                          onChange={(e) =>
-                            updateItemById(item.templateItemId, {
-                              basePrice: Number(e.target.value || 0)
-                            })
-                          }
-                        />
-                      </div>
-                      <div>
-                        <input
-                          className="input"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={(Number(item.marginRate || 0) * 100).toFixed(2)}
-                          onChange={(e) =>
-                            updateItemById(item.templateItemId, {
-                              marginRate: Math.max(0, Number(e.target.value || 0) / 100)
-                            })
-                          }
-                        />
-                      </div>
-                      <div>
-                        <input
-                          className="input"
-                          value={applyMarkup(
-                            Number(item.basePrice || 0),
-                            normalizeRate(item.marginRate, pricingConfig.materialMarkupRate)
-                          )}
-                          readOnly
-                        />
-                      </div>
+                    ))}
+
+                    <div className="step-nav">
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        disabled={prevStepIndex === -1}
+                        onClick={() => {
+                          if (prevStepIndex !== -1) setCurrentStep(prevStepIndex);
+                        }}
+                      >
+                        Previous
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        disabled={nextStepIndex === -1}
+                        onClick={() => {
+                          if (nextStepIndex !== -1) setCurrentStep(nextStepIndex);
+                        }}
+                      >
+                        Next
+                      </button>
                     </div>
-                  ))}
+                  </>
+                )}
+              </div>
+            )}
 
-                  <div className="step-nav">
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      disabled={prevStepIndex === -1}
-                      onClick={() => {
-                        if (prevStepIndex !== -1) setCurrentStep(prevStepIndex);
-                      }}
-                    >
-                      Previous
-                    </button>
-
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      disabled={nextStepIndex === -1}
-                      onClick={() => {
-                        if (nextStepIndex !== -1) setCurrentStep(nextStepIndex);
-                      }}
-                    >
-                      Next
-                    </button>
-                  </div>
-                </>
-              )}
+            <div className="quote-section-card quote-create-card">
+              {quoteError && <div className="error-text quote-create-error">{quoteError}</div>}
+              <button className="btn btn-primary quote-create-btn" disabled={!canCreate} onClick={createQuote}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="12" y1="18" x2="12" y2="12" /><line x1="9" y1="15" x2="15" y2="15" />
+                </svg>
+                {creating ? "Creating..." : "Create Quote"}
+              </button>
             </div>
-          )}
+          </div>
 
-          <div className="quote-section-card quote-create-card">
-            {quoteError && <div className="error-text quote-create-error">{quoteError}</div>}
-            <button className="btn btn-primary quote-create-btn" disabled={!canCreate} onClick={createQuote}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+          <aside className="result-card">
+            <div className="module-card-head result-card-head">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
               </svg>
-              {creating ? "Creating..." : "Create Quote"}
-            </button>
-          </div>
-        </div>
-
-        <aside className="result-card">
-          <div className="module-card-head result-card-head">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-            </svg>
-            <div className="module-card-head-text">
-              <strong>Quote Summary</strong>
-              <span>Generated output &amp; export options</span>
+              <div className="module-card-head-text">
+                <strong>Quote Summary</strong>
+                <span>Generated output &amp; export options</span>
+              </div>
             </div>
-          </div>
-          {!created && (
-            <>
-              <div className="stat-row">
-                <span>Estimated Materials</span>
-                <strong>{formatCurrency(estimatedMaterialSubtotal)}</strong>
-              </div>
-              <div className="stat-row">
-                <span>Estimated Installation</span>
-                <strong>{formatCurrency(estimatedInstallationTotal)}</strong>
-              </div>
-              <label className="field quote-export-vat-field">
-                <span>Installation Margin %</span>
-                <input
-                  className="input"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={(Number(installationMarginRate || 0) * 100).toFixed(2)}
-                  disabled={Boolean(selectedPackagePrice)}
-                  onChange={(e) =>
-                    setInstallationMarginRate(Math.max(0, Number(e.target.value || 0) / 100))
-                  }
-                />
-              </label>
-              <div className="stat-row">
-                <span>Estimated Subtotal</span>
-                <strong>{formatCurrency(estimatedSubtotal)}</strong>
-              </div>
-              {estimatedDiscountTotal > 0 && (
-                <div className="stat-row stat-row-discount">
-                  <span>Estimated Discount</span>
-                  <strong>-{formatCurrency(estimatedDiscountTotal)}</strong>
+            {!created && (
+              <>
+                <div className="stat-row">
+                  <span>Estimated Materials</span>
+                  <strong>{formatCurrency(estimatedMaterialSubtotal)}</strong>
                 </div>
-              )}
-              <div className="stat-row stat-row-total">
-                <span>Estimated Total</span>
-                <strong>{formatCurrency(estimatedTotalAfterDiscount)}</strong>
-              </div>
-            </>
-          )}
-
-          {created && (
-            <>
-              <div className="stat-row">
-                <span>Reference</span>
-                <strong>{created.quoteRef}</strong>
-              </div>
-              {Number(created.discountAmount) > 0 ? (
-                <>
-                  <div className="stat-row">
-                    <span>Subtotal</span>
-                    <strong>{formatCurrency(created.subtotal)}</strong>
+                <div className="stat-row">
+                  <span>Estimated Installation</span>
+                  <strong>{formatCurrency(estimatedInstallationTotal)}</strong>
+                </div>
+                <label className="field quote-export-vat-field">
+                  <span>Installation Margin %</span>
+                  <input
+                    className="input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={(Number(installationMarginRate || 0) * 100).toFixed(2)}
+                    disabled={Boolean(selectedPackagePrice)}
+                    onChange={(e) =>
+                      setInstallationMarginRate(Math.max(0, Number(e.target.value || 0) / 100))
+                    }
+                  />
+                </label>
+                <div className="stat-row">
+                  <span>Estimated Subtotal</span>
+                  <strong>{formatCurrency(estimatedSubtotal)}</strong>
+                </div>
+                {estimatedDiscountTotal > 0 && (
+                  <div className="stat-row stat-row-discount">
+                    <span>Estimated Discount</span>
+                    <strong>-{formatCurrency(estimatedDiscountTotal)}</strong>
                   </div>
-                  {(Array.isArray(created.discountItems) && created.discountItems.length > 0
-                    ? created.discountItems
-                    : [{ label: "Promotional Discount", amount: created.discountAmount }]
-                  ).map((d, i) => (
-                    <div className="stat-row stat-row-discount" key={i}>
-                      <span>{d.label}</span>
-                      <strong>-{formatCurrency(d.amount)}</strong>
+                )}
+                <div className="stat-row stat-row-total">
+                  <span>Estimated Total</span>
+                  <strong>{formatCurrency(estimatedTotalAfterDiscount)}</strong>
+                </div>
+              </>
+            )}
+
+            {created && (
+              <>
+                <div className="stat-row">
+                  <span>Reference</span>
+                  <strong>{created.quoteRef}</strong>
+                </div>
+                {Number(created.discountAmount) > 0 ? (
+                  <>
+                    <div className="stat-row">
+                      <span>Subtotal</span>
+                      <strong>{formatCurrency(created.subtotal)}</strong>
                     </div>
-                  ))}
-                  <div className="stat-row stat-row-total">
-                    <span>Total after Discount</span>
+                    {(Array.isArray(created.discountItems) && created.discountItems.length > 0
+                      ? created.discountItems
+                      : [{ label: "Promotional Discount", amount: created.discountAmount }]
+                    ).map((d, i) => (
+                      <div className="stat-row stat-row-discount" key={i}>
+                        <span>{d.label}</span>
+                        <strong>-{formatCurrency(d.amount)}</strong>
+                      </div>
+                    ))}
+                    <div className="stat-row stat-row-total">
+                      <span>Total after Discount</span>
+                      <strong>{formatCurrency(created.total)}</strong>
+                    </div>
+                  </>
+                ) : (
+                  <div className="stat-row">
+                    <span>Total</span>
                     <strong>{formatCurrency(created.total)}</strong>
                   </div>
-                </>
-              ) : (
-                <div className="stat-row">
-                  <span>Total</span>
-                  <strong>{formatCurrency(created.total)}</strong>
-                </div>
-              )}
-              {exportError && <div className="error-text">{exportError}</div>}
-              <button
-                className="btn btn-secondary"
-                onClick={() => exportQuote({ endpoint: "customer-excel", fallbackExt: "xlsx" })}
-                disabled={exporting}
-              >
-                {exporting ? "Exporting..." : "1) Customer Quotation Excel"}
-              </button>
-              <button
-                className="btn btn-secondary"
-                onClick={() => exportQuote({ endpoint: "customer-pdf", fallbackExt: "pdf" })}
-                disabled={exporting}
-              >
-                {exporting ? "Exporting..." : "2) Customer Quotation PDF"}
-              </button>
-              <button
-                className="btn btn-secondary"
-                onClick={() => exportQuote({ endpoint: "company-excel", fallbackExt: "xlsx" })}
-                disabled={exporting}
-              >
-                {exporting ? "Exporting..." : "3) Company Quotation Excel"}
-              </button>
-            </>
-          )}
-        </aside>
-      </div>
+                )}
+                {exportError && <div className="error-text">{exportError}</div>}
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => exportQuote({ endpoint: "customer-excel", fallbackExt: "xlsx" })}
+                  disabled={exporting}
+                >
+                  {exporting ? "Exporting..." : "1) Customer Quotation Excel"}
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => exportQuote({ endpoint: "customer-pdf", fallbackExt: "pdf" })}
+                  disabled={exporting}
+                >
+                  {exporting ? "Exporting..." : "2) Customer Quotation PDF"}
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => exportQuote({ endpoint: "company-excel", fallbackExt: "xlsx" })}
+                  disabled={exporting}
+                >
+                  {exporting ? "Exporting..." : "3) Company Quotation Excel"}
+                </button>
+              </>
+            )}
+          </aside>
+        </div>
       ) : (
         <div className="quotes-layout quote-review-layout">
           <div className="materials-card quote-review-shell">
@@ -2013,7 +2094,10 @@ export default function QuotesTab() {
           </div>
 
           <aside className="result-card quote-review-card">
-            <h4>Quote Review</h4>
+            {/* Title fixed: explicit dark color so it stays visible regardless of theme */}
+            <h4 className="quote-review-title" style={{ color: "#0f172a", margin: "0 0 12px" }}>
+              Quote Review
+            </h4>
 
             {!selectedRecentQuoteId && !loadingSelectedRecentQuote && (
               <p className="section-note">Select a saved quote to review it again.</p>
@@ -2055,6 +2139,7 @@ export default function QuotesTab() {
                 </div>
 
                 {exportError && <div className="error-text">{exportError}</div>}
+                {reviewSaveError && <div className="error-text">{reviewSaveError}</div>}
 
                 <button
                   className="btn btn-secondary"
@@ -2108,26 +2193,157 @@ export default function QuotesTab() {
                 </button>
 
                 <div className="quote-review-items">
-                  <div className="items-editor-title">
+                  <div className="items-editor-title" style={{ color: "#0f172a" }}>
                     Items ({reviewedQuoteItems.length || Number(selectedRecentQuoteMeta.itemCount || 0)})
                   </div>
                   {!reviewedQuote && !loadingSelectedRecentQuote && (
                     <p className="section-note">No detailed item data loaded.</p>
                   )}
-                  {reviewedQuoteItems.map((item) => (
-                    <div className="quote-review-item" key={item.id}>
-                      <div className="quote-review-item-top">
-                        <strong>{item.description}</strong>
-                        <span>{formatCurrency(item.line_total)}</span>
+                  {reviewedQuoteItems.map((item) => {
+                    const dirty = isReviewItemDirty(item.id);
+                    const saving = savingReviewItemId === Number(item.id);
+                    const desc = getReviewItemValue(item, "description") ?? "";
+                    const qty = getReviewItemValue(item, "qty") ?? 0;
+                    const unit = getReviewItemValue(item, "unit") ?? "";
+                    const unitPrice = getReviewItemValue(item, "unit_price") ?? 0;
+                    const itemNo = getReviewItemValue(item, "item_no") ?? 0;
+                    const lineTotal = Number(qty || 0) * Number(unitPrice || 0);
+                    const isInstallation = Number(item.is_installation) === 1;
+
+                    return (
+                      <div
+                        className="quote-review-item"
+                        key={item.id}
+                        style={{
+                          background: "#fff",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 8,
+                          padding: 12,
+                          marginBottom: 10
+                        }}
+                      >
+                        <div
+                          className="quote-review-item-top"
+                          style={{
+                            display: "flex",
+                            gap: 8,
+                            alignItems: "center",
+                            marginBottom: 8
+                          }}
+                        >
+                          <input
+                            className="input"
+                            style={{ flex: 1, color: "#0f172a" }}
+                            value={desc}
+                            disabled={isInstallation}
+                            placeholder="Description"
+                            onChange={(e) =>
+                              setReviewItemField(item.id, "description", e.target.value)
+                            }
+                          />
+                          <strong style={{ color: "#0f172a", whiteSpace: "nowrap" }}>
+                            {formatCurrency(lineTotal)}
+                          </strong>
+                        </div>
+
+                        <div
+                          className="quote-review-item-meta"
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                            gap: 8
+                          }}
+                        >
+                          <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            <span style={{ fontSize: 11, color: "#475569" }}>No.</span>
+                            <input
+                              className="input"
+                              style={{ color: "#0f172a" }}
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={itemNo}
+                              disabled={isInstallation}
+                              onChange={(e) =>
+                                setReviewItemField(item.id, "item_no", Number(e.target.value || 0))
+                              }
+                            />
+                          </label>
+
+                          <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            <span style={{ fontSize: 11, color: "#475569" }}>Qty</span>
+                            <input
+                              className="input"
+                              style={{ color: "#0f172a" }}
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={qty}
+                              onChange={(e) =>
+                                setReviewItemField(item.id, "qty", Number(e.target.value || 0))
+                              }
+                            />
+                          </label>
+
+                          <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            <span style={{ fontSize: 11, color: "#475569" }}>Unit</span>
+                            <input
+                              className="input"
+                              style={{ color: "#0f172a" }}
+                              value={unit}
+                              disabled={isInstallation}
+                              onChange={(e) =>
+                                setReviewItemField(item.id, "unit", e.target.value)
+                              }
+                            />
+                          </label>
+
+                          <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            <span style={{ fontSize: 11, color: "#475569" }}>Unit Price</span>
+                            <input
+                              className="input"
+                              style={{ color: "#0f172a" }}
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={unitPrice}
+                              onChange={(e) =>
+                                setReviewItemField(item.id, "unit_price", Number(e.target.value || 0))
+                              }
+                            />
+                          </label>
+                        </div>
+
+                        {dirty && (
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 8,
+                              justifyContent: "flex-end",
+                              marginTop: 8
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className="btn btn-ghost"
+                              disabled={saving}
+                              onClick={() => cancelReviewItemEdit(item.id)}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-primary"
+                              disabled={saving}
+                              onClick={() => saveReviewItemEdit(item)}
+                            >
+                              {saving ? "Saving..." : "Save"}
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      <div className="quote-review-item-meta">
-                        <span>No. {item.item_no}</span>
-                        <span>Qty: {item.qty}</span>
-                        <span>{item.unit || "-"}</span>
-                        <span>Unit Price: {formatCurrency(item.unit_price)}</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             )}
