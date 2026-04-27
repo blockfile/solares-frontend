@@ -37,12 +37,36 @@ function createEmptyForm() {
 }
 
 const MARGIN_FIELDS = [
-  { key: "inverterMargin", label: "DEYE/SOLIS Inverter" },
-  { key: "panelMargin", label: "JA BI FACIAL 620 W" },
-  { key: "batteryMargin", label: "Dyness Battery (314AH)" },
-  { key: "safetyMargin", label: "Complete Safety Breakers/SPD" },
-  { key: "mountingMargin", label: "Complete Mounting Fixtures" },
-  { key: "installationMargin", label: "Complete Installation" }
+  {
+    key: "inverterMargin",
+    label: "Inverter",
+    note: "Applied to inverter line items."
+  },
+  {
+    key: "panelMargin",
+    label: "Solar Panel",
+    note: "Applied to panel line items."
+  },
+  {
+    key: "batteryMargin",
+    label: "Battery",
+    note: "Applied to battery line items."
+  },
+  {
+    key: "safetyMargin",
+    label: "Safety Breakers / SPD",
+    note: "Applied to breakers, SPD, and other protection items."
+  },
+  {
+    key: "mountingMargin",
+    label: "Mounting Fixtures",
+    note: "Applied to rails, clamps, and structural mounting items."
+  },
+  {
+    key: "installationMargin",
+    label: "Installation",
+    note: "Applied to the installation line."
+  }
 ];
 
 export default function MarginTemplatesTab() {
@@ -125,7 +149,7 @@ export default function MarginTemplatesTab() {
           </svg>
           <div className="module-card-head-text">
             <strong>Margin Setup</strong>
-            <span>Build reusable margin templates using the six pricing lines from your costing workbook.</span>
+            <span>Build reusable pricing presets for the six quote buckets used during quotation.</span>
           </div>
         </div>
 
@@ -135,21 +159,21 @@ export default function MarginTemplatesTab() {
               <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
             </svg>
             <strong>{editingId ? "Edit Margin Template" : "Create Margin Template"}</strong>
-            <span className="add-item-card-sub">Set margins for inverter, panel, battery, safety, mounting, and installation.</span>
+            <span className="add-item-card-sub">Set percentage margins for system hardware, protection, mounting, and installation.</span>
           </div>
 
-          <div className="add-item-details-row row-auto">
+          <div className="margin-setup-topbar">
             <label className="field">
               <span>Template Name</span>
               <input
                 className="input"
                 value={form.name}
                 onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                placeholder="e.g. Hybrid 19 Percent"
+                placeholder="e.g. Standard Hybrid 19%"
               />
             </label>
-            <label className="field field-checkbox">
-              <span>Status</span>
+            <label className="margin-setup-status">
+              <span>Active Template</span>
               <input
                 type="checkbox"
                 checked={form.isActive}
@@ -158,32 +182,26 @@ export default function MarginTemplatesTab() {
             </label>
           </div>
 
-          <div className="materials-table-wrap">
-            <table className="materials-table">
-              <thead>
-                <tr>
-                  <th>Workbook Line</th>
-                  <th>Margin %</th>
-                </tr>
-              </thead>
-              <tbody>
-                {MARGIN_FIELDS.map((field) => (
-                  <tr key={field.key}>
-                    <td>{field.label}</td>
-                    <td>
-                      <input
-                        className="input"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={form[field.key]}
-                        onChange={(e) => setForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="margin-setup-grid">
+            {MARGIN_FIELDS.map((field) => (
+              <div className="margin-setup-card" key={field.key}>
+                <div className="margin-setup-card-head">
+                  <strong>{field.label}</strong>
+                  <span>{field.note}</span>
+                </div>
+                <label className="field">
+                  <span>Margin %</span>
+                  <input
+                    className="input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form[field.key]}
+                    onChange={(e) => setForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                  />
+                </label>
+              </div>
+            ))}
           </div>
 
           <div className="materials-actions">

@@ -3401,6 +3401,59 @@ textarea.input::placeholder {
   max-width: 220px;
 }
 
+.margin-setup-topbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.2fr) 220px;
+  gap: 14px;
+  align-items: end;
+}
+
+.margin-setup-status {
+  display: grid;
+  gap: 10px;
+  align-content: end;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.margin-setup-status input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+.margin-setup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.margin-setup-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.margin-setup-card-head {
+  display: grid;
+  gap: 4px;
+}
+
+.margin-setup-card-head strong {
+  font-size: 14px;
+  color: var(--primary-strong);
+}
+
+.margin-setup-card-head span {
+  font-size: 12px;
+  color: var(--text-soft);
+  line-height: 1.45;
+}
+
 /* ── Row-auto: flexible 3-col details row ───────────── */
 .add-item-details-row.row-auto {
   grid-template-columns: 1fr 1.4fr auto;
@@ -3413,6 +3466,11 @@ textarea.input::placeholder {
 
   .add-item-details-row.row-auto .add-item-submit {
     grid-column: span 2;
+  }
+
+  .margin-setup-topbar,
+  .margin-setup-grid {
+    grid-template-columns: 1fr;
   }
 }
 
