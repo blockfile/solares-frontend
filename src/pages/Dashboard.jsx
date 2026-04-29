@@ -3,6 +3,7 @@ import api from "../api/client";
 import CalendarTab from "./CalendarTab";
 import QuotesTab from "./QuotesTab";
 import MaterialsTab from "./MaterialsTab";
+import InventoryTab from "./InventoryTab";
 import PackagePricesTab from "./PackagePricesTab";
 import MarginTemplatesTab from "./MarginTemplatesTab";
 import TemplatesTab from "./TemplatesTab";
@@ -18,6 +19,7 @@ const TAB_CONFIG = [
   { key: "quotes", label: "Quotes", group: "Workspace", icon: "quotes" },
   { key: "templates", label: "Template Manager", group: "Catalog", icon: "templates" },
   { key: "materials", label: "Material Prices", group: "Catalog", icon: "materials" },
+  { key: "inventory", label: "Inventory", group: "Catalog", icon: "inventory" },
   { key: "packages", label: "Package Prices", group: "Catalog", icon: "packages" },
   { key: "margins", label: "Margin Setup", group: "Catalog", icon: "margins" },
   { key: "users", label: "Users", group: "System Admin", icon: "users" },
@@ -92,6 +94,15 @@ function SidebarIcon({ icon }) {
           <path d="M12 11.5v8.1" />
         </svg>
       );
+    case "inventory":
+      return (
+        <svg {...common}>
+          <path d="M4.5 7.5 12 3.5l7.5 4-7.5 4-7.5-4Z" />
+          <path d="M4.5 7.5v8.8l7.5 4.2 7.5-4.2V7.5" />
+          <path d="M12 11.5v8.8" />
+          <path d="M8.2 14.2h2.1" />
+        </svg>
+      );
     case "margins":
       return (
         <svg {...common}>
@@ -142,8 +153,8 @@ export default function Dashboard() {
     events: 0,
     templates: 0,
     materials: 0,
-    packages: 0
-    ,
+    inventory: 0,
+    packages: 0,
     margins: 0
   });
   const [user, setUser] = useState({
@@ -215,10 +226,11 @@ export default function Dashboard() {
       permissions: nextPermissions.length ? nextPermissions : ["calendar"]
     });
 
-    const [eventsRes, templatesRes, materialsRes, packagesRes, marginsRes] = await Promise.allSettled([
+    const [eventsRes, templatesRes, materialsRes, inventoryRes, packagesRes, marginsRes] = await Promise.allSettled([
       nextPermissions.includes("calendar") ? api.get("/events") : Promise.resolve({ data: [] }),
       nextPermissions.includes("templates") ? api.get("/templates?includeAll=1") : Promise.resolve({ data: [] }),
       nextPermissions.includes("materials") ? api.get("/materials") : Promise.resolve({ data: [] }),
+      nextPermissions.includes("inventory") ? api.get("/inventory") : Promise.resolve({ data: [] }),
       nextPermissions.includes("packages") ? api.get("/package-prices?activeOnly=1") : Promise.resolve({ data: [] }),
       nextPermissions.includes("margins") ? api.get("/margin-templates?activeOnly=1") : Promise.resolve({ data: [] })
     ]);
@@ -227,6 +239,7 @@ export default function Dashboard() {
       events: eventsRes.status === "fulfilled" ? toCount(eventsRes.value.data) : 0,
       templates: templatesRes?.status === "fulfilled" ? toCount(templatesRes.value.data) : 0,
       materials: materialsRes?.status === "fulfilled" ? toCount(materialsRes.value.data) : 0,
+      inventory: inventoryRes?.status === "fulfilled" ? toCount(inventoryRes.value.data) : 0,
       packages: packagesRes?.status === "fulfilled" ? toCount(packagesRes.value.data) : 0,
       margins: marginsRes?.status === "fulfilled" ? toCount(marginsRes.value.data) : 0
     });
@@ -260,6 +273,9 @@ export default function Dashboard() {
     }
     if (user.permissions.includes("materials")) {
       items.push({ label: "Materials", value: summary.materials });
+    }
+    if (user.permissions.includes("inventory")) {
+      items.push({ label: "Inventory Items", value: summary.inventory });
     }
     if (user.permissions.includes("packages")) {
       items.push({ label: "Active Packages", value: summary.packages });
@@ -366,6 +382,7 @@ export default function Dashboard() {
           {tab === "quotes" && <QuotesTab />}
           {tab === "templates" && <TemplatesTab />}
           {tab === "materials" && <MaterialsTab />}
+          {tab === "inventory" && <InventoryTab />}
           {tab === "packages" && <PackagePricesTab />}
           {tab === "margins" && <MarginTemplatesTab />}
           {tab === "users" && <UsersTab currentUser={user} />}

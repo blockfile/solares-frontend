@@ -2584,6 +2584,112 @@ textarea.input::placeholder {
   align-self: end;
 }
 
+.inventory-entry-grid {
+  align-items: start;
+}
+
+.inventory-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.inventory-field-wide {
+  grid-column: 1 / -1;
+}
+
+.inventory-selected-stock {
+  border: 1px solid rgba(31, 60, 99, 0.12);
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.inventory-selected-stock span,
+.inventory-stock-cell span {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.inventory-selected-stock strong,
+.inventory-stock-cell strong {
+  font-family: var(--font-title);
+  font-size: 19px;
+}
+
+.inventory-stock-cell {
+  display: grid;
+  gap: 3px;
+}
+
+.inventory-status-pill,
+.inventory-flow-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.inventory-status-in_stock,
+.inventory-flow-stock_in {
+  background: #dff7e8;
+  color: #147845;
+}
+
+.inventory-status-low,
+.inventory-flow-adjustment {
+  background: #fff3ca;
+  color: #7d5b00;
+}
+
+.inventory-status-out,
+.inventory-flow-stock_out {
+  background: #fde5e5;
+  color: #a03636;
+}
+
+.inventory-status-inactive {
+  background: #eceff4;
+  color: #59677a;
+}
+
+.inventory-positive {
+  color: #147845;
+  font-weight: 800;
+}
+
+.inventory-negative {
+  color: #a03636;
+  font-weight: 800;
+}
+
+.inventory-edit-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.inventory-actions {
+  grid-template-columns: repeat(2, minmax(104px, 120px));
+}
+
+.inventory-filters {
+  grid-template-columns: minmax(150px, 200px) minmax(240px, 360px);
+}
+
+.inventory-table-wrap {
+  max-height: min(58vh, 520px);
+}
+
 @media (max-width: 1240px) {
   .materials-upload-grid,
   .materials-option-grid {
@@ -4120,6 +4226,7 @@ textarea.input::placeholder {
   }
 
   .materials-layout-grid,
+  .inventory-form-grid,
   .materials-upload-grid,
   .materials-head-actions {
     grid-template-columns: 1fr;
@@ -4645,6 +4752,7 @@ button {
   .materials-layout-grid,
   .quotes-layout,
   .quote-review-layout,
+  .inventory-entry-grid,
   .calendar-ops-layout {
     grid-template-columns: 1fr;
   }
@@ -4743,10 +4851,12 @@ button {
 
   .workspace-metrics,
   .calendar-ops-summary,
-  .materials-dashboard-grid,
-  .materials-upload-grid,
-  .materials-option-grid,
-  .add-item-picker-row,
+    .materials-dashboard-grid,
+    .materials-upload-grid,
+    .materials-option-grid,
+    .inventory-form-grid,
+    .inventory-filters,
+    .add-item-picker-row,
   .add-item-details-row,
   .calendar-form-grid,
   .calendar-detail-grid,
