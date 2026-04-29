@@ -4,6 +4,7 @@ import CalendarTab from "./CalendarTab";
 import QuotesTab from "./QuotesTab";
 import MaterialsTab from "./MaterialsTab";
 import InventoryTab from "./InventoryTab";
+import PayrollTab from "./PayrollTab";
 import PackagePricesTab from "./PackagePricesTab";
 import MarginTemplatesTab from "./MarginTemplatesTab";
 import TemplatesTab from "./TemplatesTab";
@@ -17,6 +18,7 @@ import useBodyScrollLock from "../hooks/useBodyScrollLock";
 const TAB_CONFIG = [
   { key: "calendar", label: "Calendar Dashboard", group: "Workspace", icon: "calendar" },
   { key: "quotes", label: "Quotes", group: "Workspace", icon: "quotes" },
+  { key: "payroll", label: "Payroll", group: "Workspace", icon: "payroll" },
   { key: "templates", label: "Template Manager", group: "Catalog", icon: "templates" },
   { key: "materials", label: "Material Prices", group: "Catalog", icon: "materials" },
   { key: "inventory", label: "Inventory", group: "Catalog", icon: "inventory" },
@@ -63,6 +65,15 @@ function SidebarIcon({ icon }) {
           <path d="M8.5 11h7" />
           <path d="M8.5 14.5h7" />
           <path d="M8.5 18h4" />
+        </svg>
+      );
+    case "payroll":
+      return (
+        <svg {...common}>
+          <rect x="4" y="5.5" width="16" height="13" rx="2.2" />
+          <path d="M7.5 9.5h9" />
+          <path d="M7.5 13h4" />
+          <path d="M15 14.8c.4.4 1 .6 1.7.6 1 0 1.8-.5 1.8-1.3 0-.7-.5-1.1-1.7-1.4-1.1-.3-1.7-.7-1.7-1.4 0-.8.7-1.3 1.6-1.3.7 0 1.2.2 1.6.6" />
         </svg>
       );
     case "templates":
@@ -154,6 +165,7 @@ export default function Dashboard() {
     templates: 0,
     materials: 0,
     inventory: 0,
+    payroll: 0,
     packages: 0,
     margins: 0
   });
@@ -226,11 +238,12 @@ export default function Dashboard() {
       permissions: nextPermissions.length ? nextPermissions : ["calendar"]
     });
 
-    const [eventsRes, templatesRes, materialsRes, inventoryRes, packagesRes, marginsRes] = await Promise.allSettled([
+    const [eventsRes, templatesRes, materialsRes, inventoryRes, payrollRes, packagesRes, marginsRes] = await Promise.allSettled([
       nextPermissions.includes("calendar") ? api.get("/events") : Promise.resolve({ data: [] }),
       nextPermissions.includes("templates") ? api.get("/templates?includeAll=1") : Promise.resolve({ data: [] }),
       nextPermissions.includes("materials") ? api.get("/materials") : Promise.resolve({ data: [] }),
       nextPermissions.includes("inventory") ? api.get("/inventory") : Promise.resolve({ data: [] }),
+      nextPermissions.includes("payroll") ? api.get("/payroll/employees") : Promise.resolve({ data: [] }),
       nextPermissions.includes("packages") ? api.get("/package-prices?activeOnly=1") : Promise.resolve({ data: [] }),
       nextPermissions.includes("margins") ? api.get("/margin-templates?activeOnly=1") : Promise.resolve({ data: [] })
     ]);
@@ -240,6 +253,7 @@ export default function Dashboard() {
       templates: templatesRes?.status === "fulfilled" ? toCount(templatesRes.value.data) : 0,
       materials: materialsRes?.status === "fulfilled" ? toCount(materialsRes.value.data) : 0,
       inventory: inventoryRes?.status === "fulfilled" ? toCount(inventoryRes.value.data) : 0,
+      payroll: payrollRes?.status === "fulfilled" ? toCount(payrollRes.value.data) : 0,
       packages: packagesRes?.status === "fulfilled" ? toCount(packagesRes.value.data) : 0,
       margins: marginsRes?.status === "fulfilled" ? toCount(marginsRes.value.data) : 0
     });
@@ -276,6 +290,9 @@ export default function Dashboard() {
     }
     if (user.permissions.includes("inventory")) {
       items.push({ label: "Inventory Items", value: summary.inventory });
+    }
+    if (user.permissions.includes("payroll")) {
+      items.push({ label: "Payroll Employees", value: summary.payroll });
     }
     if (user.permissions.includes("packages")) {
       items.push({ label: "Active Packages", value: summary.packages });
@@ -380,6 +397,7 @@ export default function Dashboard() {
         <section className={`panel workspace-panel ${tab === "quotes" ? "workspace-panel-fill" : ""}`}>
           {tab === "calendar" && <CalendarTab currentUser={user} onActivityChange={loadSummary} />}
           {tab === "quotes" && <QuotesTab />}
+          {tab === "payroll" && <PayrollTab />}
           {tab === "templates" && <TemplatesTab />}
           {tab === "materials" && <MaterialsTab />}
           {tab === "inventory" && <InventoryTab />}

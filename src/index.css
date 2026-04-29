@@ -2690,6 +2690,92 @@ textarea.input::placeholder {
   max-height: min(58vh, 520px);
 }
 
+.payroll-entry-grid {
+  align-items: start;
+}
+
+.payroll-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.payroll-field-wide {
+  grid-column: 1 / -1;
+}
+
+.payroll-preview-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.payroll-preview-row > div {
+  border: 1px solid rgba(31, 60, 99, 0.12);
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+  display: grid;
+  gap: 5px;
+}
+
+.payroll-preview-row span {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.payroll-preview-row strong {
+  font-family: var(--font-title);
+  font-size: 18px;
+}
+
+.payroll-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.payroll-status-active,
+.payroll-status-paid {
+  background: #dff7e8;
+  color: #147845;
+}
+
+.payroll-status-draft {
+  background: #eef3fb;
+  color: #28476e;
+}
+
+.payroll-status-approved {
+  background: #fff3ca;
+  color: #7d5b00;
+}
+
+.payroll-status-inactive,
+.payroll-status-void {
+  background: #fde5e5;
+  color: #a03636;
+}
+
+.payroll-actions {
+  grid-template-columns: repeat(2, minmax(104px, 120px));
+}
+
+.payroll-filters {
+  grid-template-columns: minmax(150px, 200px) minmax(240px, 360px);
+}
+
+.payroll-table-wrap {
+  max-height: min(58vh, 520px);
+}
+
 @media (max-width: 1240px) {
   .materials-upload-grid,
   .materials-option-grid {
@@ -4227,6 +4313,7 @@ textarea.input::placeholder {
 
   .materials-layout-grid,
   .inventory-form-grid,
+  .payroll-form-grid,
   .materials-upload-grid,
   .materials-head-actions {
     grid-template-columns: 1fr;
@@ -4753,6 +4840,7 @@ button {
   .quotes-layout,
   .quote-review-layout,
   .inventory-entry-grid,
+  .payroll-entry-grid,
   .calendar-ops-layout {
     grid-template-columns: 1fr;
   }
@@ -4856,6 +4944,9 @@ button {
     .materials-option-grid,
     .inventory-form-grid,
     .inventory-filters,
+    .payroll-form-grid,
+    .payroll-filters,
+    .payroll-preview-row,
     .add-item-picker-row,
   .add-item-details-row,
   .calendar-form-grid,
