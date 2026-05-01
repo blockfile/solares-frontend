@@ -41,42 +41,42 @@ const EMPTY_ACCOUNT_FORM = { name: "", type: "expense", description: "" };
 function IconArrowDown() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 5v14M5 12l7 7 7-7"/>
+      <path d="M12 5v14M5 12l7 7 7-7" />
     </svg>
   );
 }
 function IconArrowUp() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 19V5M5 12l7-7 7 7"/>
+      <path d="M12 19V5M5 12l7-7 7 7" />
     </svg>
   );
 }
 function IconBalance() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 2v20M2 12h20"/>
+      <path d="M12 2v20M2 12h20" />
     </svg>
   );
 }
 function IconUpload() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
     </svg>
   );
 }
 function IconPlus() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
     </svg>
   );
 }
 function IconSearch() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
     </svg>
   );
 }
@@ -112,6 +112,9 @@ export default function BudgetTab() {
 
   const [deletingTx, setDeletingTx] = useState(null);
   const [deletingAcc, setDeletingAcc] = useState(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [deletingImportedId, setDeletingImportedId] = useState(null);
   const [selectedTxIds, setSelectedTxIds] = useState(new Set());
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignProjectId, setAssignProjectId] = useState("");
@@ -371,8 +374,72 @@ export default function BudgetTab() {
     finally { setTxSaving(false); }
   }
   async function confirmDeleteTx(tx) {
-    try { await api.delete(`/budget/${tx.id}`); flash("Transaction deleted."); setDeletingTx(null); await loadAll(true); }
-    catch (err) { flash(err?.response?.data?.message || "Failed to delete.", "error"); setDeletingTx(null); }
+    try {
+      await api.delete(`/budget/${tx.id}`);
+      flash("Transaction deleted.");
+      setDeletingTx(null);
+      setSelectedTxIds((prev) => {
+        const next = new Set(prev);
+        next.delete(tx.id);
+        return next;
+      });
+      await loadAll(true);
+    } catch (err) {
+      flash(err?.response?.data?.message || "Failed to delete.", "error");
+      setDeletingTx(null);
+    }
+  }
+
+  async function confirmBulkDeleteTx() {
+    if (!selectedTxCount) return;
+
+    setBulkDeleting(true);
+    try {
+      const res = await api.delete("/budget/bulk", {
+        data: { transactionIds: Array.from(selectedTxIds) }
+      });
+
+      flash(`${res.data?.deleted || selectedTxCount} transaction(s) deleted.`);
+      setSelectedTxIds(new Set());
+      setBulkDeleteOpen(false);
+      await loadAll(true);
+    } catch (err) {
+      flash(err?.response?.data?.message || "Failed to delete selected transactions.", "error");
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
+  async function deleteImportedTransaction(txId) {
+    if (!txId) return;
+
+    setDeletingImportedId(txId);
+    try {
+      await api.delete(`/budget/${txId}`);
+
+      setImportResult((prev) => {
+        if (!prev) return prev;
+        const transactions = (prev.transactions || []).filter((tx) => Number(tx.id) !== Number(txId));
+        return {
+          ...prev,
+          imported: transactions.length,
+          transactions
+        };
+      });
+
+      setSelectedTxIds((prev) => {
+        const next = new Set(prev);
+        next.delete(txId);
+        return next;
+      });
+
+      await loadAll(true);
+      flash("Imported transaction deleted.");
+    } catch (err) {
+      flash(err?.response?.data?.message || "Failed to delete imported transaction.", "error");
+    } finally {
+      setDeletingImportedId(null);
+    }
   }
 
   // ── Account form ────────────────────────────────────────────────────────────
@@ -444,13 +511,13 @@ export default function BudgetTab() {
       {/* ── Toast ──────────────────────────────────────────────────────────── */}
       {success && (
         <div className="bgt-toast bgt-toast--ok" role="status">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
           {success}
         </div>
       )}
       {error && (
         <div className="bgt-toast bgt-toast--err" role="alert">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
           {error}
         </div>
       )}
@@ -459,15 +526,15 @@ export default function BudgetTab() {
       <div className="bgt-toolbar">
         <div className="bgt-seg">
           <button className={`bgt-seg-btn${view === "transactions" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("transactions")}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12h6M9 16h4" /></svg>
             Transactions
           </button>
           <button className={`bgt-seg-btn${view === "accounts" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("accounts")}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/><path d="M7 15h2M12 15h2"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /><path d="M7 15h2M12 15h2" /></svg>
             Accounts
           </button>
           <button className={`bgt-seg-btn${view === "sales" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("sales")}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
             Sales
           </button>
         </div>
@@ -477,6 +544,9 @@ export default function BudgetTab() {
             <>
               <button className="btn btn-ghost bgt-btn-import" onClick={openAssignProject} disabled={!selectedTxCount || projects.length === 0}>
                 <IconPlus /> Assign to Project{selectedTxCount ? ` (${selectedTxCount})` : ""}
+              </button>
+              <button className="btn btn-danger" onClick={() => setBulkDeleteOpen(true)} disabled={!selectedTxCount}>
+                Delete Selected{selectedTxCount ? ` (${selectedTxCount})` : ""}
               </button>
               <button className="btn btn-ghost bgt-btn-import" onClick={openImport}>
                 <IconUpload /> Import Excel
@@ -553,7 +623,7 @@ export default function BudgetTab() {
             </div>
           ) : transactions.length === 0 ? (
             <div className="bgt-empty">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="bgt-empty-icon"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M9 13h1M14 13h1M9 17h1M14 17h1"/></svg>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="bgt-empty-icon"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 9h18M9 13h1M14 13h1M9 17h1M14 17h1" /></svg>
               <p>{hasFilters ? "No transactions match your filters." : "No transactions yet. Record one or import from Excel."}</p>
               {!hasFilters && <button className="btn btn-primary" onClick={openNewTx}><IconPlus /> Record First Transaction</button>}
             </div>
@@ -614,11 +684,11 @@ export default function BudgetTab() {
                       </td>
                       <td className="bgt-col-actions">
                         <button className="bgt-row-btn" onClick={() => openEditTx(tx)} title="Edit">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                           Edit
                         </button>
                         <button className="bgt-row-btn bgt-row-btn--del" onClick={() => setDeletingTx(tx)} title="Delete">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" /></svg>
                           Delete
                         </button>
                       </td>
@@ -645,7 +715,7 @@ export default function BudgetTab() {
                 <h3 className="bgt-modal-title">Assign to Project</h3>
               </div>
               <button className="bgt-modal-x" onClick={closeAssignProject} aria-label="Close">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
             </div>
             <form className="bgt-modal-body" onSubmit={submitAssignProject}>
@@ -674,7 +744,7 @@ export default function BudgetTab() {
       {view === "accounts" && (
         accounts.length === 0 ? (
           <div className="bgt-empty">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="bgt-empty-icon"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18M7 15h2M12 15h2"/></svg>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="bgt-empty-icon"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18M7 15h2M12 15h2" /></svg>
             <p>No accounts yet.</p>
             <button className="btn btn-primary" onClick={openNewAcc}><IconPlus /> Create First Account</button>
           </div>
@@ -777,7 +847,7 @@ export default function BudgetTab() {
             {salesView === "overview" && (
               customers.length === 0 ? (
                 <div className="bgt-empty">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="bgt-empty-icon"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="bgt-empty-icon"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
                   <p>No customers yet. Add your first customer.</p>
                   <button className="btn btn-primary" onClick={openNewCust}><IconPlus /> Add Customer</button>
                 </div>
@@ -786,12 +856,12 @@ export default function BudgetTab() {
                   {customers.map((cust) => {
                     const custProjs = projects.filter((p) => p.customer_id === cust.id);
                     const tSales = custProjs.reduce((s, p) => s + toNumber(p.sale_amount, 0), 0);
-                    const tExp   = custProjs.reduce((s, p) => s + toNumber(p.total_expenses, 0), 0);
+                    const tExp = custProjs.reduce((s, p) => s + toNumber(p.total_expenses, 0), 0);
                     const margin = tSales - tExp;
                     return (
                       <div key={cust.id} className="sl-cust-card">
                         <div className="sl-cust-card-head">
-                          <div className="sl-cust-avatar">{cust.name.slice(0,1).toUpperCase()}</div>
+                          <div className="sl-cust-avatar">{cust.name.slice(0, 1).toUpperCase()}</div>
                           <div className="sl-cust-info">
                             <strong className="sl-cust-name">{cust.name}</strong>
                             {cust.contact && <p className="sl-cust-meta">{cust.contact}</p>}
@@ -817,8 +887,8 @@ export default function BudgetTab() {
                                   <span className="sl-proj-name">{p.project_name}</span>
                                 </div>
                                 <div className="sl-proj-row-right">
-                                  <span className="sl-proj-margin" style={{ color: toNumber(p.margin,0) >= 0 ? "#147845" : "#b83a3a" }}>₱{formatMoney(p.margin)}</span>
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                                  <span className="sl-proj-margin" style={{ color: toNumber(p.margin, 0) >= 0 ? "#147845" : "#b83a3a" }}>₱{formatMoney(p.margin)}</span>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
                                 </div>
                               </button>
                             ))}
@@ -856,11 +926,11 @@ export default function BudgetTab() {
                               <tr key={p.id} className="bgt-table-row" style={{ cursor: "pointer" }} onClick={() => openDetail(p)}>
                                 <td><span className="bgt-account-chip">{p.customer_name}</span></td>
                                 <td><strong>{p.project_name}</strong></td>
-                                <td className="bgt-cell-date">{p.project_date ? new Date(p.project_date).toLocaleDateString(undefined, { year:"numeric", month:"short", day:"numeric" }) : "—"}</td>
+                                <td className="bgt-cell-date">{p.project_date ? new Date(p.project_date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—"}</td>
                                 <td><span className={`sl-pill ${STATUS_COLORS[p.status] || ""}`}>{STATUS_LABELS[p.status] || p.status}</span></td>
-                                <td className="bgt-col-amt" style={{ color:"#147845", fontWeight:700 }}>₱{formatMoney(p.sale_amount)}</td>
-                                <td className="bgt-col-amt" style={{ color:"#b83a3a", fontWeight:700 }}>₱{formatMoney(p.total_expenses)}</td>
-                                <td className="bgt-col-amt" style={{ color: m >= 0 ? "#147845" : "#b83a3a", fontWeight:700 }}>₱{formatMoney(m)}</td>
+                                <td className="bgt-col-amt" style={{ color: "#147845", fontWeight: 700 }}>₱{formatMoney(p.sale_amount)}</td>
+                                <td className="bgt-col-amt" style={{ color: "#b83a3a", fontWeight: 700 }}>₱{formatMoney(p.total_expenses)}</td>
+                                <td className="bgt-col-amt" style={{ color: m >= 0 ? "#147845" : "#b83a3a", fontWeight: 700 }}>₱{formatMoney(m)}</td>
                                 <td className="bgt-col-actions" onClick={(e) => e.stopPropagation()}>
                                   <button className="bgt-row-btn" onClick={() => openEditProj(p)}>Edit</button>
                                   <button className="bgt-row-btn bgt-row-btn--del" onClick={() => setDeletingProj(p)}>Delete</button>
@@ -882,13 +952,13 @@ export default function BudgetTab() {
                 <div className="sl-drawer" onClick={(e) => e.stopPropagation()}>
                   <div className="bgt-modal-head">
                     <div><p className="bgt-modal-eyebrow">{detailProj.customer_name}</p><h3 className="bgt-modal-title">{detailProj.project_name}</h3></div>
-                    <button className="bgt-modal-x" onClick={() => setDetailProj(null)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="bgt-modal-x" onClick={() => setDetailProj(null)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button>
                   </div>
                   <div className="bgt-modal-body">
                     <div className="sl-drawer-stats">
                       <div className="sl-dstat"><span className="sl-dstat-label">Sale Amount</span><strong className="sl-dstat-val sl-dstat-val--sales">₱{formatMoney(detailProj.sale_amount)}</strong></div>
                       <div className="sl-dstat"><span className="sl-dstat-label">Expenses</span><strong className="sl-dstat-val sl-dstat-val--exp">₱{formatMoney(detailProj.total_expenses)}</strong></div>
-                      <div className="sl-dstat"><span className="sl-dstat-label">Margin</span><strong className={`sl-dstat-val ${toNumber(detailProj.margin,0) >= 0 ? "sl-dstat-val--sales" : "sl-dstat-val--exp"}`}>₱{formatMoney(detailProj.margin)}</strong></div>
+                      <div className="sl-dstat"><span className="sl-dstat-label">Margin</span><strong className={`sl-dstat-val ${toNumber(detailProj.margin, 0) >= 0 ? "sl-dstat-val--sales" : "sl-dstat-val--exp"}`}>₱{formatMoney(detailProj.margin)}</strong></div>
                     </div>
                     <div className="sl-drawer-section">
                       <p className="sl-drawer-section-title">Linked Expenses ({detailTx.length})</p>
@@ -903,7 +973,7 @@ export default function BudgetTab() {
                             <tbody>
                               {detailTx.map((tx) => (
                                 <tr key={tx.id}>
-                                  <td className="bgt-cell-date">{tx.transaction_date ? new Date(tx.transaction_date).toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"}) : "—"}</td>
+                                  <td className="bgt-cell-date">{tx.transaction_date ? new Date(tx.transaction_date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—"}</td>
                                   <td>{tx.description || <span className="bgt-muted">—</span>}</td>
                                   <td><span className="bgt-account-chip">{tx.account_name}</span></td>
                                   <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatMoney(tx.amount)}</td>
@@ -927,7 +997,7 @@ export default function BudgetTab() {
             {custOpen && (
               <div className="bgt-backdrop" onClick={(e) => { if (e.target === e.currentTarget) closeCust(); }}>
                 <div className="bgt-modal bgt-modal--sm">
-                  <div className="bgt-modal-head"><div><p className="bgt-modal-eyebrow">{editingCust ? "Editing" : "New"}</p><h3 className="bgt-modal-title">{editingCust ? "Edit Customer" : "New Customer"}</h3></div><button className="bgt-modal-x" onClick={closeCust}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+                  <div className="bgt-modal-head"><div><p className="bgt-modal-eyebrow">{editingCust ? "Editing" : "New"}</p><h3 className="bgt-modal-title">{editingCust ? "Edit Customer" : "New Customer"}</h3></div><button className="bgt-modal-x" onClick={closeCust}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button></div>
                   <form className="bgt-modal-body" onSubmit={saveCust}>
                     <div className="bgt-form-grid">
                       <div className="bgt-field bgt-field--wide"><label className="bgt-label">Name <span className="bgt-req">*</span></label><input className="input" required placeholder="e.g. Allan Santos" value={custForm.name} onChange={(e) => setCustForm((f) => ({ ...f, name: e.target.value }))} /></div>
@@ -944,7 +1014,7 @@ export default function BudgetTab() {
             {projOpen && (
               <div className="bgt-backdrop" onClick={(e) => { if (e.target === e.currentTarget) closeProj(); }}>
                 <div className="bgt-modal bgt-modal--sm">
-                  <div className="bgt-modal-head"><div><p className="bgt-modal-eyebrow">{editingProj ? "Editing" : "New project"}</p><h3 className="bgt-modal-title">{editingProj ? "Edit Project" : "New Project"}</h3></div><button className="bgt-modal-x" onClick={closeProj}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+                  <div className="bgt-modal-head"><div><p className="bgt-modal-eyebrow">{editingProj ? "Editing" : "New project"}</p><h3 className="bgt-modal-title">{editingProj ? "Edit Project" : "New Project"}</h3></div><button className="bgt-modal-x" onClick={closeProj}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button></div>
                   <form className="bgt-modal-body" onSubmit={saveProj}>
                     <div className="bgt-form-grid">
                       <div className="bgt-field bgt-field--wide"><label className="bgt-label">Customer <span className="bgt-req">*</span></label><select className="input" required value={projForm.customerId} onChange={(e) => setProjForm((f) => ({ ...f, customerId: e.target.value }))}><option value="">— Select customer —</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
@@ -963,7 +1033,7 @@ export default function BudgetTab() {
             {deletingCust && (
               <div className="bgt-backdrop" onClick={() => setDeletingCust(null)}>
                 <div className="bgt-modal bgt-modal--confirm" onClick={(e) => e.stopPropagation()}>
-                  <div className="bgt-confirm-icon bgt-confirm-icon--del"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></div>
+                  <div className="bgt-confirm-icon bgt-confirm-icon--del"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" /></svg></div>
                   <h3 className="bgt-confirm-title">{deletingCust.project_count > 0 ? "Deactivate Customer?" : "Delete Customer?"}</h3>
                   <p className="bgt-confirm-body">{deletingCust.project_count > 0 ? <><strong>{deletingCust.name}</strong> has {deletingCust.project_count} project(s) and will be deactivated.</> : <>Delete <strong>{deletingCust.name}</strong>? This cannot be undone.</>}</p>
                   <div className="bgt-modal-foot bgt-modal-foot--center"><button className="btn btn-ghost" onClick={() => setDeletingCust(null)}>Cancel</button><button className="btn btn-danger" onClick={() => confirmDeleteCust(deletingCust)}>{deletingCust.project_count > 0 ? "Deactivate" : "Delete"}</button></div>
@@ -975,7 +1045,7 @@ export default function BudgetTab() {
             {deletingProj && (
               <div className="bgt-backdrop" onClick={() => setDeletingProj(null)}>
                 <div className="bgt-modal bgt-modal--confirm" onClick={(e) => e.stopPropagation()}>
-                  <div className="bgt-confirm-icon bgt-confirm-icon--del"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></div>
+                  <div className="bgt-confirm-icon bgt-confirm-icon--del"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" /></svg></div>
                   <h3 className="bgt-confirm-title">Delete Project?</h3>
                   <p className="bgt-confirm-body">Delete <strong>{deletingProj.project_name}</strong>? All linked expense assignments will be removed.</p>
                   <div className="bgt-modal-foot bgt-modal-foot--center"><button className="btn btn-ghost" onClick={() => setDeletingProj(null)}>Cancel</button><button className="btn btn-danger" onClick={() => confirmDeleteProj(deletingProj)}>Delete</button></div>
@@ -996,7 +1066,7 @@ export default function BudgetTab() {
                 <h3 className="bgt-modal-title">{editingTx ? "Edit Transaction" : "Record Transaction"}</h3>
               </div>
               <button className="bgt-modal-x" onClick={closeTxForm} aria-label="Close">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
             </div>
 
@@ -1068,7 +1138,7 @@ export default function BudgetTab() {
                 <h3 className="bgt-modal-title">{editingAcc ? "Edit Account" : "New Account"}</h3>
               </div>
               <button className="bgt-modal-x" onClick={closeAccForm} aria-label="Close">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
             </div>
             <form className="bgt-modal-body" onSubmit={saveAcc}>
@@ -1110,25 +1180,60 @@ export default function BudgetTab() {
                 <h3 className="bgt-modal-title">Import from Excel</h3>
               </div>
               <button className="bgt-modal-x" onClick={closeImport} aria-label="Close">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
             </div>
             <div className="bgt-modal-body">
               {importResult ? (
                 <>
                   <div className="bgt-import-success">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
                     <strong>{importResult.imported} transaction{importResult.imported !== 1 ? "s" : ""} imported successfully</strong>
                   </div>
                   <div className="bgt-import-preview">
                     <table className="bgt-table bgt-table--compact">
-                      <thead><tr><th>Date</th><th>Description</th><th className="bgt-col-amt">Amount</th></tr></thead>
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Description</th>
+                          <th>Account</th>
+                          <th>Type</th>
+                          <th className="bgt-col-amt">Amount</th>
+                          <th className="bgt-col-actions">Action</th>
+                        </tr>
+                      </thead>
                       <tbody>
-                        {importResult.rows.map((r, i) => (
+                        {(importResult.transactions || []).map((tx) => (
+                          <tr key={tx.id}>
+                            <td className="bgt-cell-date">{formatDate(tx.transaction_date)}</td>
+                            <td>{tx.description || <span className="bgt-muted">—</span>}</td>
+                            <td><span className="bgt-account-chip">{tx.account_name || "—"}</span></td>
+                            <td>
+                              <span className={`bgt-type-pill bgt-type-pill--${tx.type}`}>
+                                {tx.type === "in" ? "↓ In" : "↑ Out"}
+                              </span>
+                            </td>
+                            <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatMoney(tx.amount)}</td>
+                            <td className="bgt-col-actions">
+                              <button
+                                type="button"
+                                className="bgt-row-btn bgt-row-btn--del"
+                                disabled={deletingImportedId === tx.id}
+                                onClick={() => deleteImportedTransaction(tx.id)}
+                              >
+                                {deletingImportedId === tx.id ? "Deleting…" : "Delete"}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        {(!importResult.transactions || importResult.transactions.length === 0) && (importResult.rows || []).map((r, i) => (
                           <tr key={i}>
                             <td className="bgt-cell-date">{formatDate(r.transactionDate)}</td>
                             <td>{r.description}</td>
+                            <td><span className="bgt-muted">—</span></td>
+                            <td><span className="bgt-muted">—</span></td>
                             <td className="bgt-col-amt bgt-amount--out">₱{formatMoney(r.amount)}</td>
+                            <td className="bgt-col-actions"><span className="bgt-muted">Reload required</span></td>
                           </tr>
                         ))}
                       </tbody>
@@ -1144,11 +1249,11 @@ export default function BudgetTab() {
                   {/* Format hint */}
                   <div className="bgt-import-format">
                     <div className="bgt-import-format-title">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
                       Expected Excel format
                     </div>
                     <div className="bgt-import-cols">
-                      {["Date","Description / Expenses","Price","Qty","Sub Total"].map((col) => (
+                      {["Date", "Description / Expenses", "Price", "Qty", "Sub Total"].map((col) => (
                         <span key={col} className="bgt-import-col-chip">{col}</span>
                       ))}
                     </div>
@@ -1187,7 +1292,7 @@ export default function BudgetTab() {
                       <label className="bgt-label">Excel File <span className="bgt-req">*</span></label>
                       <label className="bgt-file-drop">
                         <input type="file" accept=".xlsx,.xls" required className="bgt-file-input" onChange={(e) => setImportFile(e.target.files[0] || null)} />
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
                         <span className="bgt-file-label">
                           {importFile ? importFile.name : <><strong>Choose file</strong> or drag & drop</>}
                         </span>
@@ -1211,12 +1316,33 @@ export default function BudgetTab() {
         </div>
       )}
 
+      {/* ── Bulk delete tx confirm ─────────────────────────────────────────── */}
+      {bulkDeleteOpen && (
+        <div className="bgt-backdrop" onClick={() => setBulkDeleteOpen(false)}>
+          <div className="bgt-modal bgt-modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="bgt-confirm-icon bgt-confirm-icon--del">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" /></svg>
+            </div>
+            <h3 className="bgt-confirm-title">Delete Selected Transactions?</h3>
+            <p className="bgt-confirm-body">
+              This will permanently delete <strong>{selectedTxCount}</strong> selected transaction{selectedTxCount !== 1 ? "s" : ""}. This cannot be undone.
+            </p>
+            <div className="bgt-modal-foot bgt-modal-foot--center">
+              <button className="btn btn-ghost" onClick={() => setBulkDeleteOpen(false)} disabled={bulkDeleting}>Cancel</button>
+              <button className="btn btn-danger" onClick={confirmBulkDeleteTx} disabled={bulkDeleting || !selectedTxCount}>
+                {bulkDeleting ? "Deleting…" : "Delete Selected"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Delete tx confirm ──────────────────────────────────────────────── */}
       {deletingTx && (
         <div className="bgt-backdrop" onClick={() => setDeletingTx(null)}>
           <div className="bgt-modal bgt-modal--confirm" onClick={(e) => e.stopPropagation()}>
             <div className="bgt-confirm-icon bgt-confirm-icon--del">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" /></svg>
             </div>
             <h3 className="bgt-confirm-title">Delete Transaction?</h3>
             <p className="bgt-confirm-body">
@@ -1236,7 +1362,7 @@ export default function BudgetTab() {
         <div className="bgt-backdrop" onClick={() => setDeletingAcc(null)}>
           <div className="bgt-modal bgt-modal--confirm" onClick={(e) => e.stopPropagation()}>
             <div className="bgt-confirm-icon bgt-confirm-icon--del">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" /></svg>
             </div>
             <h3 className="bgt-confirm-title">{deletingAcc.transaction_count > 0 ? "Deactivate Account?" : "Delete Account?"}</h3>
             <p className="bgt-confirm-body">
