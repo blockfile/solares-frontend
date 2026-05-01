@@ -81,6 +81,14 @@ export default function BudgetTab() {
   const [deletingTx, setDeletingTx] = useState(null);
   const [deletingAcc, setDeletingAcc] = useState(null);
 
+  // Excel import
+  const [importOpen, setImportOpen] = useState(false);
+  const [importAccountId, setImportAccountId] = useState("");
+  const [importType, setImportType] = useState("out");
+  const [importFile, setImportFile] = useState(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState(null); // { imported, rows }
+
   const loadAll = async (quiet = false) => {
     if (!quiet) setLoading(true);
     setError("");
@@ -120,6 +128,45 @@ export default function BudgetTab() {
     if (type === "success") { setSuccess(msg); setError(""); }
     else { setError(msg); setSuccess(""); }
     setTimeout(() => { setSuccess(""); setError(""); }, 3500);
+  }
+
+  // ── Excel Import ───────────────────────────────────────────────────────────
+
+  function openImport() {
+    setImportAccountId(activeAccounts[0]?.id ? String(activeAccounts[0].id) : "");
+    setImportType("out");
+    setImportFile(null);
+    setImportResult(null);
+    setImportOpen(true);
+  }
+
+  function closeImport() {
+    setImportOpen(false);
+    setImportFile(null);
+    setImportResult(null);
+  }
+
+  async function submitImport(e) {
+    e.preventDefault();
+    if (!importFile) { flash("Please select an Excel file.", "error"); return; }
+    if (!importAccountId) { flash("Please select an account.", "error"); return; }
+    setImportLoading(true);
+    setImportResult(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", importFile);
+      formData.append("accountId", importAccountId);
+      formData.append("type", importType);
+      const res = await api.post("/budget/import", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      setImportResult(res.data);
+      await loadAll(true);
+    } catch (err) {
+      flash(err?.response?.data?.message || "Import failed.", "error");
+    } finally {
+      setImportLoading(false);
+    }
   }
 
   // ── Transaction form ───────────────────────────────────────────────────────
@@ -296,7 +343,17 @@ export default function BudgetTab() {
           >Accounts</button>
         </div>
         {view === "transactions" && (
-          <button className="btn btn-primary" onClick={openNewTx}>+ Record Transaction</button>
+          <div className="budget-action-group">
+            <button className="btn btn-ghost" onClick={openImport}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              Import Excel
+            </button>
+            <button className="btn btn-primary" onClick={openNewTx}>+ Record Transaction</button>
+          </div>
         )}
         {view === "accounts" && (
           <button className="btn btn-primary" onClick={openNewAcc}>+ New Account</button>
@@ -636,6 +693,103 @@ export default function BudgetTab() {
                 <button className="btn btn-ghost" onClick={() => setDeletingTx(null)}>Cancel</button>
                 <button className="btn btn-danger" onClick={() => confirmDeleteTx(deletingTx)}>Delete</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Excel Import modal ── */}
+      {importOpen && (
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeImport(); }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">Import from Excel</h2>
+              <button className="modal-close" onClick={closeImport} aria-label="Close">×</button>
+            </div>
+            <div className="modal-body">
+              {importResult ? (
+                <div>
+                  <p className="form-success">
+                    Successfully imported <strong>{importResult.imported}</strong> transaction(s).
+                  </p>
+                  <div className="table-wrapper" style={{ maxHeight: 320, overflowY: "auto" }}>
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Description</th>
+                          <th className="text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importResult.rows.map((r, i) => (
+                          <tr key={i}>
+                            <td>{formatDate(r.transactionDate)}</td>
+                            <td>{r.description}</td>
+                            <td className="text-right monospace">₱{formatMoneyPlain(r.amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="modal-actions">
+                    <button className="btn btn-primary" onClick={closeImport}>Done</button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={submitImport}>
+                  <p className="import-hint">
+                    Upload your Excel file (.xlsx / .xls). Expected columns: <strong>Date</strong>, <strong>Expenses / Description</strong>, <strong>Price</strong>, <strong>Qty</strong> — matches the standard format. Date column is optional if dates are merged rows.
+                  </p>
+
+                  <div className="form-row">
+                    <label className="form-label">Account <span className="required">*</span></label>
+                    <select
+                      className="input"
+                      required
+                      value={importAccountId}
+                      onChange={(e) => setImportAccountId(e.target.value)}
+                    >
+                      <option value="">— Select account —</option>
+                      {activeAccounts.map((a) => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-row">
+                    <label className="form-label">Transaction Type <span className="required">*</span></label>
+                    <div className="radio-group">
+                      <label className="radio-label">
+                        <input type="radio" value="out" checked={importType === "out"} onChange={() => setImportType("out")} />
+                        <span className="budget-negative">Out (Expenses)</span>
+                      </label>
+                      <label className="radio-label">
+                        <input type="radio" value="in" checked={importType === "in"} onChange={() => setImportType("in")} />
+                        <span className="budget-positive">In (Income)</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="form-row">
+                    <label className="form-label">Excel File <span className="required">*</span></label>
+                    <input
+                      className="input"
+                      type="file"
+                      accept=".xlsx,.xls"
+                      required
+                      onChange={(e) => setImportFile(e.target.files[0] || null)}
+                    />
+                  </div>
+
+                  <div className="modal-actions">
+                    <button type="button" className="btn btn-ghost" onClick={closeImport} disabled={importLoading}>Cancel</button>
+                    <button type="submit" className="btn btn-primary" disabled={importLoading}>
+                      {importLoading ? "Importing…" : "Import"}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         </div>
