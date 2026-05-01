@@ -91,6 +91,8 @@ export default function BudgetTab() {
 
   const [filterType, setFilterType] = useState("all");
   const [filterAccount, setFilterAccount] = useState("all");
+  const [scopeMode, setScopeMode] = useState("overall");
+  const [scopeProjectId, setScopeProjectId] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
   const [searchRaw, setSearchRaw] = useState("");
@@ -110,6 +112,10 @@ export default function BudgetTab() {
 
   const [deletingTx, setDeletingTx] = useState(null);
   const [deletingAcc, setDeletingAcc] = useState(null);
+  const [selectedTxIds, setSelectedTxIds] = useState(new Set());
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignProjectId, setAssignProjectId] = useState("");
+  const [assignSaving, setAssignSaving] = useState(false);
 
   const [importOpen, setImportOpen] = useState(false);
   const [importAccountId, setImportAccountId] = useState("");
@@ -153,10 +159,12 @@ export default function BudgetTab() {
       const params = new URLSearchParams();
       if (filterType !== "all") params.set("type", filterType);
       if (filterAccount !== "all") params.set("accountId", filterAccount);
+      if (scopeMode === "project" && scopeProjectId) params.set("projectId", scopeProjectId);
       if (filterDateFrom) params.set("dateFrom", filterDateFrom);
       if (filterDateTo) params.set("dateTo", filterDateTo);
       if (search) params.set("q", search);
       const summaryParams = new URLSearchParams();
+      if (scopeMode === "project" && scopeProjectId) summaryParams.set("projectId", scopeProjectId);
       if (filterDateFrom) summaryParams.set("dateFrom", filterDateFrom);
       if (filterDateTo) summaryParams.set("dateTo", filterDateTo);
       const [txRes, accRes, sumRes, projRes, custRes, salesSumRes] = await Promise.all([
@@ -183,7 +191,7 @@ export default function BudgetTab() {
   useEffect(() => {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterType, filterAccount, filterDateFrom, filterDateTo, search]);
+  }, [filterType, filterAccount, filterDateFrom, filterDateTo, search, scopeMode, scopeProjectId]);
 
   function flash(msg, type = "success") {
     if (type === "success") { setSuccess(msg); setError(""); }
@@ -192,8 +200,30 @@ export default function BudgetTab() {
   }
 
   const activeAccounts = useMemo(() => accounts.filter((a) => Number(a.is_active) === 1), [accounts]);
-  const hasFilters = filterType !== "all" || filterAccount !== "all" || filterDateFrom || filterDateTo || searchRaw;
+  const hasFilters = filterType !== "all" || filterAccount !== "all" || filterDateFrom || filterDateTo || searchRaw || scopeMode !== "overall";
   const netPositive = toNumber(summary.netBalance, 0) >= 0;
+  const visibleTxIds = useMemo(() => transactions.map((tx) => tx.id), [transactions]);
+  const selectedTxCount = selectedTxIds.size;
+  const allVisibleTxSelected = visibleTxIds.length > 0 && visibleTxIds.every((id) => selectedTxIds.has(id));
+  const projectScoped = scopeMode === "project" && !!scopeProjectId;
+  const selectedScopeProject = useMemo(
+    () => projects.find((p) => String(p.id) === String(scopeProjectId)) || null,
+    [projects, scopeProjectId]
+  );
+
+  useEffect(() => {
+    if (scopeMode === "project" && !scopeProjectId && projects[0]?.id) {
+      setScopeProjectId(String(projects[0].id));
+    }
+  }, [scopeMode, scopeProjectId, projects]);
+
+  useEffect(() => {
+    setSelectedTxIds((prev) => {
+      const visible = new Set(visibleTxIds);
+      const next = new Set(Array.from(prev).filter((id) => visible.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [visibleTxIds]);
 
   // ── Import ──────────────────────────────────────────────────────────────────
   function openImport() {
@@ -264,6 +294,58 @@ export default function BudgetTab() {
   }
 
   // ── Transaction form ────────────────────────────────────────────────────────
+  function toggleTxSelection(id) {
+    setSelectedTxIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleVisibleTxSelection() {
+    setSelectedTxIds((prev) => {
+      const next = new Set(prev);
+      const allSelected = visibleTxIds.length > 0 && visibleTxIds.every((id) => next.has(id));
+      visibleTxIds.forEach((id) => {
+        if (allSelected) next.delete(id);
+        else next.add(id);
+      });
+      return next;
+    });
+  }
+
+  function openAssignProject() {
+    if (!selectedTxCount) return;
+    setAssignProjectId(projects[0]?.id ? String(projects[0].id) : "");
+    setAssignOpen(true);
+  }
+
+  function closeAssignProject() {
+    setAssignOpen(false);
+    setAssignProjectId("");
+  }
+
+  async function submitAssignProject(e) {
+    e.preventDefault();
+    if (!assignProjectId) { flash("Please select a project.", "error"); return; }
+    setAssignSaving(true);
+    try {
+      const res = await api.put("/budget/bulk/project", {
+        transactionIds: Array.from(selectedTxIds),
+        projectId: Number(assignProjectId)
+      });
+      flash(`${res.data?.updated || selectedTxCount} transaction(s) assigned to project.`);
+      setSelectedTxIds(new Set());
+      closeAssignProject();
+      await loadAll(true);
+    } catch (err) {
+      flash(err?.response?.data?.message || "Failed to assign transactions.", "error");
+    } finally {
+      setAssignSaving(false);
+    }
+  }
+
   function openNewTx() {
     setEditingTx(null); setTxForm({ ...EMPTY_TX_FORM, transactionDate: localDateInput() }); setTxFormOpen(true);
   }
@@ -325,7 +407,7 @@ export default function BudgetTab() {
         <div className="bgt-kpi bgt-kpi--in">
           <div className="bgt-kpi-icon"><IconArrowDown /></div>
           <div className="bgt-kpi-body">
-            <span className="bgt-kpi-label">Total Income</span>
+            <span className="bgt-kpi-label">{projectScoped ? "Project Budget" : "Total Income"}</span>
             <strong className="bgt-kpi-value">₱{formatMoney(summary.totalIn)}</strong>
           </div>
         </div>
@@ -339,11 +421,11 @@ export default function BudgetTab() {
         <div className={`bgt-kpi bgt-kpi--net ${netPositive ? "bgt-kpi--net-pos" : "bgt-kpi--net-neg"}`}>
           <div className="bgt-kpi-icon"><IconBalance /></div>
           <div className="bgt-kpi-body">
-            <span className="bgt-kpi-label">Net Balance</span>
+            <span className="bgt-kpi-label">{projectScoped ? "Project Margin" : "Net Balance"}</span>
             <strong className="bgt-kpi-value">₱{formatMoney(summary.netBalance)}</strong>
           </div>
           <div className={`bgt-kpi-badge ${netPositive ? "bgt-kpi-badge--pos" : "bgt-kpi-badge--neg"}`}>
-            {netPositive ? "Surplus" : "Deficit"}
+            {netPositive ? (projectScoped ? "Profit" : "Surplus") : (projectScoped ? "Loss" : "Deficit")}
           </div>
         </div>
         <div className="bgt-kpi bgt-kpi--count">
@@ -351,7 +433,11 @@ export default function BudgetTab() {
             <span className="bgt-kpi-label">Transactions</span>
             <strong className="bgt-kpi-value">{summary.transactionCount}</strong>
           </div>
-          <div className="bgt-kpi-sub">{summary.activeAccounts} active account{summary.activeAccounts !== 1 ? "s" : ""}</div>
+          <div className="bgt-kpi-sub">
+            {projectScoped && selectedScopeProject
+              ? `${selectedScopeProject.customer_name} — ${selectedScopeProject.project_name}`
+              : `${summary.activeAccounts} active account${summary.activeAccounts !== 1 ? "s" : ""}`}
+          </div>
         </div>
       </div>
 
@@ -389,6 +475,9 @@ export default function BudgetTab() {
         <div className="bgt-toolbar-actions">
           {view === "transactions" && (
             <>
+              <button className="btn btn-ghost bgt-btn-import" onClick={openAssignProject} disabled={!selectedTxCount || projects.length === 0}>
+                <IconPlus /> Assign to Project{selectedTxCount ? ` (${selectedTxCount})` : ""}
+              </button>
               <button className="btn btn-ghost bgt-btn-import" onClick={openImport}>
                 <IconUpload /> Import Excel
               </button>
@@ -418,6 +507,20 @@ export default function BudgetTab() {
       {view === "transactions" && (
         <>
           <div className="bgt-filters">
+            <div className="bgt-seg" style={{ flexShrink: 0 }}>
+              <button className={`bgt-seg-btn${scopeMode === "overall" ? " bgt-seg-btn--on" : ""}`} onClick={() => setScopeMode("overall")}>
+                Overall
+              </button>
+              <button className={`bgt-seg-btn${scopeMode === "project" ? " bgt-seg-btn--on" : ""}`} onClick={() => { setScopeMode("project"); if (!scopeProjectId && projects[0]?.id) setScopeProjectId(String(projects[0].id)); }}>
+                Per Project
+              </button>
+            </div>
+            {scopeMode === "project" && (
+              <select className="input bgt-filter-select" value={scopeProjectId} onChange={(e) => setScopeProjectId(e.target.value)}>
+                <option value="">Select project</option>
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.customer_name} — {p.project_name}</option>)}
+              </select>
+            )}
             <div className="bgt-search-wrap">
               <span className="bgt-search-icon"><IconSearch /></span>
               <input className="input bgt-search-input" placeholder="Search description, reference, account…" value={searchRaw} onChange={(e) => setSearchRaw(e.target.value)} />
@@ -437,7 +540,7 @@ export default function BudgetTab() {
               <input className="input bgt-date-input" type="date" title="To" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} />
             </div>
             {hasFilters && (
-              <button className="btn btn-ghost bgt-clear-btn" onClick={() => { setFilterType("all"); setFilterAccount("all"); setFilterDateFrom(""); setFilterDateTo(""); setSearchRaw(""); }}>
+              <button className="btn btn-ghost bgt-clear-btn" onClick={() => { setFilterType("all"); setFilterAccount("all"); setScopeMode("overall"); setScopeProjectId(""); setFilterDateFrom(""); setFilterDateTo(""); setSearchRaw(""); }}>
                 Clear filters
               </button>
             )}
@@ -459,6 +562,14 @@ export default function BudgetTab() {
               <table className="bgt-table">
                 <thead>
                   <tr>
+                    <th style={{ width: 36 }}>
+                      <input
+                        type="checkbox"
+                        checked={allVisibleTxSelected}
+                        onChange={toggleVisibleTxSelection}
+                        aria-label="Select all visible transactions"
+                      />
+                    </th>
                     <th>Date</th>
                     <th>Account</th>
                     <th>Description</th>
@@ -471,6 +582,14 @@ export default function BudgetTab() {
                 <tbody>
                   {transactions.map((tx) => (
                     <tr key={tx.id} className="bgt-table-row">
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedTxIds.has(tx.id)}
+                          onChange={() => toggleTxSelection(tx.id)}
+                          aria-label={`Select transaction ${tx.id}`}
+                        />
+                      </td>
                       <td className="bgt-cell-date">{formatDate(tx.transaction_date)}</td>
                       <td className="bgt-cell-account">
                         <span className="bgt-account-chip">{tx.account_name || "—"}</span>
@@ -509,6 +628,7 @@ export default function BudgetTab() {
               </table>
               <div className="bgt-table-footer">
                 {transactions.length} transaction{transactions.length !== 1 ? "s" : ""}
+                {selectedTxCount > 0 ? ` • ${selectedTxCount} selected` : ""}
               </div>
             </div>
           )}
@@ -516,6 +636,41 @@ export default function BudgetTab() {
       )}
 
       {/* ── Accounts view ──────────────────────────────────────────────────── */}
+      {assignOpen && (
+        <div className="bgt-backdrop" onClick={(e) => { if (e.target === e.currentTarget) closeAssignProject(); }}>
+          <div className="bgt-modal bgt-modal--sm">
+            <div className="bgt-modal-head">
+              <div>
+                <p className="bgt-modal-eyebrow">Assign expenses</p>
+                <h3 className="bgt-modal-title">Assign to Project</h3>
+              </div>
+              <button className="bgt-modal-x" onClick={closeAssignProject} aria-label="Close">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <form className="bgt-modal-body" onSubmit={submitAssignProject}>
+              <div className="bgt-field">
+                <label className="bgt-label">Selected Transactions</label>
+                <div className="bgt-account-chip">{selectedTxCount} selected</div>
+              </div>
+              <div className="bgt-field">
+                <label className="bgt-label">Project <span className="bgt-req">*</span></label>
+                <select className="input" required value={assignProjectId} onChange={(e) => setAssignProjectId(e.target.value)}>
+                  <option value="">— Select project —</option>
+                  {projects.map((p) => <option key={p.id} value={p.id}>{p.customer_name} — {p.project_name}</option>)}
+                </select>
+              </div>
+              <div className="bgt-modal-foot">
+                <button type="button" className="btn btn-ghost" onClick={closeAssignProject} disabled={assignSaving}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={assignSaving || !assignProjectId}>
+                  {assignSaving ? "Assigning…" : "Assign"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {view === "accounts" && (
         accounts.length === 0 ? (
           <div className="bgt-empty">
@@ -614,7 +769,7 @@ export default function BudgetTab() {
 
             {/* Sub-view toggle */}
             <div style={{ display: "flex", gap: 8 }}>
-              <button className={`bgt-seg-btn${salesView === "overview" ? " bgt-seg-btn--on" : ""}`} style={{ background: salesView === "overview" ? "#fff" : "transparent", borderRadius: 9, padding: "7px 14px", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13 }} onClick={() => setSalesView("overview")}>Overview</button>
+              <button className={`bgt-seg-btn${salesView === "overview" ? " bgt-seg-btn--on" : ""}`} style={{ background: salesView === "overview" ? "#fff" : "transparent", borderRadius: 9, padding: "7px 14px", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13 }} onClick={() => setSalesView("overview")}>Overall</button>
               <button className={`bgt-seg-btn${salesView === "projects" ? " bgt-seg-btn--on" : ""}`} style={{ background: salesView === "projects" ? "#fff" : "transparent", borderRadius: 9, padding: "7px 14px", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13 }} onClick={() => setSalesView("projects")}>All Projects</button>
             </div>
 
