@@ -11,6 +11,7 @@ import TemplatesTab from "./TemplatesTab";
 import UsersTab from "./UsersTab";
 import RolesTab from "./RolesTab";
 import AuditTab from "./AuditTab";
+import BudgetTab from "./BudgetTab";
 import solaresLogo from "../components/assets/SOLARES.png";
 import { normalizeModules, roleLabel } from "../constants/access";
 import useBodyScrollLock from "../hooks/useBodyScrollLock";
@@ -24,6 +25,7 @@ const TAB_CONFIG = [
   { key: "inventory", label: "Inventory", group: "Catalog", icon: "inventory" },
   { key: "packages", label: "Package Prices", group: "Catalog", icon: "packages" },
   { key: "margins", label: "Margin Setup", group: "Catalog", icon: "margins" },
+  { key: "budget", label: "Budget & Expenses", group: "Workspace", icon: "budget" },
   { key: "users", label: "Users", group: "System Admin", icon: "users" },
   { key: "roles", label: "Roles", group: "System Admin", icon: "roles" },
   { key: "audit", label: "Audit", group: "System Admin", icon: "audit" }
@@ -149,6 +151,19 @@ function SidebarIcon({ icon }) {
           <circle cx="12" cy="12" r="7.5" />
           <path d="M12 2.5v2" />
           <path d="M21.5 12h-2" />
+        </svg>
+      );
+    case "budget":
+      return (
+        <svg {...common}>
+          <rect x="3.5" y="6" width="17" height="13" rx="2" />
+          <path d="M3.5 10h17" />
+          <path d="M7.5 14h2" />
+          <path d="M11.5 14h2" />
+          <path d="M15.5 14h1" />
+          <path d="M12 3.5v2.5" />
+          <path d="M8 3.5v2.5" />
+          <path d="M16 3.5v2.5" />
         </svg>
       );
     default:
@@ -406,6 +421,7 @@ export default function Dashboard() {
           {tab === "users" && <UsersTab currentUser={user} />}
           {tab === "roles" && <RolesTab />}
           {tab === "audit" && <AuditTab />}
+          {tab === "budget" && <BudgetTab />}
         </section>
       </main>
     </div>
