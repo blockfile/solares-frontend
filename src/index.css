@@ -5903,22 +5903,110 @@ button {
 }
 
 /* ── Import ───────────────────────────────────────────────────────────────── */
-.bgt-import-hint {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  background: #f0f4ff;
-  border: 1px solid #c7d5f5;
-  border-radius: 12px;
-  padding: 13px 14px;
-  font-size: 13px;
-  color: #2c4a85;
-  line-height: 1.5;
+.bgt-modal--import {
+  max-width: 480px;
 }
 
-.bgt-import-hint svg {
+.bgt-import-format {
+  background: #f7f8fb;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bgt-import-format-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+
+.bgt-import-cols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bgt-import-col-chip {
+  display: inline-flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--primary);
+  font-family: "Courier New", Courier, monospace;
+}
+
+.bgt-import-format-note {
+  font-size: 12px;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+
+.bgt-file-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 28px 20px;
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  background: #f9fafc;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s;
+  position: relative;
+  text-align: center;
+  color: var(--text-soft);
+}
+
+.bgt-file-drop:hover {
+  border-color: var(--primary);
+  background: #f0f4ff;
+}
+
+.bgt-file-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+.bgt-file-label {
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.bgt-file-label strong {
+  color: var(--primary);
+}
+
+.bgt-file-note {
+  font-size: 11.5px;
+  color: var(--text-soft);
+}
+
+.bgt-btn-spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: bgt-spin 0.7s linear infinite;
   flex-shrink: 0;
-  margin-top: 1px;
 }
 
 .bgt-import-success {
@@ -5939,6 +6027,378 @@ button {
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 12px;
+}
+
+/* ── Misc ─────────────────────────────────────────────────────────────────── */
+.bgt-label-opt {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-soft);
+  margin-left: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SALES & CUSTOMERS MODULE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.sl {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-bottom: 32px;
+}
+
+/* ── KPI ──────────────────────────────────────────────────────────────────── */
+.sl-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.sl-kpi {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 2px 8px rgba(20,35,59,0.05);
+  position: relative;
+}
+
+.sl-kpi-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+
+.sl-kpi-value {
+  font-size: 22px;
+  font-weight: 800;
+  font-family: var(--font-title);
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.sl-kpi--sales .sl-kpi-value  { color: #147845; }
+.sl-kpi--expenses .sl-kpi-value { color: #b83a3a; }
+.sl-kpi--pos .sl-kpi-value    { color: #147845; }
+.sl-kpi--neg .sl-kpi-value    { color: #b83a3a; }
+
+.sl-kpi-sub {
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.sl-kpi-badge {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 9px;
+  border-radius: 20px;
+}
+
+.sl-kpi-badge--pos { background: #dff7e8; color: #147845; }
+.sl-kpi-badge--neg { background: #fde8e8; color: #b83a3a; }
+
+/* ── Overview grid ────────────────────────────────────────────────────────── */
+.sl-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.sl-cust-card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 2px 8px rgba(20,35,59,0.04);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.sl-cust-card:hover {
+  box-shadow: 0 6px 20px rgba(20,35,59,0.09);
+  transform: translateY(-1px);
+}
+
+.sl-cust-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sl-cust-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #24476e, #1f3c63);
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 800;
+  font-family: var(--font-title);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sl-cust-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sl-cust-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sl-cust-meta {
+  font-size: 12.5px;
+  color: var(--text-soft);
+  margin-top: 2px;
+}
+
+.sl-cust-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.sl-cust-stats {
+  display: flex;
+  align-items: center;
+  background: #f7f8fb;
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.sl-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+}
+
+.sl-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+
+.sl-stat-val {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.sl-stat-val--sales { color: #147845; }
+.sl-stat-val--exp   { color: #b83a3a; }
+
+.sl-stat-div {
+  width: 1px;
+  height: 32px;
+  background: var(--border);
+  flex-shrink: 0;
+  margin: 0 12px;
+}
+
+/* ── Project rows inside customer card ─────────────────────────────────────── */
+.sl-cust-projects {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sl-proj-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fafbfd;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+  width: 100%;
+}
+
+.sl-proj-row:hover {
+  background: #f0f4ff;
+  border-color: rgba(31,60,99,0.2);
+}
+
+.sl-proj-row-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sl-proj-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sl-proj-row-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  color: var(--text-soft);
+}
+
+.sl-proj-margin {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sl-add-proj-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 9px;
+  border: 1.5px dashed var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.sl-add-proj-btn:hover {
+  background: #f0f4ff;
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* ── Status pills ─────────────────────────────────────────────────────────── */
+.sl-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.sl-pill--active    { background: #dff7e8; color: #147845; }
+.sl-pill--done      { background: rgba(31,60,99,0.1); color: var(--primary); }
+.sl-pill--cancelled { background: #f5f5f5; color: #888; }
+
+/* ── Filter bar ───────────────────────────────────────────────────────────── */
+.sl-filter-bar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sl-filter-select {
+  max-width: 260px;
+}
+
+/* ── Project detail drawer ────────────────────────────────────────────────── */
+.sl-drawer {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(15,25,45,0.25);
+  width: 100%;
+  max-width: 600px;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  animation: bgt-modal-in 0.25s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.sl-drawer-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.sl-dstat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #f7f8fb;
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.sl-dstat-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+
+.sl-dstat-val {
+  font-size: 18px;
+  font-weight: 800;
+  font-family: var(--font-title);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.sl-dstat-val--sales { color: #147845; }
+.sl-dstat-val--exp   { color: #b83a3a; }
+
+.sl-drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sl-drawer-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .sl-kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sl-drawer-stats { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 640px) {
+  .sl-kpi-row { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .sl-overview-grid { grid-template-columns: 1fr; }
+  .sl-drawer { max-width: calc(100vw - 24px); }
+  .sl-drawer-stats { grid-template-columns: 1fr; }
 }
 
 /* ── Responsive ───────────────────────────────────────────────────────────── */

@@ -95,7 +95,7 @@ export default function BudgetTab() {
   const [searchRaw, setSearchRaw] = useState("");
   const search = useDeferredValue(searchRaw);
 
-  const [view, setView] = useState("transactions");
+  const [view, setView] = useState("transactions"); // "transactions" | "accounts" | "sales"
 
   const [txForm, setTxForm] = useState(EMPTY_TX_FORM);
   const [editingTx, setEditingTx] = useState(null);
@@ -113,9 +113,37 @@ export default function BudgetTab() {
   const [importOpen, setImportOpen] = useState(false);
   const [importAccountId, setImportAccountId] = useState("");
   const [importType, setImportType] = useState("out");
+  const [importProjectId, setImportProjectId] = useState("");
   const [importFile, setImportFile] = useState(null);
   const [importLoading, setImportLoading] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [projects, setProjects] = useState([]);
+
+  // ── Sales / Customers state ─────────────────────────────────────────────────
+  const [customers, setCustomers] = useState([]);
+  const [salesSummary, setSalesSummary] = useState({ totalCustomers: 0, totalProjects: 0, totalSales: 0, totalExpenses: 0, totalMargin: 0 });
+  const [selectedCustomerFilter, setSelectedCustomerFilter] = useState(null);
+
+  const EMPTY_CUST = { name: "", contact: "", address: "", notes: "" };
+  const EMPTY_PROJ = { customerId: "", projectName: "", saleAmount: "", projectDate: localDateInput(), status: "active", notes: "" };
+
+  const [custForm, setCustForm] = useState(EMPTY_CUST);
+  const [editingCust, setEditingCust] = useState(null);
+  const [custOpen, setCustOpen] = useState(false);
+  const [custSaving, setCustSaving] = useState(false);
+  const [deletingCust, setDeletingCust] = useState(null);
+
+  const [projForm, setProjForm] = useState(EMPTY_PROJ);
+  const [editingProj, setEditingProj] = useState(null);
+  const [projOpen, setProjOpen] = useState(false);
+  const [projSaving, setProjSaving] = useState(false);
+  const [deletingProj, setDeletingProj] = useState(null);
+
+  const [detailProj, setDetailProj] = useState(null);
+  const [detailTx, setDetailTx] = useState([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const [salesView, setSalesView] = useState("overview"); // "overview" | "projects"
 
   const loadAll = async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -130,14 +158,20 @@ export default function BudgetTab() {
       const summaryParams = new URLSearchParams();
       if (filterDateFrom) summaryParams.set("dateFrom", filterDateFrom);
       if (filterDateTo) summaryParams.set("dateTo", filterDateTo);
-      const [txRes, accRes, sumRes] = await Promise.all([
+      const [txRes, accRes, sumRes, projRes, custRes, salesSumRes] = await Promise.all([
         api.get(`/budget?${params}`),
         api.get("/budget/accounts"),
-        api.get(`/budget/summary?${summaryParams}`)
+        api.get(`/budget/summary?${summaryParams}`),
+        api.get("/customers/projects").catch(() => ({ data: [] })),
+        api.get("/customers").catch(() => ({ data: [] })),
+        api.get("/customers/summary").catch(() => ({ data: {} }))
       ]);
       setTransactions(txRes.data || []);
       setAccounts(accRes.data || []);
       setSummary(sumRes.data || { totalIn: 0, totalOut: 0, netBalance: 0, transactionCount: 0, activeAccounts: 0 });
+      setProjects(projRes.data || []);
+      setCustomers(custRes.data || []);
+      setSalesSummary(salesSumRes.data || {});
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to load budget data.");
     } finally {
@@ -163,9 +197,9 @@ export default function BudgetTab() {
   // ── Import ──────────────────────────────────────────────────────────────────
   function openImport() {
     setImportAccountId(activeAccounts[0]?.id ? String(activeAccounts[0].id) : "");
-    setImportType("out"); setImportFile(null); setImportResult(null); setImportOpen(true);
+    setImportType("out"); setImportProjectId(""); setImportFile(null); setImportResult(null); setImportOpen(true);
   }
-  function closeImport() { setImportOpen(false); setImportFile(null); setImportResult(null); }
+  function closeImport() { setImportOpen(false); setImportFile(null); setImportResult(null); setImportProjectId(""); }
   async function submitImport(e) {
     e.preventDefault();
     if (!importFile) { flash("Please select an Excel file.", "error"); return; }
@@ -173,13 +207,59 @@ export default function BudgetTab() {
     setImportLoading(true); setImportResult(null);
     try {
       const fd = new FormData();
-      fd.append("file", importFile); fd.append("accountId", importAccountId); fd.append("type", importType);
+      fd.append("file", importFile);
+      fd.append("accountId", importAccountId);
+      fd.append("type", importType);
+      if (importProjectId) fd.append("projectId", importProjectId);
       const res = await api.post("/budget/import", fd, { headers: { "Content-Type": "multipart/form-data" } });
       setImportResult(res.data);
       await loadAll(true);
     } catch (err) {
       flash(err?.response?.data?.message || "Import failed.", "error");
     } finally { setImportLoading(false); }
+  }
+
+  // ── Customer / Project handlers ─────────────────────────────────────────────
+  function openNewCust() { setEditingCust(null); setCustForm(EMPTY_CUST); setCustOpen(true); }
+  function openEditCust(c) { setEditingCust(c); setCustForm({ name: c.name || "", contact: c.contact || "", address: c.address || "", notes: c.notes || "" }); setCustOpen(true); }
+  function closeCust() { setCustOpen(false); setEditingCust(null); setCustForm(EMPTY_CUST); }
+  async function saveCust(e) {
+    e.preventDefault(); setCustSaving(true);
+    try {
+      const payload = { name: custForm.name, contact: custForm.contact, address: custForm.address, notes: custForm.notes };
+      if (editingCust) { await api.put(`/customers/${editingCust.id}`, payload); flash("Customer updated."); }
+      else { await api.post("/customers", payload); flash("Customer created."); }
+      closeCust(); await loadAll(true);
+    } catch (err) { flash(err?.response?.data?.message || "Failed to save.", "error"); }
+    finally { setCustSaving(false); }
+  }
+  async function confirmDeleteCust(c) {
+    try { const res = await api.delete(`/customers/${c.id}`); flash(res.data?.deactivated ? "Customer deactivated." : "Customer deleted."); setDeletingCust(null); await loadAll(true); }
+    catch (err) { flash(err?.response?.data?.message || "Failed.", "error"); setDeletingCust(null); }
+  }
+
+  function openNewProj(custId = "") { setEditingProj(null); setProjForm({ ...EMPTY_PROJ, customerId: custId ? String(custId) : "", projectDate: localDateInput() }); setProjOpen(true); }
+  function openEditProj(p) { setEditingProj(p); setProjForm({ customerId: String(p.customer_id), projectName: p.project_name || "", saleAmount: String(p.sale_amount), projectDate: p.project_date ? p.project_date.slice(0, 10) : localDateInput(), status: p.status || "active", notes: p.notes || "" }); setProjOpen(true); }
+  function closeProj() { setProjOpen(false); setEditingProj(null); setProjForm(EMPTY_PROJ); }
+  async function saveProj(e) {
+    e.preventDefault(); setProjSaving(true);
+    try {
+      const payload = { customerId: Number(projForm.customerId), projectName: projForm.projectName, saleAmount: Number(projForm.saleAmount), projectDate: projForm.projectDate, status: projForm.status, notes: projForm.notes };
+      if (editingProj) { await api.put(`/customers/projects/${editingProj.id}`, payload); flash("Project updated."); }
+      else { await api.post("/customers/projects", payload); flash("Project created."); }
+      closeProj(); await loadAll(true);
+    } catch (err) { flash(err?.response?.data?.message || "Failed to save.", "error"); }
+    finally { setProjSaving(false); }
+  }
+  async function confirmDeleteProj(p) {
+    try { await api.delete(`/customers/projects/${p.id}`); flash("Project deleted."); setDeletingProj(null); await loadAll(true); }
+    catch (err) { flash(err?.response?.data?.message || "Failed.", "error"); setDeletingProj(null); }
+  }
+  async function openDetail(proj) {
+    setDetailProj(proj); setDetailTx([]); setDetailLoading(true);
+    try { const res = await api.get(`/customers/projects/${proj.id}/transactions`); setDetailTx(res.data || []); }
+    catch { setDetailTx([]); }
+    finally { setDetailLoading(false); }
   }
 
   // ── Transaction form ────────────────────────────────────────────────────────
@@ -299,6 +379,10 @@ export default function BudgetTab() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/><path d="M7 15h2M12 15h2"/></svg>
             Accounts
           </button>
+          <button className={`bgt-seg-btn${view === "sales" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("sales")}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Sales
+          </button>
         </div>
 
         <div className="bgt-toolbar-actions">
@@ -316,6 +400,12 @@ export default function BudgetTab() {
             <button className="btn btn-primary" onClick={openNewAcc}>
               <IconPlus /> New Account
             </button>
+          )}
+          {view === "sales" && (
+            <div className="bgt-toolbar-actions">
+              <button className="btn btn-ghost bgt-btn-import" onClick={openNewCust}><IconPlus /> New Customer</button>
+              <button className="btn btn-primary" onClick={() => openNewProj()}><IconPlus /> New Project</button>
+            </div>
           )}
         </div>
       </div>
@@ -482,6 +572,256 @@ export default function BudgetTab() {
         )
       )}
 
+      {/* ── Sales view ─────────────────────────────────────────────────────── */}
+      {view === "sales" && (() => {
+        const STATUS_LABELS = { active: "Active", completed: "Completed", cancelled: "Cancelled" };
+        const STATUS_COLORS = { active: "sl-pill--active", completed: "sl-pill--done", cancelled: "sl-pill--cancelled" };
+        const netPos = toNumber(salesSummary.totalMargin, 0) >= 0;
+        return (
+          <>
+            {/* Sales KPI strip */}
+            <div className="sl-kpi-row">
+              <div className="sl-kpi">
+                <span className="sl-kpi-label">Customers</span>
+                <strong className="sl-kpi-value">{salesSummary.totalCustomers || 0}</strong>
+                <span className="sl-kpi-sub">{salesSummary.totalProjects || 0} project(s)</span>
+              </div>
+              <div className="sl-kpi sl-kpi--sales">
+                <span className="sl-kpi-label">Total Sales</span>
+                <strong className="sl-kpi-value">₱{formatMoney(salesSummary.totalSales)}</strong>
+                <span className="sl-kpi-sub">contract value</span>
+              </div>
+              <div className="sl-kpi sl-kpi--expenses">
+                <span className="sl-kpi-label">Total Expenses</span>
+                <strong className="sl-kpi-value">₱{formatMoney(salesSummary.totalExpenses)}</strong>
+                <span className="sl-kpi-sub">linked costs</span>
+              </div>
+              <div className={`sl-kpi ${netPos ? "sl-kpi--pos" : "sl-kpi--neg"}`}>
+                <span className="sl-kpi-label">Net Margin</span>
+                <strong className="sl-kpi-value">₱{formatMoney(salesSummary.totalMargin)}</strong>
+                <span className={`sl-kpi-badge ${netPos ? "sl-kpi-badge--pos" : "sl-kpi-badge--neg"}`}>{netPos ? "Profit" : "Loss"}</span>
+              </div>
+            </div>
+
+            {/* Sub-view toggle */}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className={`bgt-seg-btn${salesView === "overview" ? " bgt-seg-btn--on" : ""}`} style={{ background: salesView === "overview" ? "#fff" : "transparent", borderRadius: 9, padding: "7px 14px", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13 }} onClick={() => setSalesView("overview")}>Overview</button>
+              <button className={`bgt-seg-btn${salesView === "projects" ? " bgt-seg-btn--on" : ""}`} style={{ background: salesView === "projects" ? "#fff" : "transparent", borderRadius: 9, padding: "7px 14px", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13 }} onClick={() => setSalesView("projects")}>All Projects</button>
+            </div>
+
+            {/* Overview — customer cards */}
+            {salesView === "overview" && (
+              customers.length === 0 ? (
+                <div className="bgt-empty">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="bgt-empty-icon"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                  <p>No customers yet. Add your first customer.</p>
+                  <button className="btn btn-primary" onClick={openNewCust}><IconPlus /> Add Customer</button>
+                </div>
+              ) : (
+                <div className="sl-overview-grid">
+                  {customers.map((cust) => {
+                    const custProjs = projects.filter((p) => p.customer_id === cust.id);
+                    const tSales = custProjs.reduce((s, p) => s + toNumber(p.sale_amount, 0), 0);
+                    const tExp   = custProjs.reduce((s, p) => s + toNumber(p.total_expenses, 0), 0);
+                    const margin = tSales - tExp;
+                    return (
+                      <div key={cust.id} className="sl-cust-card">
+                        <div className="sl-cust-card-head">
+                          <div className="sl-cust-avatar">{cust.name.slice(0,1).toUpperCase()}</div>
+                          <div className="sl-cust-info">
+                            <strong className="sl-cust-name">{cust.name}</strong>
+                            {cust.contact && <p className="sl-cust-meta">{cust.contact}</p>}
+                          </div>
+                          <div className="sl-cust-actions">
+                            <button className="bgt-row-btn" onClick={() => openEditCust(cust)}>Edit</button>
+                            <button className="bgt-row-btn bgt-row-btn--del" onClick={() => setDeletingCust(cust)}>Delete</button>
+                          </div>
+                        </div>
+                        <div className="sl-cust-stats">
+                          <div className="sl-stat"><span className="sl-stat-label">Sales</span><span className="sl-stat-val sl-stat-val--sales">₱{formatMoney(tSales)}</span></div>
+                          <div className="sl-stat-div" />
+                          <div className="sl-stat"><span className="sl-stat-label">Expenses</span><span className="sl-stat-val sl-stat-val--exp">₱{formatMoney(tExp)}</span></div>
+                          <div className="sl-stat-div" />
+                          <div className="sl-stat"><span className="sl-stat-label">Margin</span><span className={`sl-stat-val ${margin >= 0 ? "sl-stat-val--sales" : "sl-stat-val--exp"}`}>₱{formatMoney(margin)}</span></div>
+                        </div>
+                        {custProjs.length > 0 && (
+                          <div className="sl-cust-projects">
+                            {custProjs.map((p) => (
+                              <button key={p.id} className="sl-proj-row" onClick={() => openDetail(p)}>
+                                <div className="sl-proj-row-left">
+                                  <span className={`sl-pill ${STATUS_COLORS[p.status] || ""}`}>{STATUS_LABELS[p.status] || p.status}</span>
+                                  <span className="sl-proj-name">{p.project_name}</span>
+                                </div>
+                                <div className="sl-proj-row-right">
+                                  <span className="sl-proj-margin" style={{ color: toNumber(p.margin,0) >= 0 ? "#147845" : "#b83a3a" }}>₱{formatMoney(p.margin)}</span>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <button className="sl-add-proj-btn" onClick={() => openNewProj(cust.id)}><IconPlus /> Add Project</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            )}
+
+            {/* Projects table */}
+            {salesView === "projects" && (
+              <>
+                <div className="sl-filter-bar">
+                  <select className="input sl-filter-select" value={selectedCustomerFilter || ""} onChange={(e) => setSelectedCustomerFilter(e.target.value ? Number(e.target.value) : null)}>
+                    <option value="">All customers</option>
+                    {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                {(() => {
+                  const filtered = selectedCustomerFilter ? projects.filter((p) => p.customer_id === selectedCustomerFilter) : projects;
+                  return filtered.length === 0 ? (
+                    <div className="bgt-empty"><p>No projects found.</p><button className="btn btn-primary" onClick={() => openNewProj()}><IconPlus /> Add Project</button></div>
+                  ) : (
+                    <div className="bgt-table-wrap">
+                      <table className="bgt-table">
+                        <thead><tr><th>Customer</th><th>Project</th><th>Date</th><th>Status</th><th className="bgt-col-amt">Sale Amount</th><th className="bgt-col-amt">Expenses</th><th className="bgt-col-amt">Margin</th><th /></tr></thead>
+                        <tbody>
+                          {filtered.map((p) => {
+                            const m = toNumber(p.margin, 0);
+                            return (
+                              <tr key={p.id} className="bgt-table-row" style={{ cursor: "pointer" }} onClick={() => openDetail(p)}>
+                                <td><span className="bgt-account-chip">{p.customer_name}</span></td>
+                                <td><strong>{p.project_name}</strong></td>
+                                <td className="bgt-cell-date">{p.project_date ? new Date(p.project_date).toLocaleDateString(undefined, { year:"numeric", month:"short", day:"numeric" }) : "—"}</td>
+                                <td><span className={`sl-pill ${STATUS_COLORS[p.status] || ""}`}>{STATUS_LABELS[p.status] || p.status}</span></td>
+                                <td className="bgt-col-amt" style={{ color:"#147845", fontWeight:700 }}>₱{formatMoney(p.sale_amount)}</td>
+                                <td className="bgt-col-amt" style={{ color:"#b83a3a", fontWeight:700 }}>₱{formatMoney(p.total_expenses)}</td>
+                                <td className="bgt-col-amt" style={{ color: m >= 0 ? "#147845" : "#b83a3a", fontWeight:700 }}>₱{formatMoney(m)}</td>
+                                <td className="bgt-col-actions" onClick={(e) => e.stopPropagation()}>
+                                  <button className="bgt-row-btn" onClick={() => openEditProj(p)}>Edit</button>
+                                  <button className="bgt-row-btn bgt-row-btn--del" onClick={() => setDeletingProj(p)}>Delete</button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
+              </>
+            )}
+
+            {/* Project detail modal */}
+            {detailProj && (
+              <div className="bgt-backdrop" onClick={() => setDetailProj(null)}>
+                <div className="sl-drawer" onClick={(e) => e.stopPropagation()}>
+                  <div className="bgt-modal-head">
+                    <div><p className="bgt-modal-eyebrow">{detailProj.customer_name}</p><h3 className="bgt-modal-title">{detailProj.project_name}</h3></div>
+                    <button className="bgt-modal-x" onClick={() => setDetailProj(null)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                  </div>
+                  <div className="bgt-modal-body">
+                    <div className="sl-drawer-stats">
+                      <div className="sl-dstat"><span className="sl-dstat-label">Sale Amount</span><strong className="sl-dstat-val sl-dstat-val--sales">₱{formatMoney(detailProj.sale_amount)}</strong></div>
+                      <div className="sl-dstat"><span className="sl-dstat-label">Expenses</span><strong className="sl-dstat-val sl-dstat-val--exp">₱{formatMoney(detailProj.total_expenses)}</strong></div>
+                      <div className="sl-dstat"><span className="sl-dstat-label">Margin</span><strong className={`sl-dstat-val ${toNumber(detailProj.margin,0) >= 0 ? "sl-dstat-val--sales" : "sl-dstat-val--exp"}`}>₱{formatMoney(detailProj.margin)}</strong></div>
+                    </div>
+                    <div className="sl-drawer-section">
+                      <p className="sl-drawer-section-title">Linked Expenses ({detailTx.length})</p>
+                      {detailLoading ? (
+                        <div className="bgt-empty" style={{ padding: 24 }}><div className="bgt-spinner" /></div>
+                      ) : detailTx.length === 0 ? (
+                        <p style={{ fontSize: 13, color: "var(--text-soft)", padding: "10px 0" }}>No expenses linked yet. Assign via Import Excel → select this project.</p>
+                      ) : (
+                        <div className="bgt-import-preview">
+                          <table className="bgt-table bgt-table--compact">
+                            <thead><tr><th>Date</th><th>Description</th><th>Account</th><th className="bgt-col-amt">Amount</th></tr></thead>
+                            <tbody>
+                              {detailTx.map((tx) => (
+                                <tr key={tx.id}>
+                                  <td className="bgt-cell-date">{tx.transaction_date ? new Date(tx.transaction_date).toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"}) : "—"}</td>
+                                  <td>{tx.description || <span className="bgt-muted">—</span>}</td>
+                                  <td><span className="bgt-account-chip">{tx.account_name}</span></td>
+                                  <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatMoney(tx.amount)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                    <div className="bgt-modal-foot">
+                      <button className="btn btn-ghost" onClick={() => { setDetailProj(null); openEditProj(detailProj); }}>Edit Project</button>
+                      <button className="btn btn-primary" onClick={() => setDetailProj(null)}>Close</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Customer form */}
+            {custOpen && (
+              <div className="bgt-backdrop" onClick={(e) => { if (e.target === e.currentTarget) closeCust(); }}>
+                <div className="bgt-modal bgt-modal--sm">
+                  <div className="bgt-modal-head"><div><p className="bgt-modal-eyebrow">{editingCust ? "Editing" : "New"}</p><h3 className="bgt-modal-title">{editingCust ? "Edit Customer" : "New Customer"}</h3></div><button className="bgt-modal-x" onClick={closeCust}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+                  <form className="bgt-modal-body" onSubmit={saveCust}>
+                    <div className="bgt-form-grid">
+                      <div className="bgt-field bgt-field--wide"><label className="bgt-label">Name <span className="bgt-req">*</span></label><input className="input" required placeholder="e.g. Allan Santos" value={custForm.name} onChange={(e) => setCustForm((f) => ({ ...f, name: e.target.value }))} /></div>
+                      <div className="bgt-field bgt-field--wide"><label className="bgt-label">Contact / Phone</label><input className="input" placeholder="Phone or email" value={custForm.contact} onChange={(e) => setCustForm((f) => ({ ...f, contact: e.target.value }))} /></div>
+                      <div className="bgt-field bgt-field--wide"><label className="bgt-label">Address</label><input className="input" placeholder="Address (optional)" value={custForm.address} onChange={(e) => setCustForm((f) => ({ ...f, address: e.target.value }))} /></div>
+                    </div>
+                    <div className="bgt-modal-foot"><button type="button" className="btn btn-ghost" onClick={closeCust} disabled={custSaving}>Cancel</button><button type="submit" className="btn btn-primary" disabled={custSaving}>{custSaving ? "Saving…" : editingCust ? "Save Changes" : "Create Customer"}</button></div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* Project form */}
+            {projOpen && (
+              <div className="bgt-backdrop" onClick={(e) => { if (e.target === e.currentTarget) closeProj(); }}>
+                <div className="bgt-modal bgt-modal--sm">
+                  <div className="bgt-modal-head"><div><p className="bgt-modal-eyebrow">{editingProj ? "Editing" : "New project"}</p><h3 className="bgt-modal-title">{editingProj ? "Edit Project" : "New Project"}</h3></div><button className="bgt-modal-x" onClick={closeProj}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+                  <form className="bgt-modal-body" onSubmit={saveProj}>
+                    <div className="bgt-form-grid">
+                      <div className="bgt-field bgt-field--wide"><label className="bgt-label">Customer <span className="bgt-req">*</span></label><select className="input" required value={projForm.customerId} onChange={(e) => setProjForm((f) => ({ ...f, customerId: e.target.value }))}><option value="">— Select customer —</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                      <div className="bgt-field bgt-field--wide"><label className="bgt-label">Project Name <span className="bgt-req">*</span></label><input className="input" required placeholder="e.g. Solar Installation – Phase 1" value={projForm.projectName} onChange={(e) => setProjForm((f) => ({ ...f, projectName: e.target.value }))} /></div>
+                      <div className="bgt-field"><label className="bgt-label">Sale Amount (₱) <span className="bgt-req">*</span></label><input className="input" type="number" min="0" step="0.01" required placeholder="0.00" value={projForm.saleAmount} onChange={(e) => setProjForm((f) => ({ ...f, saleAmount: e.target.value }))} /></div>
+                      <div className="bgt-field"><label className="bgt-label">Date</label><input className="input" type="date" value={projForm.projectDate} onChange={(e) => setProjForm((f) => ({ ...f, projectDate: e.target.value }))} /></div>
+                      <div className="bgt-field bgt-field--wide"><label className="bgt-label">Status</label><select className="input" value={projForm.status} onChange={(e) => setProjForm((f) => ({ ...f, status: e.target.value }))}><option value="active">Active</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></div>
+                    </div>
+                    <div className="bgt-modal-foot"><button type="button" className="btn btn-ghost" onClick={closeProj} disabled={projSaving}>Cancel</button><button type="submit" className="btn btn-primary" disabled={projSaving}>{projSaving ? "Saving…" : editingProj ? "Save Changes" : "Create Project"}</button></div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* Delete customer */}
+            {deletingCust && (
+              <div className="bgt-backdrop" onClick={() => setDeletingCust(null)}>
+                <div className="bgt-modal bgt-modal--confirm" onClick={(e) => e.stopPropagation()}>
+                  <div className="bgt-confirm-icon bgt-confirm-icon--del"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></div>
+                  <h3 className="bgt-confirm-title">{deletingCust.project_count > 0 ? "Deactivate Customer?" : "Delete Customer?"}</h3>
+                  <p className="bgt-confirm-body">{deletingCust.project_count > 0 ? <><strong>{deletingCust.name}</strong> has {deletingCust.project_count} project(s) and will be deactivated.</> : <>Delete <strong>{deletingCust.name}</strong>? This cannot be undone.</>}</p>
+                  <div className="bgt-modal-foot bgt-modal-foot--center"><button className="btn btn-ghost" onClick={() => setDeletingCust(null)}>Cancel</button><button className="btn btn-danger" onClick={() => confirmDeleteCust(deletingCust)}>{deletingCust.project_count > 0 ? "Deactivate" : "Delete"}</button></div>
+                </div>
+              </div>
+            )}
+
+            {/* Delete project */}
+            {deletingProj && (
+              <div className="bgt-backdrop" onClick={() => setDeletingProj(null)}>
+                <div className="bgt-modal bgt-modal--confirm" onClick={(e) => e.stopPropagation()}>
+                  <div className="bgt-confirm-icon bgt-confirm-icon--del"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></div>
+                  <h3 className="bgt-confirm-title">Delete Project?</h3>
+                  <p className="bgt-confirm-body">Delete <strong>{deletingProj.project_name}</strong>? All linked expense assignments will be removed.</p>
+                  <div className="bgt-modal-foot bgt-modal-foot--center"><button className="btn btn-ghost" onClick={() => setDeletingProj(null)}>Cancel</button><button className="btn btn-danger" onClick={() => confirmDeleteProj(deletingProj)}>Delete</button></div>
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
+
       {/* ── Transaction modal ──────────────────────────────────────────────── */}
       {txFormOpen && (
         <div className="bgt-backdrop" onClick={(e) => { if (e.target === e.currentTarget) closeTxForm(); }}>
@@ -592,7 +932,7 @@ export default function BudgetTab() {
       {/* ── Import modal ───────────────────────────────────────────────────── */}
       {importOpen && (
         <div className="bgt-backdrop" onClick={(e) => { if (e.target === e.currentTarget) closeImport(); }}>
-          <div className="bgt-modal bgt-modal--sm" onClick={(e) => e.stopPropagation()}>
+          <div className="bgt-modal bgt-modal--import" onClick={(e) => e.stopPropagation()}>
             <div className="bgt-modal-head">
               <div>
                 <p className="bgt-modal-eyebrow">Bulk import</p>
@@ -606,7 +946,7 @@ export default function BudgetTab() {
               {importResult ? (
                 <>
                   <div className="bgt-import-success">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                     <strong>{importResult.imported} transaction{importResult.imported !== 1 ? "s" : ""} imported successfully</strong>
                   </div>
                   <div className="bgt-import-preview">
@@ -629,16 +969,35 @@ export default function BudgetTab() {
                 </>
               ) : (
                 <form onSubmit={submitImport}>
-                  <div className="bgt-import-hint">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                    Expected columns: <strong>Date</strong>, <strong>Expenses / Description</strong>, <strong>Price</strong>, <strong>Qty</strong>. Matches the standard format — dates are carried forward across merged rows.
+
+                  {/* Format hint */}
+                  <div className="bgt-import-format">
+                    <div className="bgt-import-format-title">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                      Expected Excel format
+                    </div>
+                    <div className="bgt-import-cols">
+                      {["Date","Description / Expenses","Price","Qty"].map((col) => (
+                        <span key={col} className="bgt-import-col-chip">{col}</span>
+                      ))}
+                    </div>
+                    <p className="bgt-import-format-note">Dates carry forward across merged rows automatically.</p>
                   </div>
-                  <div className="bgt-form-grid">
+
+                  <div className="bgt-form-grid" style={{ marginTop: 16 }}>
                     <div className="bgt-field bgt-field--wide">
                       <label className="bgt-label">Account <span className="bgt-req">*</span></label>
                       <select className="input" required value={importAccountId} onChange={(e) => setImportAccountId(e.target.value)}>
                         <option value="">— Select account —</option>
                         {activeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="bgt-field bgt-field--wide">
+                      <label className="bgt-label">Assign to Project <span className="bgt-label-opt">(optional)</span></label>
+                      <select className="input" value={importProjectId} onChange={(e) => setImportProjectId(e.target.value)}>
+                        <option value="">— No project —</option>
+                        {projects.map((p) => <option key={p.id} value={p.id}>{p.customer_name} — {p.project_name}</option>)}
                       </select>
                     </div>
                     <div className="bgt-field bgt-field--wide">
@@ -652,15 +1011,26 @@ export default function BudgetTab() {
                         </button>
                       </div>
                     </div>
+
                     <div className="bgt-field bgt-field--wide">
-                      <label className="bgt-label">Excel File (.xlsx / .xls) <span className="bgt-req">*</span></label>
-                      <input className="input" type="file" accept=".xlsx,.xls" required onChange={(e) => setImportFile(e.target.files[0] || null)} />
+                      <label className="bgt-label">Excel File <span className="bgt-req">*</span></label>
+                      <label className="bgt-file-drop">
+                        <input type="file" accept=".xlsx,.xls" required className="bgt-file-input" onChange={(e) => setImportFile(e.target.files[0] || null)} />
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        <span className="bgt-file-label">
+                          {importFile ? importFile.name : <><strong>Choose file</strong> or drag & drop</>}
+                        </span>
+                        <span className="bgt-file-note">.xlsx or .xls · max 20 MB</span>
+                      </label>
                     </div>
                   </div>
-                  <div className="bgt-modal-foot">
+
+                  <div className="bgt-modal-foot" style={{ marginTop: 8 }}>
                     <button type="button" className="btn btn-ghost" onClick={closeImport} disabled={importLoading}>Cancel</button>
-                    <button type="submit" className="btn btn-primary" disabled={importLoading}>
-                      {importLoading ? "Importing…" : "Import"}
+                    <button type="submit" className="btn btn-primary" disabled={importLoading || !importFile}>
+                      {importLoading
+                        ? <><span className="bgt-btn-spinner" /> Importing…</>
+                        : <><IconUpload /> Import</>}
                     </button>
                   </div>
                 </form>
