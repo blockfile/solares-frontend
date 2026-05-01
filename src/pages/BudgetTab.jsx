@@ -27,6 +27,7 @@ function formatDate(value) {
 
 const EMPTY_TX_FORM = {
   accountId: "",
+  projectId: "",
   type: "out",
   amount: "",
   description: "",
@@ -269,7 +270,7 @@ export default function BudgetTab() {
   function openEditTx(tx) {
     setEditingTx(tx);
     setTxForm({
-      accountId: String(tx.account_id), type: tx.type, amount: String(tx.amount),
+      accountId: String(tx.account_id), projectId: tx.project_id ? String(tx.project_id) : "", type: tx.type, amount: String(tx.amount),
       description: tx.description || "", referenceNo: tx.reference_no || "",
       transactionDate: tx.transaction_date ? tx.transaction_date.slice(0, 10) : localDateInput(),
       notes: tx.notes || ""
@@ -280,7 +281,7 @@ export default function BudgetTab() {
   async function saveTx(e) {
     e.preventDefault(); setTxSaving(true);
     try {
-      const payload = { accountId: Number(txForm.accountId), type: txForm.type, amount: Number(txForm.amount), description: txForm.description, referenceNo: txForm.referenceNo, transactionDate: txForm.transactionDate, notes: txForm.notes };
+      const payload = { accountId: Number(txForm.accountId), projectId: txForm.projectId ? Number(txForm.projectId) : null, type: txForm.type, amount: Number(txForm.amount), description: txForm.description, referenceNo: txForm.referenceNo, transactionDate: txForm.transactionDate, notes: txForm.notes };
       if (editingTx) { await api.put(`/budget/${editingTx.id}`, payload); flash("Transaction updated."); }
       else { await api.post("/budget", payload); flash("Transaction recorded."); }
       closeTxForm(); await loadAll(true);
@@ -403,6 +404,9 @@ export default function BudgetTab() {
           )}
           {view === "sales" && (
             <div className="bgt-toolbar-actions">
+              <button className="btn btn-ghost bgt-btn-import" onClick={openImport}>
+                <IconUpload /> Import Expenses
+              </button>
               <button className="btn btn-ghost bgt-btn-import" onClick={openNewCust}><IconPlus /> New Customer</button>
               <button className="btn btn-primary" onClick={() => openNewProj()}><IconPlus /> New Project</button>
             </div>
@@ -470,6 +474,11 @@ export default function BudgetTab() {
                       <td className="bgt-cell-date">{formatDate(tx.transaction_date)}</td>
                       <td className="bgt-cell-account">
                         <span className="bgt-account-chip">{tx.account_name || "—"}</span>
+                        {tx.project_id && (
+                          <div className="bgt-muted" style={{ marginTop: 5, fontSize: 11 }}>
+                            {tx.customer_name ? `${tx.customer_name} — ` : ""}{tx.project_name}
+                          </div>
+                        )}
                       </td>
                       <td className="bgt-cell-desc">{tx.description || <span className="bgt-muted">—</span>}</td>
                       <td className="bgt-cell-ref">
@@ -785,7 +794,7 @@ export default function BudgetTab() {
                     <div className="bgt-form-grid">
                       <div className="bgt-field bgt-field--wide"><label className="bgt-label">Customer <span className="bgt-req">*</span></label><select className="input" required value={projForm.customerId} onChange={(e) => setProjForm((f) => ({ ...f, customerId: e.target.value }))}><option value="">— Select customer —</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                       <div className="bgt-field bgt-field--wide"><label className="bgt-label">Project Name <span className="bgt-req">*</span></label><input className="input" required placeholder="e.g. Solar Installation – Phase 1" value={projForm.projectName} onChange={(e) => setProjForm((f) => ({ ...f, projectName: e.target.value }))} /></div>
-                      <div className="bgt-field"><label className="bgt-label">Sale Amount (₱) <span className="bgt-req">*</span></label><input className="input" type="number" min="0" step="0.01" required placeholder="0.00" value={projForm.saleAmount} onChange={(e) => setProjForm((f) => ({ ...f, saleAmount: e.target.value }))} /></div>
+                      <div className="bgt-field"><label className="bgt-label">Collected Budget (₱) <span className="bgt-req">*</span></label><input className="input" type="number" min="0" step="0.01" required placeholder="0.00" value={projForm.saleAmount} onChange={(e) => setProjForm((f) => ({ ...f, saleAmount: e.target.value }))} /></div>
                       <div className="bgt-field"><label className="bgt-label">Date</label><input className="input" type="date" value={projForm.projectDate} onChange={(e) => setProjForm((f) => ({ ...f, projectDate: e.target.value }))} /></div>
                       <div className="bgt-field bgt-field--wide"><label className="bgt-label">Status</label><select className="input" value={projForm.status} onChange={(e) => setProjForm((f) => ({ ...f, status: e.target.value }))}><option value="active">Active</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></div>
                     </div>
@@ -852,6 +861,13 @@ export default function BudgetTab() {
                   <select className="input" required value={txForm.accountId} onChange={(e) => setTxForm((f) => ({ ...f, accountId: e.target.value }))}>
                     <option value="">— Select account —</option>
                     {activeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </div>
+                <div className="bgt-field bgt-field--wide">
+                  <label className="bgt-label">Project <span className="bgt-label-opt">(optional)</span></label>
+                  <select className="input" value={txForm.projectId} onChange={(e) => setTxForm((f) => ({ ...f, projectId: e.target.value }))}>
+                    <option value="">— No project —</option>
+                    {projects.map((p) => <option key={p.id} value={p.id}>{p.customer_name} — {p.project_name}</option>)}
                   </select>
                 </div>
                 <div className="bgt-field">
@@ -977,11 +993,11 @@ export default function BudgetTab() {
                       Expected Excel format
                     </div>
                     <div className="bgt-import-cols">
-                      {["Date","Description / Expenses","Price","Qty"].map((col) => (
+                      {["Date","Description / Expenses","Price","Qty","Sub Total"].map((col) => (
                         <span key={col} className="bgt-import-col-chip">{col}</span>
                       ))}
                     </div>
-                    <p className="bgt-import-format-note">Dates carry forward across merged rows automatically.</p>
+                    <p className="bgt-import-format-note">Dates carry forward across merged rows automatically. If Sub Total exists, it is used as the row amount.</p>
                   </div>
 
                   <div className="bgt-form-grid" style={{ marginTop: 16 }}>
