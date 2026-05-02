@@ -226,6 +226,9 @@ export default function BudgetTab() {
     () => projects.find((p) => String(p.id) === String(scopeProjectId)) || null,
     [projects, scopeProjectId]
   );
+  const projectProjectedIncome = projectScoped ? toNumber(summary.projectedIncome ?? summary.projectBudget ?? summary.totalIn, 0) : toNumber(summary.totalIn, 0);
+  const projectCollectedIncome = projectScoped ? toNumber(summary.collectedIncome ?? summary.totalIn, 0) : toNumber(summary.totalIn, 0);
+  const projectBalanceDue = projectScoped ? toNumber(summary.balanceDue, Math.max(0, projectProjectedIncome - projectCollectedIncome)) : 0;
   const salesCollected = useMemo(
     () => projects.reduce((sum, project) => sum + toNumber(project.total_income, 0), 0),
     [projects]
@@ -580,35 +583,35 @@ export default function BudgetTab() {
         <div className="bgt-kpi bgt-kpi--in">
           <div className="bgt-kpi-icon"><IconArrowDown /></div>
           <div className="bgt-kpi-body">
-            <span className="bgt-kpi-label">{projectScoped ? "Project Budget" : "Total Income"}</span>
+            <span className="bgt-kpi-label">{projectScoped ? "Projected Income" : "Total Income"}</span>
             <strong className="bgt-kpi-value">₱{formatMoney(summary.totalIn)}</strong>
           </div>
         </div>
         <div className="bgt-kpi bgt-kpi--out">
           <div className="bgt-kpi-icon"><IconArrowUp /></div>
           <div className="bgt-kpi-body">
-            <span className="bgt-kpi-label">Total Expenses</span>
+            <span className="bgt-kpi-label">{projectScoped ? "Current Expenses" : "Total Expenses"}</span>
             <strong className="bgt-kpi-value">₱{formatMoney(summary.totalOut)}</strong>
           </div>
         </div>
         <div className={`bgt-kpi bgt-kpi--net ${netPositive ? "bgt-kpi--net-pos" : "bgt-kpi--net-neg"}`}>
           <div className="bgt-kpi-icon"><IconBalance /></div>
           <div className="bgt-kpi-body">
-            <span className="bgt-kpi-label">{projectScoped ? "Project Margin" : "Net Balance"}</span>
+            <span className="bgt-kpi-label">{projectScoped ? "Collected vs Expenses" : "Net Balance"}</span>
             <strong className="bgt-kpi-value">₱{formatMoney(summary.netBalance)}</strong>
           </div>
           <div className={`bgt-kpi-badge ${netPositive ? "bgt-kpi-badge--pos" : "bgt-kpi-badge--neg"}`}>
-            {netPositive ? (projectScoped ? "Profit" : "Surplus") : (projectScoped ? "Loss" : "Deficit")}
+            {netPositive ? (projectScoped ? "Ahead" : "Surplus") : (projectScoped ? "Short" : "Deficit")}
           </div>
         </div>
         <div className="bgt-kpi bgt-kpi--count">
           <div className="bgt-kpi-body">
-            <span className="bgt-kpi-label">Transactions</span>
-            <strong className="bgt-kpi-value">{summary.transactionCount}</strong>
+            <span className="bgt-kpi-label">{projectScoped ? "Collected Payments" : "Transactions"}</span>
+            <strong className="bgt-kpi-value">{projectScoped ? `₱${formatMoney(projectCollectedIncome)}` : summary.transactionCount}</strong>
           </div>
           <div className="bgt-kpi-sub">
-            {projectScoped && selectedScopeProject
-              ? `${selectedScopeProject.customer_name} — ${selectedScopeProject.project_name}`
+            {projectScoped
+              ? `Balance due ₱${formatMoney(projectBalanceDue)}`
               : `${summary.activeAccounts} active account${summary.activeAccounts !== 1 ? "s" : ""}`}
           </div>
         </div>
