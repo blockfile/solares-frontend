@@ -735,6 +735,9 @@ export default function BudgetTab() {
               <button className={`bgt-seg-btn${scopeMode === "project" ? " bgt-seg-btn--on" : ""}`} onClick={() => { setScopeMode("project"); if (!scopeProjectId && projects[0]?.id) setScopeProjectId(String(projects[0].id)); }}>
                 Per Project
               </button>
+              <button className={`bgt-seg-btn${scopeMode === "transaction" ? " bgt-seg-btn--on" : ""}`} onClick={() => setScopeMode("transaction")}>
+                Per Transaction
+              </button>
             </div>
             {scopeMode === "project" && (
               <select className="input bgt-filter-select" value={scopeProjectId} onChange={(e) => setScopeProjectId(e.target.value)}>
