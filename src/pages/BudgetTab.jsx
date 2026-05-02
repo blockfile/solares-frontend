@@ -130,6 +130,9 @@ export default function BudgetTab() {
   const [importFile, setImportFile] = useState(null);
   const [importLoading, setImportLoading] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [importBatches, setImportBatches] = useState([]);
+  const [deletingImportBatch, setDeletingImportBatch] = useState(null);
+  const [importBatchDeleting, setImportBatchDeleting] = useState(false);
   const [projects, setProjects] = useState([]);
 
   // ── Sales / Customers state ─────────────────────────────────────────────────
@@ -173,13 +176,14 @@ export default function BudgetTab() {
       if (scopeMode === "project" && scopeProjectId) summaryParams.set("projectId", scopeProjectId);
       if (filterDateFrom) summaryParams.set("dateFrom", filterDateFrom);
       if (filterDateTo) summaryParams.set("dateTo", filterDateTo);
-      const [txRes, accRes, sumRes, projRes, custRes, salesSumRes] = await Promise.all([
+      const [txRes, accRes, sumRes, projRes, custRes, salesSumRes, importBatchRes] = await Promise.all([
         api.get(`/budget?${params}`),
         api.get("/budget/accounts"),
         api.get(`/budget/summary?${summaryParams}`),
         api.get("/customers/projects").catch(() => ({ data: [] })),
         api.get("/customers").catch(() => ({ data: [] })),
-        api.get("/customers/summary").catch(() => ({ data: {} }))
+        api.get("/customers/summary").catch(() => ({ data: {} })),
+        api.get("/budget/import-batches").catch(() => ({ data: [] }))
       ]);
       setTransactions(txRes.data || []);
       setAccounts(accRes.data || []);
@@ -187,6 +191,7 @@ export default function BudgetTab() {
       setProjects(projRes.data || []);
       setCustomers(custRes.data || []);
       setSalesSummary(salesSumRes.data || {});
+      setImportBatches(importBatchRes.data || []);
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to load budget data.");
     } finally {
@@ -206,6 +211,11 @@ export default function BudgetTab() {
   }
 
   const activeAccounts = useMemo(() => accounts.filter((a) => Number(a.is_active) === 1), [accounts]);
+  const incomeAccounts = useMemo(
+    () => activeAccounts.filter((a) => String(a.type || "").toLowerCase() === "income"),
+    [activeAccounts]
+  );
+  const defaultIncomeAccountId = incomeAccounts[0]?.id ? String(incomeAccounts[0].id) : "";
   const hasFilters = filterType !== "all" || filterAccount !== "all" || filterDateFrom || filterDateTo || searchRaw || scopeMode !== "overall";
   const netPositive = toNumber(summary.netBalance, 0) >= 0;
   const visibleTxIds = useMemo(() => transactions.map((tx) => tx.id), [transactions]);
@@ -215,6 +225,14 @@ export default function BudgetTab() {
   const selectedScopeProject = useMemo(
     () => projects.find((p) => String(p.id) === String(scopeProjectId)) || null,
     [projects, scopeProjectId]
+  );
+  const salesCollected = useMemo(
+    () => projects.reduce((sum, project) => sum + toNumber(project.total_income, 0), 0),
+    [projects]
+  );
+  const salesBalanceDue = useMemo(
+    () => projects.reduce((sum, project) => sum + Math.max(0, toNumber(project.sale_amount, 0) - toNumber(project.total_income, 0)), 0),
+    [projects]
   );
 
   useEffect(() => {
@@ -234,7 +252,11 @@ export default function BudgetTab() {
   // ── Import ──────────────────────────────────────────────────────────────────
   function openImport() {
     setImportAccountId(activeAccounts[0]?.id ? String(activeAccounts[0].id) : "");
-    setImportType("out"); setImportProjectId(""); setImportFile(null); setImportResult(null); setImportOpen(true);
+    setImportType("out");
+    setImportProjectId(projectScoped && selectedScopeProject ? String(selectedScopeProject.id) : "");
+    setImportFile(null);
+    setImportResult(null);
+    setImportOpen(true);
   }
   function closeImport() {
     setImportOpen(false);
@@ -243,6 +265,7 @@ export default function BudgetTab() {
     setImportProjectId("");
     setConfirmImportedDeleteTx(null);
     setClearImportedOpen(false);
+    setDeletingImportBatch(null);
   }
   async function submitImport(e) {
     e.preventDefault();
@@ -261,6 +284,24 @@ export default function BudgetTab() {
     } catch (err) {
       flash(err?.response?.data?.message || "Import failed.", "error");
     } finally { setImportLoading(false); }
+  }
+
+  async function confirmDeleteImportBatch() {
+    if (!deletingImportBatch?.import_batch_id) return;
+
+    setImportBatchDeleting(true);
+    try {
+      const res = await api.delete(`/budget/import-batches/${encodeURIComponent(deletingImportBatch.import_batch_id)}`);
+      flash(`${res.data?.deleted || deletingImportBatch.transaction_count} imported transaction(s) deleted.`);
+      setImportResult((prev) => (prev?.importBatchId === deletingImportBatch.import_batch_id ? null : prev));
+      setDeletingImportBatch(null);
+      setSelectedTxIds(new Set());
+      await loadAll(true);
+    } catch (err) {
+      flash(err?.response?.data?.message || "Failed to delete imported Excel batch.", "error");
+    } finally {
+      setImportBatchDeleting(false);
+    }
   }
 
   // ── Customer / Project handlers ─────────────────────────────────────────────
@@ -359,8 +400,24 @@ export default function BudgetTab() {
     }
   }
 
-  function openNewTx() {
-    setEditingTx(null); setTxForm({ ...EMPTY_TX_FORM, transactionDate: localDateInput() }); setTxFormOpen(true);
+  function openNewTx(overrides = {}) {
+    setEditingTx(null);
+    setTxForm({
+      ...EMPTY_TX_FORM,
+      transactionDate: localDateInput(),
+      projectId: projectScoped && selectedScopeProject ? String(selectedScopeProject.id) : "",
+      ...overrides
+    });
+    setTxFormOpen(true);
+  }
+  function openNewPayment(project = null) {
+    const targetProject = project || selectedScopeProject || null;
+    openNewTx({
+      type: "in",
+      accountId: defaultIncomeAccountId,
+      projectId: targetProject?.id ? String(targetProject.id) : "",
+      description: "Partial client payment"
+    });
   }
   function openEditTx(tx) {
     setEditingTx(tx);
@@ -453,6 +510,16 @@ export default function BudgetTab() {
   }
 
   async function confirmDeleteAllImported() {
+    if (importResult?.importBatchId) {
+      setDeletingImportBatch({
+        import_batch_id: importResult.importBatchId,
+        import_source_name: importResult.importSourceName || "Imported Excel",
+        transaction_count: (importResult.transactions || []).length
+      });
+      setClearImportedOpen(false);
+      return;
+    }
+
     const txIds = (importResult?.transactions || [])
       .map((tx) => Number(tx.id))
       .filter((id) => Number.isInteger(id) && id > 0);
@@ -590,6 +657,9 @@ export default function BudgetTab() {
               <button className="btn btn-ghost bgt-btn-import" onClick={openImport}>
                 <IconUpload /> Import Excel
               </button>
+              <button className="btn btn-ghost" onClick={() => openNewPayment()} disabled={!defaultIncomeAccountId}>
+                <IconArrowDown /> Record Payment
+              </button>
               <button className="btn btn-primary" onClick={openNewTx}>
                 <IconPlus /> Record Transaction
               </button>
@@ -605,8 +675,9 @@ export default function BudgetTab() {
               <button className="btn btn-ghost bgt-btn-import" onClick={openImport}>
                 <IconUpload /> Import Expenses
               </button>
-              <button className="btn btn-ghost bgt-btn-import" onClick={openNewCust}><IconPlus /> New Customer</button>
-              <button className="btn btn-primary" onClick={() => openNewProj()}><IconPlus /> New Project</button>
+              <button className="btn btn-ghost" onClick={() => openNewPayment(detailProj)} disabled={!defaultIncomeAccountId}><IconArrowDown /> Record Payment</button>
+              <button className="btn btn-ghost bgt-btn-import" onClick={openNewCust}><IconPlus /> Add Client</button>
+              <button className="btn btn-primary" onClick={() => openNewProj()}><IconPlus /> Add Project / Sale</button>
             </div>
           )}
         </div>
@@ -855,14 +926,14 @@ export default function BudgetTab() {
             {/* Sales KPI strip */}
             <div className="sl-kpi-row">
               <div className="sl-kpi">
-                <span className="sl-kpi-label">Customers</span>
+                <span className="sl-kpi-label">Clients</span>
                 <strong className="sl-kpi-value">{salesSummary.totalCustomers || 0}</strong>
-                <span className="sl-kpi-sub">{salesSummary.totalProjects || 0} project(s)</span>
+                <span className="sl-kpi-sub">{salesSummary.totalProjects || 0} project(s) • ₱{formatMoney(salesCollected)} collected</span>
               </div>
               <div className="sl-kpi sl-kpi--sales">
-                <span className="sl-kpi-label">Total Sales</span>
+                <span className="sl-kpi-label">Contract Value</span>
                 <strong className="sl-kpi-value">₱{formatMoney(salesSummary.totalSales)}</strong>
-                <span className="sl-kpi-sub">contract value</span>
+                <span className="sl-kpi-sub">₱{formatMoney(salesBalanceDue)} still to collect</span>
               </div>
               <div className="sl-kpi sl-kpi--expenses">
                 <span className="sl-kpi-label">Total Expenses</span>
@@ -887,8 +958,8 @@ export default function BudgetTab() {
               customers.length === 0 ? (
                 <div className="bgt-empty">
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="bgt-empty-icon"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
-                  <p>No customers yet. Add your first customer.</p>
-                  <button className="btn btn-primary" onClick={openNewCust}><IconPlus /> Add Customer</button>
+                  <p>No clients yet. Add your first client, then create a project under that client.</p>
+                  <button className="btn btn-primary" onClick={openNewCust}><IconPlus /> Add Client</button>
                 </div>
               ) : (
                 <div className="sl-overview-grid">
@@ -923,17 +994,21 @@ export default function BudgetTab() {
                               <button key={p.id} className="sl-proj-row" onClick={() => openDetail(p)}>
                                 <div className="sl-proj-row-left">
                                   <span className={`sl-pill ${STATUS_COLORS[p.status] || ""}`}>{STATUS_LABELS[p.status] || p.status}</span>
-                                  <span className="sl-proj-name">{p.project_name}</span>
+                                  <div className="sl-proj-copy">
+                                    <span className="sl-proj-name">{p.project_name}</span>
+                                    <span className="sl-proj-sub">Collected ₱{formatMoney(p.total_income)} of ₱{formatMoney(p.sale_amount)}</span>
+                                  </div>
                                 </div>
                                 <div className="sl-proj-row-right">
                                   <span className="sl-proj-margin" style={{ color: toNumber(p.margin, 0) >= 0 ? "#147845" : "#b83a3a" }}>₱{formatMoney(p.margin)}</span>
+                                  <button className="bgt-row-btn" onClick={(e) => { e.stopPropagation(); openNewPayment(p); }}>Payment</button>
                                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
                                 </div>
                               </button>
                             ))}
                           </div>
                         )}
-                        <button className="sl-add-proj-btn" onClick={() => openNewProj(cust.id)}><IconPlus /> Add Project</button>
+                        <button className="sl-add-proj-btn" onClick={() => openNewProj(cust.id)}><IconPlus /> Add Project / Sale</button>
                       </div>
                     );
                   })}
@@ -953,11 +1028,11 @@ export default function BudgetTab() {
                 {(() => {
                   const filtered = selectedCustomerFilter ? projects.filter((p) => p.customer_id === selectedCustomerFilter) : projects;
                   return filtered.length === 0 ? (
-                    <div className="bgt-empty"><p>No projects found.</p><button className="btn btn-primary" onClick={() => openNewProj()}><IconPlus /> Add Project</button></div>
+                    <div className="bgt-empty"><p>No projects found.</p><button className="btn btn-primary" onClick={() => openNewProj()}><IconPlus /> Add Project / Sale</button></div>
                   ) : (
                     <div className="bgt-table-wrap">
                       <table className="bgt-table">
-                        <thead><tr><th>Customer</th><th>Project</th><th>Date</th><th>Status</th><th className="bgt-col-amt">Sale Amount</th><th className="bgt-col-amt">Expenses</th><th className="bgt-col-amt">Margin</th><th /></tr></thead>
+                        <thead><tr><th>Customer</th><th>Project</th><th>Date</th><th>Status</th><th className="bgt-col-amt">Contract</th><th className="bgt-col-amt">Expenses</th><th className="bgt-col-amt">Margin</th><th /></tr></thead>
                         <tbody>
                           {filtered.map((p) => {
                             const m = toNumber(p.margin, 0);
@@ -971,6 +1046,7 @@ export default function BudgetTab() {
                                 <td className="bgt-col-amt" style={{ color: "#b83a3a", fontWeight: 700 }}>₱{formatMoney(p.total_expenses)}</td>
                                 <td className="bgt-col-amt" style={{ color: m >= 0 ? "#147845" : "#b83a3a", fontWeight: 700 }}>₱{formatMoney(m)}</td>
                                 <td className="bgt-col-actions" onClick={(e) => e.stopPropagation()}>
+                                  <button className="bgt-row-btn" onClick={() => openNewPayment(p)}>Payment</button>
                                   <button className="bgt-row-btn" onClick={() => openEditProj(p)}>Edit</button>
                                   <button className="bgt-row-btn bgt-row-btn--del" onClick={() => setDeletingProj(p)}>Delete</button>
                                 </td>
@@ -995,12 +1071,18 @@ export default function BudgetTab() {
                   </div>
                   <div className="bgt-modal-body">
                     <div className="sl-drawer-stats">
+                      <div className="sl-dstat"><span className="sl-dstat-label">Collected</span><strong className="sl-dstat-val sl-dstat-val--sales">₱{formatMoney(detailProj.total_income)}</strong></div>
+                      <div className="sl-dstat"><span className="sl-dstat-label">Balance Due</span><strong className="sl-dstat-val" style={{ color: toNumber(detailProj.balance_due, 0) > 0 ? "#b86d12" : "#147845" }}>₱{formatMoney(detailProj.balance_due)}</strong></div>
                       <div className="sl-dstat"><span className="sl-dstat-label">Sale Amount</span><strong className="sl-dstat-val sl-dstat-val--sales">₱{formatMoney(detailProj.sale_amount)}</strong></div>
                       <div className="sl-dstat"><span className="sl-dstat-label">Expenses</span><strong className="sl-dstat-val sl-dstat-val--exp">₱{formatMoney(detailProj.total_expenses)}</strong></div>
                       <div className="sl-dstat"><span className="sl-dstat-label">Margin</span><strong className={`sl-dstat-val ${toNumber(detailProj.margin, 0) >= 0 ? "sl-dstat-val--sales" : "sl-dstat-val--exp"}`}>₱{formatMoney(detailProj.margin)}</strong></div>
                     </div>
+                    <div className="bgt-modal-foot" style={{ justifyContent: "flex-start", paddingTop: 0 }}>
+                      <button className="btn btn-ghost" onClick={() => openNewPayment(detailProj)} disabled={!defaultIncomeAccountId}><IconArrowDown /> Record Partial Payment</button>
+                      <button className="btn btn-ghost" onClick={() => openEditProj(detailProj)}>Edit Contract</button>
+                    </div>
                     <div className="sl-drawer-section">
-                      <p className="sl-drawer-section-title">Linked Expenses ({detailTx.length})</p>
+                      <p className="sl-drawer-section-title">Linked Transactions ({detailTx.length})</p>
                       {detailLoading ? (
                         <div className="bgt-empty" style={{ padding: 24 }}><div className="bgt-spinner" /></div>
                       ) : detailTx.length === 0 ? (
@@ -1036,14 +1118,14 @@ export default function BudgetTab() {
             {custOpen && (
               <div className="bgt-backdrop" onClick={(e) => { if (e.target === e.currentTarget) closeCust(); }}>
                 <div className="bgt-modal bgt-modal--sm">
-                  <div className="bgt-modal-head"><div><p className="bgt-modal-eyebrow">{editingCust ? "Editing" : "New"}</p><h3 className="bgt-modal-title">{editingCust ? "Edit Customer" : "New Customer"}</h3></div><button className="bgt-modal-x" onClick={closeCust}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button></div>
+                  <div className="bgt-modal-head"><div><p className="bgt-modal-eyebrow">{editingCust ? "Editing" : "New client"}</p><h3 className="bgt-modal-title">{editingCust ? "Edit Client" : "Add Client"}</h3></div><button className="bgt-modal-x" onClick={closeCust}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button></div>
                   <form className="bgt-modal-body" onSubmit={saveCust}>
                     <div className="bgt-form-grid">
                       <div className="bgt-field bgt-field--wide"><label className="bgt-label">Name <span className="bgt-req">*</span></label><input className="input" required placeholder="e.g. Allan Santos" value={custForm.name} onChange={(e) => setCustForm((f) => ({ ...f, name: e.target.value }))} /></div>
                       <div className="bgt-field bgt-field--wide"><label className="bgt-label">Contact / Phone</label><input className="input" placeholder="Phone or email" value={custForm.contact} onChange={(e) => setCustForm((f) => ({ ...f, contact: e.target.value }))} /></div>
                       <div className="bgt-field bgt-field--wide"><label className="bgt-label">Address</label><input className="input" placeholder="Address (optional)" value={custForm.address} onChange={(e) => setCustForm((f) => ({ ...f, address: e.target.value }))} /></div>
                     </div>
-                    <div className="bgt-modal-foot"><button type="button" className="btn btn-ghost" onClick={closeCust} disabled={custSaving}>Cancel</button><button type="submit" className="btn btn-primary" disabled={custSaving}>{custSaving ? "Saving…" : editingCust ? "Save Changes" : "Create Customer"}</button></div>
+                    <div className="bgt-modal-foot"><button type="button" className="btn btn-ghost" onClick={closeCust} disabled={custSaving}>Cancel</button><button type="submit" className="btn btn-primary" disabled={custSaving}>{custSaving ? "Saving…" : editingCust ? "Save Changes" : "Create Client"}</button></div>
                   </form>
                 </div>
               </div>
@@ -1053,16 +1135,16 @@ export default function BudgetTab() {
             {projOpen && (
               <div className="bgt-backdrop" onClick={(e) => { if (e.target === e.currentTarget) closeProj(); }}>
                 <div className="bgt-modal bgt-modal--sm">
-                  <div className="bgt-modal-head"><div><p className="bgt-modal-eyebrow">{editingProj ? "Editing" : "New project"}</p><h3 className="bgt-modal-title">{editingProj ? "Edit Project" : "New Project"}</h3></div><button className="bgt-modal-x" onClick={closeProj}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button></div>
+                  <div className="bgt-modal-head"><div><p className="bgt-modal-eyebrow">{editingProj ? "Editing" : "New project / sale"}</p><h3 className="bgt-modal-title">{editingProj ? "Edit Project / Sale" : "Add Project / Sale"}</h3></div><button className="bgt-modal-x" onClick={closeProj}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button></div>
                   <form className="bgt-modal-body" onSubmit={saveProj}>
                     <div className="bgt-form-grid">
                       <div className="bgt-field bgt-field--wide"><label className="bgt-label">Customer <span className="bgt-req">*</span></label><select className="input" required value={projForm.customerId} onChange={(e) => setProjForm((f) => ({ ...f, customerId: e.target.value }))}><option value="">— Select customer —</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                       <div className="bgt-field bgt-field--wide"><label className="bgt-label">Project Name <span className="bgt-req">*</span></label><input className="input" required placeholder="e.g. Solar Installation – Phase 1" value={projForm.projectName} onChange={(e) => setProjForm((f) => ({ ...f, projectName: e.target.value }))} /></div>
-                      <div className="bgt-field"><label className="bgt-label">Collected Budget (₱) <span className="bgt-req">*</span></label><input className="input" type="number" min="0" step="0.01" required placeholder="0.00" value={projForm.saleAmount} onChange={(e) => setProjForm((f) => ({ ...f, saleAmount: e.target.value }))} /></div>
+                      <div className="bgt-field"><label className="bgt-label">Contract Amount (₱) <span className="bgt-req">*</span></label><input className="input" type="number" min="0" step="0.01" required placeholder="0.00" value={projForm.saleAmount} onChange={(e) => setProjForm((f) => ({ ...f, saleAmount: e.target.value }))} /><span className="bgt-field-note">Use the full project price here. Partial client payments are recorded later as Income.</span></div>
                       <div className="bgt-field"><label className="bgt-label">Date</label><input className="input" type="date" value={projForm.projectDate} onChange={(e) => setProjForm((f) => ({ ...f, projectDate: e.target.value }))} /></div>
                       <div className="bgt-field bgt-field--wide"><label className="bgt-label">Status</label><select className="input" value={projForm.status} onChange={(e) => setProjForm((f) => ({ ...f, status: e.target.value }))}><option value="active">Active</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></div>
                     </div>
-                    <div className="bgt-modal-foot"><button type="button" className="btn btn-ghost" onClick={closeProj} disabled={projSaving}>Cancel</button><button type="submit" className="btn btn-primary" disabled={projSaving}>{projSaving ? "Saving…" : editingProj ? "Save Changes" : "Create Project"}</button></div>
+                    <div className="bgt-modal-foot"><button type="button" className="btn btn-ghost" onClick={closeProj} disabled={projSaving}>Cancel</button><button type="submit" className="btn btn-primary" disabled={projSaving}>{projSaving ? "Saving…" : editingProj ? "Save Changes" : "Create Project / Sale"}</button></div>
                   </form>
                 </div>
               </div>
@@ -1227,7 +1309,7 @@ export default function BudgetTab() {
                 <>
                   <div className="bgt-import-success">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
-                    <strong>{importResult.imported} transaction{importResult.imported !== 1 ? "s" : ""} imported successfully</strong>
+                    <strong>{importResult.imported} transaction{importResult.imported !== 1 ? "s" : ""} imported from {importResult.importSourceName || "Excel file"}</strong>
                   </div>
                   <div className="bgt-import-preview">
                     <table className="bgt-table bgt-table--compact">
@@ -1292,7 +1374,7 @@ export default function BudgetTab() {
                       onClick={() => setClearImportedOpen(true)}
                       disabled={!(importResult.transactions || []).length}
                     >
-                      Delete All Imported
+                      Delete This Imported Excel
                     </button>
                     <button className="btn btn-primary" onClick={closeImport}>Done</button>
                   </div>
@@ -1313,6 +1395,31 @@ export default function BudgetTab() {
                     </div>
                     <p className="bgt-import-format-note">Dates carry forward across merged rows automatically. If Sub Total exists, it is used as the row amount.</p>
                   </div>
+                  <p className="bgt-import-helper">
+                    Create the client/project first if you want these imported rows linked to a sale. Partial client payments should be recorded as Income, not imported with expense sheets.
+                  </p>
+
+                  {importBatches.length > 0 && (
+                    <div className="bgt-import-history">
+                      <div className="bgt-import-history-head">
+                        <strong>Recent imported Excels</strong>
+                        <span>{importBatches.length} batch{importBatches.length !== 1 ? "es" : ""}</span>
+                      </div>
+                      <div className="bgt-import-history-list">
+                        {importBatches.map((batch) => (
+                          <div key={batch.import_batch_id} className="bgt-import-history-item">
+                            <div className="bgt-import-history-copy">
+                              <strong>{batch.import_source_name || "Imported Excel"}</strong>
+                              <span>{batch.transaction_count} row(s) • ₱{formatMoney(batch.total_amount)}</span>
+                            </div>
+                            <button type="button" className="bgt-row-btn bgt-row-btn--del" onClick={() => setDeletingImportBatch(batch)}>
+                              Delete
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="bgt-form-grid" style={{ marginTop: 16 }}>
                     <div className="bgt-field bgt-field--wide">
@@ -1413,6 +1520,26 @@ export default function BudgetTab() {
               <button className="btn btn-ghost" onClick={() => setClearImportedOpen(false)} disabled={clearingImported}>Cancel</button>
               <button className="btn btn-danger" onClick={confirmDeleteAllImported} disabled={clearingImported}>
                 {clearingImported ? "Deleting..." : "Delete All"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deletingImportBatch && (
+        <div className="bgt-backdrop" onClick={() => !importBatchDeleting && setDeletingImportBatch(null)}>
+          <div className="bgt-modal bgt-modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="bgt-confirm-icon bgt-confirm-icon--del">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" /></svg>
+            </div>
+            <h3 className="bgt-confirm-title">Delete Imported Excel?</h3>
+            <p className="bgt-confirm-body">
+              This will permanently delete <strong>{deletingImportBatch.import_source_name || "this imported Excel"}</strong> and all <strong>{deletingImportBatch.transaction_count}</strong> transaction(s) created from it.
+            </p>
+            <div className="bgt-modal-foot bgt-modal-foot--center">
+              <button className="btn btn-ghost" onClick={() => setDeletingImportBatch(null)} disabled={importBatchDeleting}>Cancel</button>
+              <button className="btn btn-danger" onClick={confirmDeleteImportBatch} disabled={importBatchDeleting}>
+                {importBatchDeleting ? "Deleting..." : "Delete Imported Excel"}
               </button>
             </div>
           </div>
