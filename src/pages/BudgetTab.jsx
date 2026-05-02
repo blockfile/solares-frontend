@@ -579,43 +579,81 @@ export default function BudgetTab() {
     <div className="bgt">
 
       {/* ── KPI Strip ──────────────────────────────────────────────────────── */}
-      <div className="bgt-kpi-row">
-        <div className="bgt-kpi bgt-kpi--in">
-          <div className="bgt-kpi-icon"><IconArrowDown /></div>
-          <div className="bgt-kpi-body">
-            <span className="bgt-kpi-label">{projectScoped ? "Projected Income" : "Total Income"}</span>
-            <strong className="bgt-kpi-value">₱{formatMoney(summary.totalIn)}</strong>
+      {projectScoped ? (
+        <div className="bgt-kpi-row">
+          <div className="bgt-kpi bgt-kpi--in">
+            <div className="bgt-kpi-icon"><IconArrowDown /></div>
+            <div className="bgt-kpi-body">
+              <span className="bgt-kpi-label">Contract Value</span>
+              <strong className="bgt-kpi-value">₱{formatMoney(summary.projectBudget)}</strong>
+              <span className="bgt-kpi-sub">agreed project price</span>
+            </div>
+          </div>
+          <div className="bgt-kpi bgt-kpi--count">
+            <div className="bgt-kpi-body">
+              <span className="bgt-kpi-label">Collected Payments</span>
+              <strong className="bgt-kpi-value">₱{formatMoney(summary.collectedIncome ?? summary.totalIn)}</strong>
+            </div>
+            <div className="bgt-kpi-sub" style={{ color: toNumber(summary.balanceDue, 0) > 0 ? "#b86d12" : "#147845" }}>
+              Balance due ₱{formatMoney(summary.balanceDue)}
+            </div>
+          </div>
+          <div className="bgt-kpi bgt-kpi--out">
+            <div className="bgt-kpi-icon"><IconArrowUp /></div>
+            <div className="bgt-kpi-body">
+              <span className="bgt-kpi-label">Current Expenses</span>
+              <strong className="bgt-kpi-value">₱{formatMoney(summary.totalOut)}</strong>
+              <span className="bgt-kpi-sub">linked costs</span>
+            </div>
+          </div>
+          <div className={`bgt-kpi bgt-kpi--net ${netPositive ? "bgt-kpi--net-pos" : "bgt-kpi--net-neg"}`}>
+            <div className="bgt-kpi-icon"><IconBalance /></div>
+            <div className="bgt-kpi-body">
+              <span className="bgt-kpi-label">Collected vs Expenses</span>
+              <strong className="bgt-kpi-value">₱{formatMoney(summary.netBalance)}</strong>
+            </div>
+            <div className={`bgt-kpi-badge ${netPositive ? "bgt-kpi-badge--pos" : "bgt-kpi-badge--neg"}`}>
+              {netPositive ? "Ahead" : "Short"}
+            </div>
           </div>
         </div>
-        <div className="bgt-kpi bgt-kpi--out">
-          <div className="bgt-kpi-icon"><IconArrowUp /></div>
-          <div className="bgt-kpi-body">
-            <span className="bgt-kpi-label">{projectScoped ? "Current Expenses" : "Total Expenses"}</span>
-            <strong className="bgt-kpi-value">₱{formatMoney(summary.totalOut)}</strong>
+      ) : (
+        <div className="bgt-kpi-row">
+          <div className="bgt-kpi bgt-kpi--in">
+            <div className="bgt-kpi-icon"><IconArrowDown /></div>
+            <div className="bgt-kpi-body">
+              <span className="bgt-kpi-label">Projected Revenue</span>
+              <strong className="bgt-kpi-value">₱{formatMoney(summary.projectedRevenue ?? summary.totalBudget)}</strong>
+              <span className="bgt-kpi-sub">total contract value</span>
+            </div>
+          </div>
+          <div className="bgt-kpi bgt-kpi--in" style={{ opacity: 0.85 }}>
+            <div className="bgt-kpi-icon"><IconArrowDown /></div>
+            <div className="bgt-kpi-body">
+              <span className="bgt-kpi-label">Total Collected</span>
+              <strong className="bgt-kpi-value">₱{formatMoney(summary.totalIn)}</strong>
+              <span className="bgt-kpi-sub">payments received</span>
+            </div>
+          </div>
+          <div className="bgt-kpi bgt-kpi--out">
+            <div className="bgt-kpi-icon"><IconArrowUp /></div>
+            <div className="bgt-kpi-body">
+              <span className="bgt-kpi-label">Total Expenses</span>
+              <strong className="bgt-kpi-value">₱{formatMoney(summary.totalOut)}</strong>
+            </div>
+          </div>
+          <div className={`bgt-kpi bgt-kpi--net ${netPositive ? "bgt-kpi--net-pos" : "bgt-kpi--net-neg"}`}>
+            <div className="bgt-kpi-icon"><IconBalance /></div>
+            <div className="bgt-kpi-body">
+              <span className="bgt-kpi-label">Net Balance</span>
+              <strong className="bgt-kpi-value">₱{formatMoney(summary.netBalance)}</strong>
+            </div>
+            <div className={`bgt-kpi-badge ${netPositive ? "bgt-kpi-badge--pos" : "bgt-kpi-badge--neg"}`}>
+              {netPositive ? "Surplus" : "Deficit"}
+            </div>
           </div>
         </div>
-        <div className={`bgt-kpi bgt-kpi--net ${netPositive ? "bgt-kpi--net-pos" : "bgt-kpi--net-neg"}`}>
-          <div className="bgt-kpi-icon"><IconBalance /></div>
-          <div className="bgt-kpi-body">
-            <span className="bgt-kpi-label">{projectScoped ? "Collected vs Expenses" : "Net Balance"}</span>
-            <strong className="bgt-kpi-value">₱{formatMoney(summary.netBalance)}</strong>
-          </div>
-          <div className={`bgt-kpi-badge ${netPositive ? "bgt-kpi-badge--pos" : "bgt-kpi-badge--neg"}`}>
-            {netPositive ? (projectScoped ? "Ahead" : "Surplus") : (projectScoped ? "Short" : "Deficit")}
-          </div>
-        </div>
-        <div className="bgt-kpi bgt-kpi--count">
-          <div className="bgt-kpi-body">
-            <span className="bgt-kpi-label">{projectScoped ? "Collected Payments" : "Transactions"}</span>
-            <strong className="bgt-kpi-value">{projectScoped ? `₱${formatMoney(projectCollectedIncome)}` : summary.transactionCount}</strong>
-          </div>
-          <div className="bgt-kpi-sub">
-            {projectScoped
-              ? `Balance due ₱${formatMoney(projectBalanceDue)}`
-              : `${summary.activeAccounts} active account${summary.activeAccounts !== 1 ? "s" : ""}`}
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* ── Toast ──────────────────────────────────────────────────────────── */}
       {success && (
