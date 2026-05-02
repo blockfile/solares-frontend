@@ -6180,9 +6180,11 @@ button {
 .sl-cust-stats {
   display: flex;
   align-items: center;
+  gap: 10px;
   background: #f7f8fb;
   border-radius: 12px;
   padding: 12px 16px;
+  overflow: hidden;
 }
 
 .sl-stat {
@@ -6190,6 +6192,7 @@ button {
   flex-direction: column;
   gap: 3px;
   flex: 1;
+  min-width: 0;
 }
 
 .sl-stat-label {
@@ -6201,9 +6204,13 @@ button {
 }
 
 .sl-stat-val {
+  display: block;
   font-size: 14px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--text);
 }
 
@@ -6215,7 +6222,7 @@ button {
   height: 32px;
   background: var(--border);
   flex-shrink: 0;
-  margin: 0 12px;
+  margin: 0 2px;
 }
 
 /* ── Project rows inside customer card ─────────────────────────────────────── */
@@ -6262,14 +6269,21 @@ button {
 }
 
 .sl-proj-row-right {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
-  flex-shrink: 0;
+  min-width: 0;
+  max-width: 48%;
   color: var(--text-soft);
 }
 
 .sl-proj-margin {
+  text-align: right;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 13px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
