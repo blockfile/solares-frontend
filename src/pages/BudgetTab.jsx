@@ -115,6 +115,9 @@ export default function BudgetTab() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [deletingImportedId, setDeletingImportedId] = useState(null);
+  const [confirmImportedDeleteTx, setConfirmImportedDeleteTx] = useState(null);
+  const [clearImportedOpen, setClearImportedOpen] = useState(false);
+  const [clearingImported, setClearingImported] = useState(false);
   const [selectedTxIds, setSelectedTxIds] = useState(new Set());
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignProjectId, setAssignProjectId] = useState("");
@@ -233,7 +236,14 @@ export default function BudgetTab() {
     setImportAccountId(activeAccounts[0]?.id ? String(activeAccounts[0].id) : "");
     setImportType("out"); setImportProjectId(""); setImportFile(null); setImportResult(null); setImportOpen(true);
   }
-  function closeImport() { setImportOpen(false); setImportFile(null); setImportResult(null); setImportProjectId(""); }
+  function closeImport() {
+    setImportOpen(false);
+    setImportFile(null);
+    setImportResult(null);
+    setImportProjectId("");
+    setConfirmImportedDeleteTx(null);
+    setClearImportedOpen(false);
+  }
   async function submitImport(e) {
     e.preventDefault();
     if (!importFile) { flash("Please select an Excel file.", "error"); return; }
@@ -439,6 +449,35 @@ export default function BudgetTab() {
       flash(err?.response?.data?.message || "Failed to delete imported transaction.", "error");
     } finally {
       setDeletingImportedId(null);
+    }
+  }
+
+  async function confirmDeleteAllImported() {
+    const txIds = (importResult?.transactions || [])
+      .map((tx) => Number(tx.id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+
+    if (!txIds.length) {
+      setImportResult(null);
+      setClearImportedOpen(false);
+      return;
+    }
+
+    setClearingImported(true);
+    try {
+      const res = await api.delete("/budget/bulk", {
+        data: { transactionIds: txIds }
+      });
+
+      flash(`${res.data?.deleted || txIds.length} imported transaction(s) deleted.`);
+      setImportResult(null);
+      setClearImportedOpen(false);
+      setSelectedTxIds(new Set());
+      await loadAll(true);
+    } catch (err) {
+      flash(err?.response?.data?.message || "Failed to clear imported transactions.", "error");
+    } finally {
+      setClearingImported(false);
     }
   }
 
@@ -1219,7 +1258,7 @@ export default function BudgetTab() {
                                 type="button"
                                 className="bgt-row-btn bgt-row-btn--del"
                                 disabled={deletingImportedId === tx.id}
-                                onClick={() => deleteImportedTransaction(tx.id)}
+                                onClick={() => setConfirmImportedDeleteTx(tx)}
                               >
                                 {deletingImportedId === tx.id ? "Deleting…" : "Delete"}
                               </button>
@@ -1240,6 +1279,21 @@ export default function BudgetTab() {
                     </table>
                   </div>
                   <div className="bgt-modal-foot">
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => setImportResult(null)}
+                    >
+                      Clear Preview
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      onClick={() => setClearImportedOpen(true)}
+                      disabled={!(importResult.transactions || []).length}
+                    >
+                      Delete All Imported
+                    </button>
                     <button className="btn btn-primary" onClick={closeImport}>Done</button>
                   </div>
                 </>
@@ -1317,6 +1371,54 @@ export default function BudgetTab() {
       )}
 
       {/* ── Bulk delete tx confirm ─────────────────────────────────────────── */}
+      {confirmImportedDeleteTx && (
+        <div className="bgt-backdrop" onClick={() => setConfirmImportedDeleteTx(null)}>
+          <div className="bgt-modal bgt-modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="bgt-confirm-icon bgt-confirm-icon--del">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" /></svg>
+            </div>
+            <h3 className="bgt-confirm-title">Delete Imported Row?</h3>
+            <p className="bgt-confirm-body">
+              This will permanently delete <strong>{confirmImportedDeleteTx.description || "this imported transaction"}</strong>. This cannot be undone.
+            </p>
+            <div className="bgt-modal-foot bgt-modal-foot--center">
+              <button className="btn btn-ghost" onClick={() => setConfirmImportedDeleteTx(null)} disabled={deletingImportedId === confirmImportedDeleteTx.id}>Cancel</button>
+              <button
+                className="btn btn-danger"
+                disabled={deletingImportedId === confirmImportedDeleteTx.id}
+                onClick={async () => {
+                  const txId = confirmImportedDeleteTx.id;
+                  setConfirmImportedDeleteTx(null);
+                  await deleteImportedTransaction(txId);
+                }}
+              >
+                {deletingImportedId === confirmImportedDeleteTx.id ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {clearImportedOpen && (
+        <div className="bgt-backdrop" onClick={() => !clearingImported && setClearImportedOpen(false)}>
+          <div className="bgt-modal bgt-modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="bgt-confirm-icon bgt-confirm-icon--del">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" /></svg>
+            </div>
+            <h3 className="bgt-confirm-title">Delete All Imported Rows?</h3>
+            <p className="bgt-confirm-body">
+              This will permanently delete <strong>{(importResult?.transactions || []).length}</strong> imported transaction(s) from this Excel import. This cannot be undone.
+            </p>
+            <div className="bgt-modal-foot bgt-modal-foot--center">
+              <button className="btn btn-ghost" onClick={() => setClearImportedOpen(false)} disabled={clearingImported}>Cancel</button>
+              <button className="btn btn-danger" onClick={confirmDeleteAllImported} disabled={clearingImported}>
+                {clearingImported ? "Deleting..." : "Delete All"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {bulkDeleteOpen && (
         <div className="bgt-backdrop" onClick={() => setBulkDeleteOpen(false)}>
           <div className="bgt-modal bgt-modal--confirm" onClick={(e) => e.stopPropagation()}>
