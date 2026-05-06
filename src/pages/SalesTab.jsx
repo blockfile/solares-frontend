@@ -11,8 +11,17 @@ function formatMoney(value) {
   return toNumber(value, 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function formatQuantity(value) {
+  if (value == null || value === "") return "—";
+  return toNumber(value, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+}
+
 function formatDate(value) {
   if (!value) return "—";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split("-").map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  }
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return String(value);
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
@@ -115,7 +124,7 @@ export default function SalesTab() {
   function openNewProj(custId = "") { setEditingProj(null); setProjForm({ ...EMPTY_PROJ, customerId: custId ? String(custId) : "", projectDate: localDate() }); setProjOpen(true); }
   function openEditProj(p) {
     setEditingProj(p);
-    setProjForm({ customerId: String(p.customer_id), projectName: p.project_name || "", saleAmount: String(p.sale_amount), projectDate: p.project_date ? p.project_date.slice(0, 10) : localDate(), status: p.status || "active", notes: p.notes || "" });
+    setProjForm({ customerId: String(p.customer_id), projectName: p.project_name || "", saleAmount: String(p.sale_amount), projectDate: p.project_date ? localDate(p.project_date) : localDate(), status: p.status || "active", notes: p.notes || "" });
     setProjOpen(true);
   }
   function closeProj() { setProjOpen(false); setEditingProj(null); setProjForm(EMPTY_PROJ); }
@@ -438,13 +447,15 @@ export default function SalesTab() {
                 ) : (
                   <div className="bgt-import-preview">
                     <table className="bgt-table bgt-table--compact">
-                      <thead><tr><th>Date</th><th>Description</th><th>Account</th><th className="bgt-col-amt">Amount</th></tr></thead>
+                      <thead><tr><th>Date</th><th>Description</th><th>Account</th><th className="bgt-col-amt">Price</th><th>Qty</th><th className="bgt-col-amt">Amount</th></tr></thead>
                       <tbody>
                         {detailTx.map((tx) => (
                           <tr key={tx.id}>
                             <td className="bgt-cell-date">{formatDate(tx.transaction_date)}</td>
                             <td>{tx.description || <span className="bgt-muted">—</span>}</td>
                             <td><span className="bgt-account-chip">{tx.account_name}</span></td>
+                            <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
+                            <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
                             <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatMoney(tx.amount)}</td>
                           </tr>
                         ))}

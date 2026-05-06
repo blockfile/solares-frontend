@@ -18,17 +18,40 @@ function formatMoney(value) {
   return toNumber(value, 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function formatQuantity(value) {
+  if (value == null || value === "") return "—";
+  return toNumber(value, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+}
+
 function formatDate(value) {
   if (!value) return "—";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split("-").map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  }
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function formatFormNumber(value) {
+  if (value == null || value === "") return "";
+  return String(value);
+}
+
+function calculateTransactionAmount(price, quantity) {
+  const unitPrice = Number(price);
+  const qty = Number(quantity);
+  if (!Number.isFinite(unitPrice) || !Number.isFinite(qty) || unitPrice <= 0 || qty <= 0) return "";
+  return (Math.round(unitPrice * qty * 100) / 100).toFixed(2);
 }
 
 const EMPTY_TX_FORM = {
   accountId: "",
   projectId: "",
   type: "out",
+  price: "",
+  quantity: "",
   amount: "",
   description: "",
   referenceNo: "",
@@ -327,7 +350,7 @@ export default function BudgetTab() {
   }
 
   function openNewProj(custId = "") { setEditingProj(null); setProjForm({ ...EMPTY_PROJ, customerId: custId ? String(custId) : "", projectDate: localDateInput() }); setProjOpen(true); }
-  function openEditProj(p) { setEditingProj(p); setProjForm({ customerId: String(p.customer_id), projectName: p.project_name || "", saleAmount: String(p.sale_amount), projectDate: p.project_date ? p.project_date.slice(0, 10) : localDateInput(), status: p.status || "active", notes: p.notes || "" }); setProjOpen(true); }
+  function openEditProj(p) { setEditingProj(p); setProjForm({ customerId: String(p.customer_id), projectName: p.project_name || "", saleAmount: String(p.sale_amount), projectDate: p.project_date ? localDateInput(p.project_date) : localDateInput(), status: p.status || "active", notes: p.notes || "" }); setProjOpen(true); }
   function closeProj() { setProjOpen(false); setEditingProj(null); setProjForm(EMPTY_PROJ); }
   async function saveProj(e) {
     e.preventDefault(); setProjSaving(true);
@@ -405,6 +428,8 @@ export default function BudgetTab() {
 
   function openNewTx(overrides = {}) {
     setEditingTx(null);
+    setError("");
+    setSuccess("");
     setTxForm({
       ...EMPTY_TX_FORM,
       transactionDate: localDateInput(),
@@ -424,19 +449,41 @@ export default function BudgetTab() {
   }
   function openEditTx(tx) {
     setEditingTx(tx);
+    setError("");
+    setSuccess("");
     setTxForm({
-      accountId: String(tx.account_id), projectId: tx.project_id ? String(tx.project_id) : "", type: tx.type, amount: String(tx.amount),
+      accountId: String(tx.account_id), projectId: tx.project_id ? String(tx.project_id) : "", type: tx.type, price: formatFormNumber(tx.price), quantity: formatFormNumber(tx.quantity), amount: String(tx.amount),
       description: tx.description || "", referenceNo: tx.reference_no || "",
-      transactionDate: tx.transaction_date ? tx.transaction_date.slice(0, 10) : localDateInput(),
+      transactionDate: tx.transaction_date ? localDateInput(tx.transaction_date) : localDateInput(),
       notes: tx.notes || ""
     });
     setTxFormOpen(true);
   }
-  function closeTxForm() { setTxFormOpen(false); setEditingTx(null); setTxForm(EMPTY_TX_FORM); }
+  function closeTxForm() { setTxFormOpen(false); setEditingTx(null); setTxForm(EMPTY_TX_FORM); setError(""); }
+  function updateTxLineValue(field, value) {
+    setTxForm((prev) => {
+      const next = { ...prev, [field]: value };
+      const amount = calculateTransactionAmount(next.price, next.quantity);
+      if (amount) next.amount = amount;
+      return next;
+    });
+  }
   async function saveTx(e) {
     e.preventDefault(); setTxSaving(true);
     try {
-      const payload = { accountId: Number(txForm.accountId), projectId: txForm.projectId ? Number(txForm.projectId) : null, type: txForm.type, amount: Number(txForm.amount), description: txForm.description, referenceNo: txForm.referenceNo, transactionDate: txForm.transactionDate, notes: txForm.notes };
+      const calculatedAmount = calculateTransactionAmount(txForm.price, txForm.quantity);
+      const payload = {
+        accountId: Number(txForm.accountId),
+        projectId: txForm.projectId ? Number(txForm.projectId) : null,
+        type: txForm.type,
+        price: txForm.price === "" ? null : Number(txForm.price),
+        quantity: txForm.quantity === "" ? null : Number(txForm.quantity),
+        amount: Number(txForm.amount || calculatedAmount),
+        description: txForm.description,
+        referenceNo: txForm.referenceNo,
+        transactionDate: txForm.transactionDate,
+        notes: txForm.notes
+      };
       if (editingTx) { await api.put(`/budget/${editingTx.id}`, payload); flash("Transaction updated."); }
       else { await api.post("/budget", payload); flash("Transaction recorded."); }
       closeTxForm(); await loadAll(true);
@@ -799,6 +846,8 @@ export default function BudgetTab() {
                     <th>Description</th>
                     <th>Reference</th>
                     <th>Type</th>
+                    <th className="bgt-col-amt">Price</th>
+                    <th>Qty</th>
                     <th className="bgt-col-amt">Amount</th>
                     <th className="bgt-col-actions" />
                   </tr>
@@ -832,6 +881,8 @@ export default function BudgetTab() {
                           {tx.type === "in" ? "↓ In" : "↑ Out"}
                         </span>
                       </td>
+                      <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
+                      <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
                       <td className={`bgt-col-amt bgt-amount--${tx.type}`}>
                         <span className="bgt-amount-sign">{tx.type === "in" ? "+" : "−"}</span>
                         <span>₱{formatMoney(tx.amount)}</span>
@@ -1084,7 +1135,7 @@ export default function BudgetTab() {
                               <tr key={p.id} className="bgt-table-row" style={{ cursor: "pointer" }} onClick={() => openDetail(p)}>
                                 <td><span className="bgt-account-chip">{p.customer_name}</span></td>
                                 <td><strong>{p.project_name}</strong></td>
-                                <td className="bgt-cell-date">{p.project_date ? new Date(p.project_date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—"}</td>
+                                <td className="bgt-cell-date">{formatDate(p.project_date)}</td>
                                 <td><span className={`sl-pill ${STATUS_COLORS[p.status] || ""}`}>{STATUS_LABELS[p.status] || p.status}</span></td>
                                 <td className="bgt-col-amt" style={{ color: "#147845", fontWeight: 700 }}>₱{formatMoney(p.sale_amount)}</td>
                                 <td className="bgt-col-amt" style={{ color: "#b83a3a", fontWeight: 700 }}>₱{formatMoney(p.total_expenses)}</td>
@@ -1134,13 +1185,15 @@ export default function BudgetTab() {
                       ) : (
                         <div className="bgt-import-preview">
                           <table className="bgt-table bgt-table--compact">
-                            <thead><tr><th>Date</th><th>Description</th><th>Account</th><th className="bgt-col-amt">Amount</th></tr></thead>
+                            <thead><tr><th>Date</th><th>Description</th><th>Account</th><th className="bgt-col-amt">Price</th><th>Qty</th><th className="bgt-col-amt">Amount</th></tr></thead>
                             <tbody>
                               {detailTx.map((tx) => (
                                 <tr key={tx.id}>
-                                  <td className="bgt-cell-date">{tx.transaction_date ? new Date(tx.transaction_date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—"}</td>
+                                  <td className="bgt-cell-date">{formatDate(tx.transaction_date)}</td>
                                   <td>{tx.description || <span className="bgt-muted">—</span>}</td>
                                   <td><span className="bgt-account-chip">{tx.account_name}</span></td>
+                                  <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
+                                  <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
                                   <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatMoney(tx.amount)}</td>
                                 </tr>
                               ))}
@@ -1265,6 +1318,14 @@ export default function BudgetTab() {
                   <input className="input" type="date" required value={txForm.transactionDate} onChange={(e) => setTxForm((f) => ({ ...f, transactionDate: e.target.value }))} />
                 </div>
                 <div className="bgt-field">
+                  <label className="bgt-label">Price (₱)</label>
+                  <input className="input" type="number" min="0" step="0.01" placeholder="0.00" value={txForm.price} onChange={(e) => updateTxLineValue("price", e.target.value)} />
+                </div>
+                <div className="bgt-field">
+                  <label className="bgt-label">Qty</label>
+                  <input className="input" type="number" min="0" step="0.001" placeholder="1" value={txForm.quantity} onChange={(e) => updateTxLineValue("quantity", e.target.value)} />
+                </div>
+                <div className="bgt-field">
                   <label className="bgt-label">Amount (₱) <span className="bgt-req">*</span></label>
                   <input className="input" type="number" min="0.01" step="0.01" required placeholder="0.00" value={txForm.amount} onChange={(e) => setTxForm((f) => ({ ...f, amount: e.target.value }))} />
                 </div>
@@ -1363,6 +1424,8 @@ export default function BudgetTab() {
                           <th>Description</th>
                           <th>Account</th>
                           <th>Type</th>
+                          <th className="bgt-col-amt">Price</th>
+                          <th>Qty</th>
                           <th className="bgt-col-amt">Amount</th>
                           <th className="bgt-col-actions">Action</th>
                         </tr>
@@ -1378,6 +1441,8 @@ export default function BudgetTab() {
                                 {tx.type === "in" ? "↓ In" : "↑ Out"}
                               </span>
                             </td>
+                            <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
+                            <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
                             <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatMoney(tx.amount)}</td>
                             <td className="bgt-col-actions">
                               <button
@@ -1397,6 +1462,8 @@ export default function BudgetTab() {
                             <td>{r.description}</td>
                             <td><span className="bgt-muted">—</span></td>
                             <td><span className="bgt-muted">—</span></td>
+                            <td className="bgt-col-amt">{r.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(r.price)}</>}</td>
+                            <td>{r.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(r.quantity)}</td>
                             <td className="bgt-col-amt bgt-amount--out">₱{formatMoney(r.amount)}</td>
                             <td className="bgt-col-actions"><span className="bgt-muted">Reload required</span></td>
                           </tr>

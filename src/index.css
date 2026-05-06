@@ -5215,6 +5215,12 @@ button {
 
 /* ── Toast ────────────────────────────────────────────────────────────────── */
 .bgt-toast {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 2000;
+  width: min(560px, calc(100vw - 32px));
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -5222,12 +5228,13 @@ button {
   border-radius: 12px;
   font-size: 14px;
   font-weight: 600;
+  box-shadow: 0 16px 40px rgba(15, 25, 45, 0.18);
   animation: bgt-toast-in 0.25s ease;
 }
 
 @keyframes bgt-toast-in {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
 }
 
 .bgt-toast--ok  { background: #dff7e8; color: #116638; border: 1px solid #b3e8c8; }
@@ -5382,12 +5389,13 @@ button {
 .bgt-table-wrap {
   border: 1px solid var(--border);
   border-radius: 14px;
-  overflow: hidden;
+  overflow-x: auto;
   background: #ffffff;
 }
 
 .bgt-table {
   width: 100%;
+  min-width: 760px;
   border-collapse: collapse;
   font-size: 13.5px;
 }
@@ -5425,6 +5433,10 @@ button {
 .bgt-table--compact td,
 .bgt-table--compact th {
   padding: 9px 12px;
+}
+
+.bgt-table--compact {
+  min-width: 640px;
 }
 
 .bgt-cell-date {
@@ -6024,7 +6036,7 @@ button {
 
 .bgt-import-preview {
   max-height: 300px;
-  overflow-y: auto;
+  overflow: auto;
   border: 1px solid var(--border);
   border-radius: 12px;
 }
