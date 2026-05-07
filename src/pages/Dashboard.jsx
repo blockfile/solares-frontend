@@ -171,7 +171,7 @@ function SidebarIcon({ icon }) {
   }
 }
 
-export default function Dashboard() {
+export default function Dashboard({ theme = "light", onToggleTheme }) {
   const [tab, setTab] = useState("calendar");
   const [now, setNow] = useState(new Date());
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -225,6 +225,7 @@ export default function Dashboard() {
     () => visibleTabs.find((item) => item.key === tab) || visibleTabs[0] || TAB_CONFIG[0],
     [tab, visibleTabs]
   );
+  const isDarkTheme = theme === "dark";
 
   const showDashboardMetrics = activeTab?.key === "calendar";
   const pageEyebrow = showDashboardMetrics ? "Dashboard" : activeTab?.group || "Workspace";
@@ -361,6 +362,22 @@ export default function Dashboard() {
               <span>{user.username || user.email || "Authenticated user"}</span>
             </div>
           </div>
+          <button
+            className="theme-switch"
+            type="button"
+            role="switch"
+            aria-checked={isDarkTheme}
+            aria-label={`Switch to ${isDarkTheme ? "light" : "dark"} mode`}
+            onClick={onToggleTheme}
+          >
+            <span className="theme-switch-copy">
+              <span>{isDarkTheme ? "Dark mode" : "Light mode"}</span>
+              <small>{isDarkTheme ? "Night workspace" : "Day workspace"}</small>
+            </span>
+            <span className="theme-switch-track" aria-hidden="true">
+              <span className="theme-switch-thumb" />
+            </span>
+          </button>
           <button
             className="btn btn-ghost sidebar-logout-btn"
             onClick={() => {

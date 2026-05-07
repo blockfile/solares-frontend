@@ -3,7 +3,7 @@ import api from "../api/client";
 import solaresLogo from "../components/assets/SOLARES.png";
 import useBodyScrollLock from "../hooks/useBodyScrollLock";
 
-export default function Login() {
+export default function Login({ theme = "light", onToggleTheme }) {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
@@ -14,6 +14,7 @@ export default function Login() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changeErr, setChangeErr] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
+  const isDarkTheme = theme === "dark";
 
   useBodyScrollLock(Boolean(pendingLogin));
 
@@ -93,6 +94,22 @@ export default function Login() {
   return (
     <div className="login-city-shell page-animate">
       <div className="login-city-card">
+        <button
+          className="theme-switch theme-switch-login"
+          type="button"
+          role="switch"
+          aria-checked={isDarkTheme}
+          aria-label={`Switch to ${isDarkTheme ? "light" : "dark"} mode`}
+          onClick={onToggleTheme}
+        >
+          <span className="theme-switch-copy">
+            <span>{isDarkTheme ? "Dark mode" : "Light mode"}</span>
+            <small>{isDarkTheme ? "Night workspace" : "Day workspace"}</small>
+          </span>
+          <span className="theme-switch-track" aria-hidden="true">
+            <span className="theme-switch-thumb" />
+          </span>
+        </button>
         <div className="login-city-brand">
           <img src={solaresLogo} alt="Solares" className="login-city-brand-image" />
           <p className="login-city-subtitle">MANAGEMENT INFORMATION SYSTEM</p>
