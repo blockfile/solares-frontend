@@ -13,14 +13,20 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function formatMoney(value) {
+const LINE_DECIMAL_PLACES = 4;
+
+function formatMoney(value, fractionDigits = 2) {
   if (value == null || value === "") return "—";
-  return toNumber(value, 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return toNumber(value, 0).toLocaleString("en-PH", { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits });
+}
+
+function formatLineMoney(value) {
+  return formatMoney(value, LINE_DECIMAL_PLACES);
 }
 
 function formatQuantity(value) {
   if (value == null || value === "") return "—";
-  return toNumber(value, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+  return toNumber(value, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: LINE_DECIMAL_PLACES });
 }
 
 function formatDate(value) {
@@ -43,7 +49,7 @@ function calculateTransactionAmount(price, quantity) {
   const unitPrice = Number(price);
   const qty = Number(quantity);
   if (!Number.isFinite(unitPrice) || !Number.isFinite(qty) || unitPrice <= 0 || qty <= 0) return "";
-  return (Math.round(unitPrice * qty * 100) / 100).toFixed(2);
+  return (Math.round(unitPrice * qty * 10000) / 10000).toFixed(LINE_DECIMAL_PLACES);
 }
 
 const EMPTY_TX_FORM = {
@@ -881,11 +887,11 @@ export default function BudgetTab() {
                           {tx.type === "in" ? "↓ In" : "↑ Out"}
                         </span>
                       </td>
-                      <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
+                      <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatLineMoney(tx.price)}</>}</td>
                       <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
                       <td className={`bgt-col-amt bgt-amount--${tx.type}`}>
                         <span className="bgt-amount-sign">{tx.type === "in" ? "+" : "−"}</span>
-                        <span>₱{formatMoney(tx.amount)}</span>
+                        <span>₱{formatLineMoney(tx.amount)}</span>
                       </td>
                       <td className="bgt-col-actions">
                         <button className="bgt-row-btn" onClick={() => openEditTx(tx)} title="Edit">
@@ -1192,9 +1198,9 @@ export default function BudgetTab() {
                                   <td className="bgt-cell-date">{formatDate(tx.transaction_date)}</td>
                                   <td>{tx.description || <span className="bgt-muted">—</span>}</td>
                                   <td><span className="bgt-account-chip">{tx.account_name}</span></td>
-                                  <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
+                                  <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatLineMoney(tx.price)}</>}</td>
                                   <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
-                                  <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatMoney(tx.amount)}</td>
+                                  <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatLineMoney(tx.amount)}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -1319,15 +1325,15 @@ export default function BudgetTab() {
                 </div>
                 <div className="bgt-field">
                   <label className="bgt-label">Price (₱)</label>
-                  <input className="input" type="number" min="0" step="0.01" placeholder="0.00" value={txForm.price} onChange={(e) => updateTxLineValue("price", e.target.value)} />
+                  <input className="input" type="number" min="0" step="0.0001" placeholder="0.0000" value={txForm.price} onChange={(e) => updateTxLineValue("price", e.target.value)} />
                 </div>
                 <div className="bgt-field">
                   <label className="bgt-label">Qty</label>
-                  <input className="input" type="number" min="0" step="0.001" placeholder="1" value={txForm.quantity} onChange={(e) => updateTxLineValue("quantity", e.target.value)} />
+                  <input className="input" type="number" min="0" step="0.0001" placeholder="1" value={txForm.quantity} onChange={(e) => updateTxLineValue("quantity", e.target.value)} />
                 </div>
                 <div className="bgt-field">
                   <label className="bgt-label">Amount (₱) <span className="bgt-req">*</span></label>
-                  <input className="input" type="number" min="0.01" step="0.01" required placeholder="0.00" value={txForm.amount} onChange={(e) => setTxForm((f) => ({ ...f, amount: e.target.value }))} />
+                  <input className="input" type="number" min="0.0001" step="0.0001" required placeholder="0.0000" value={txForm.amount} onChange={(e) => setTxForm((f) => ({ ...f, amount: e.target.value }))} />
                 </div>
                 <div className="bgt-field bgt-field--wide">
                   <label className="bgt-label">Description</label>
@@ -1441,9 +1447,9 @@ export default function BudgetTab() {
                                 {tx.type === "in" ? "↓ In" : "↑ Out"}
                               </span>
                             </td>
-                            <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
+                            <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatLineMoney(tx.price)}</>}</td>
                             <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
-                            <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatMoney(tx.amount)}</td>
+                            <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatLineMoney(tx.amount)}</td>
                             <td className="bgt-col-actions">
                               <button
                                 type="button"
@@ -1462,9 +1468,9 @@ export default function BudgetTab() {
                             <td>{r.description}</td>
                             <td><span className="bgt-muted">—</span></td>
                             <td><span className="bgt-muted">—</span></td>
-                            <td className="bgt-col-amt">{r.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(r.price)}</>}</td>
+                            <td className="bgt-col-amt">{r.price == null ? <span className="bgt-muted">—</span> : <>₱{formatLineMoney(r.price)}</>}</td>
                             <td>{r.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(r.quantity)}</td>
-                            <td className="bgt-col-amt bgt-amount--out">₱{formatMoney(r.amount)}</td>
+                            <td className="bgt-col-amt bgt-amount--out">₱{formatLineMoney(r.amount)}</td>
                             <td className="bgt-col-actions"><span className="bgt-muted">Reload required</span></td>
                           </tr>
                         ))}
@@ -1686,7 +1692,7 @@ export default function BudgetTab() {
             </div>
             <h3 className="bgt-confirm-title">Delete Transaction?</h3>
             <p className="bgt-confirm-body">
-              This will permanently delete the {deletingTx.type === "in" ? "income" : "expense"} of <strong>₱{formatMoney(deletingTx.amount)}</strong>
+              This will permanently delete the {deletingTx.type === "in" ? "income" : "expense"} of <strong>₱{formatLineMoney(deletingTx.amount)}</strong>
               {deletingTx.description ? ` — "${deletingTx.description}"` : ""}. This cannot be undone.
             </p>
             <div className="bgt-modal-foot bgt-modal-foot--center">
