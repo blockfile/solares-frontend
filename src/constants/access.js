@@ -56,7 +56,7 @@ export const MODULE_DEFINITIONS = [
   },
   {
     key: "budget",
-    label: "Budget & Expenses",
+    label: "Financial Management",
     description: "Track income and expenses, manage accounts, and monitor cash flow."
   }
 ];

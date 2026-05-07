@@ -5714,6 +5714,8 @@ button {
 
 .bgt-acc-type-dot--income  { background: #147845; }
 .bgt-acc-type-dot--expense { background: #b83a3a; }
+.bgt-acc-type-dot--investment { background: #1f6fd1; }
+.bgt-acc-type-dot--withdrawal { background: #b86d12; }
 
 .bgt-acc-name {
   font-size: 15px;
@@ -5747,6 +5749,8 @@ button {
 
 .bgt-pill--income   { background: #dff7e8; color: #147845; }
 .bgt-pill--expense  { background: #fde8e8; color: #b83a3a; }
+.bgt-pill--investment { background: #e4f0ff; color: #1f6fd1; }
+.bgt-pill--withdrawal { background: #fff0d9; color: #b86d12; }
 .bgt-pill--inactive { background: #f0f3f8; color: #8292aa; }
 
 .bgt-acc-stats {
@@ -5857,6 +5861,11 @@ button {
   max-width: 440px;
 }
 
+.bgt-modal--project-form,
+.bgt-modal--project-details {
+  max-width: 760px;
+}
+
 .bgt-modal--confirm {
   max-width: 400px;
   text-align: center;
@@ -5955,6 +5964,136 @@ button {
 
 .bgt-field--wide {
   grid-column: 1 / -1;
+}
+
+.bgt-project-details-editor,
+.bgt-project-details-summary {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  text-align: left;
+}
+
+.bgt-project-detail-editor-section,
+.bgt-project-detail-section {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.08);
+  padding: 12px;
+}
+
+.bgt-project-detail-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.bgt-project-detail-editor-head h4,
+.bgt-project-detail-section h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.bgt-detail-add-btn {
+  padding: 7px 10px;
+  flex-shrink: 0;
+}
+
+.bgt-detail-edit-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.bgt-detail-edit-grid > span {
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.bgt-detail-edit-grid--materials,
+.bgt-detail-edit-row {
+  grid-template-columns: minmax(150px, 1.4fr) minmax(80px, 0.6fr) minmax(110px, 0.75fr) minmax(110px, 0.75fr) 34px;
+}
+
+.bgt-detail-edit-grid--amount {
+  grid-template-columns: minmax(180px, 1fr) minmax(120px, 0.45fr) 34px;
+}
+
+.bgt-detail-edit-row {
+  display: grid;
+  gap: 8px;
+  grid-column: 1 / -1;
+  align-items: center;
+}
+
+.bgt-detail-edit-grid--amount .bgt-detail-edit-row {
+  grid-template-columns: minmax(180px, 1fr) minmax(120px, 0.45fr) 34px;
+}
+
+.bgt-row-icon-btn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.bgt-row-icon-btn:hover {
+  background: #fde8e8;
+  color: #b83a3a;
+  border-color: #f5c0c0;
+}
+
+.bgt-detail-table {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.bgt-detail-table--materials {
+  grid-template-columns: minmax(150px, 1fr) 80px 120px 120px;
+}
+
+.bgt-detail-table--amount {
+  grid-template-columns: minmax(180px, 1fr) 140px;
+}
+
+.bgt-detail-table > span {
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.bgt-detail-row {
+  display: contents;
+}
+
+.bgt-detail-row span {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.bgt-project-details-empty {
+  margin: 8px 0 0;
+  color: var(--text-soft);
+  font-size: 12px;
 }
 
 .bgt-label {
@@ -6101,6 +6240,53 @@ button {
   color: var(--text-soft);
   line-height: 1.6;
   max-width: 320px;
+}
+
+.bgt-modal--project-delete {
+  max-width: 680px;
+}
+
+.bgt-delete-fields {
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.08);
+  display: grid;
+  gap: 8px;
+  text-align: left;
+}
+
+.bgt-delete-fields div {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+}
+
+.bgt-delete-fields dt {
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.bgt-delete-fields dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.bgt-delete-fields--wide {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.bgt-delete-fields--wide div {
+  align-items: flex-start;
 }
 
 /* ── Import ───────────────────────────────────────────────────────────────── */

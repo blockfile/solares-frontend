@@ -26,7 +26,7 @@ const TAB_CONFIG = [
   { key: "inventory", label: "Inventory", group: "Catalog", icon: "inventory" },
   { key: "packages", label: "Package Prices", group: "Catalog", icon: "packages" },
   { key: "margins", label: "Margin Setup", group: "Catalog", icon: "margins" },
-  { key: "budget", label: "Budget & Expenses", group: "Workspace", icon: "budget" },
+  { key: "budget", label: "Financial Management", group: "Workspace", icon: "budget" },
   { key: "users", label: "Users", group: "System Admin", icon: "users" },
   { key: "roles", label: "Roles", group: "System Admin", icon: "roles" },
   { key: "audit", label: "Audit", group: "System Admin", icon: "audit" }
