@@ -6,20 +6,16 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-const LINE_DECIMAL_PLACES = 4;
+const PRICE_DECIMAL_PLACES = 4;
 
 function formatMoney(value, fractionDigits = 2) {
   if (value == null || value === "") return "—";
   return toNumber(value, 0).toLocaleString("en-PH", { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits });
 }
 
-function formatLineMoney(value) {
-  return formatMoney(value, LINE_DECIMAL_PLACES);
-}
-
 function formatQuantity(value) {
   if (value == null || value === "") return "—";
-  return toNumber(value, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: LINE_DECIMAL_PLACES });
+  return toNumber(value, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: PRICE_DECIMAL_PLACES });
 }
 
 function formatDate(value) {
@@ -460,9 +456,9 @@ export default function SalesTab() {
                             <td className="bgt-cell-date">{formatDate(tx.transaction_date)}</td>
                             <td>{tx.description || <span className="bgt-muted">—</span>}</td>
                             <td><span className="bgt-account-chip">{tx.account_name}</span></td>
-                            <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatLineMoney(tx.price)}</>}</td>
+                            <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
                             <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
-                            <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatLineMoney(tx.amount)}</td>
+                            <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatMoney(tx.amount)}</td>
                           </tr>
                         ))}
                       </tbody>
