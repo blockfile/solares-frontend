@@ -47,11 +47,15 @@ function formatFixedFormNumber(value, fractionDigits) {
   return toNumber(value, 0).toFixed(fractionDigits);
 }
 
-function calculateTransactionAmount(price, quantity) {
+function calculateTransactionAmount(price, quantity, discount = 0) {
   const unitPrice = Number(price);
   const qty = Number(quantity);
+  const discountAmount = discount === "" || discount == null ? 0 : Number(discount);
   if (!Number.isFinite(unitPrice) || !Number.isFinite(qty) || unitPrice <= 0 || qty <= 0) return "";
-  return (Math.round(unitPrice * qty * 100) / 100).toFixed(AMOUNT_DECIMAL_PLACES);
+  if (!Number.isFinite(discountAmount) || discountAmount < 0) return "";
+  const amount = unitPrice * qty - discountAmount;
+  if (amount <= 0) return "";
+  return (Math.round(amount * 100) / 100).toFixed(AMOUNT_DECIMAL_PLACES);
 }
 
 let txLineSequence = 0;
@@ -63,6 +67,7 @@ function createTxLine(overrides = {}) {
     description: "",
     price: "",
     quantity: "",
+    discount: "",
     amount: "",
     notes: "",
     ...overrides
@@ -70,7 +75,7 @@ function createTxLine(overrides = {}) {
 }
 
 function hasTxLineInput(line) {
-  return ["description", "price", "quantity", "amount", "notes"].some((field) => {
+  return ["description", "price", "quantity", "discount", "amount", "notes"].some((field) => {
     const value = line?.[field];
     return value != null && String(value).trim() !== "";
   });
@@ -284,7 +289,7 @@ export default function BudgetTab() {
     [projects]
   );
   const txLinesTotal = useMemo(
-    () => txLines.reduce((sum, line) => sum + toNumber(line.amount || calculateTransactionAmount(line.price, line.quantity), 0), 0),
+    () => txLines.reduce((sum, line) => sum + toNumber(calculateTransactionAmount(line.price, line.quantity, line.discount) || line.amount, 0), 0),
     [txLines]
   );
 
@@ -454,7 +459,7 @@ export default function BudgetTab() {
   }
 
   function openNewTx(overrides = {}) {
-    const { description, price, quantity, amount, notes, ...headerOverrides } = overrides;
+    const { description, price, quantity, discount, amount, notes, ...headerOverrides } = overrides;
     setEditingTx(null);
     setError("");
     setSuccess("");
@@ -468,6 +473,7 @@ export default function BudgetTab() {
       description: description || "",
       price: price || "",
       quantity: quantity || "",
+      discount: discount || "",
       amount: amount || "",
       notes: notes || ""
     })]);
@@ -496,6 +502,7 @@ export default function BudgetTab() {
     setTxLines([createTxLine({
       price: formatFormNumber(tx.price),
       quantity: formatFormNumber(tx.quantity),
+      discount: formatFormNumber(tx.discount),
       amount: formatFixedFormNumber(tx.amount, AMOUNT_DECIMAL_PLACES),
       description: tx.description || "",
       notes: tx.notes || ""
@@ -513,9 +520,8 @@ export default function BudgetTab() {
     setTxLines((prev) => prev.map((line) => {
       if (line.lineKey !== lineKey) return line;
       const next = { ...line, [field]: value };
-      if (field === "price" || field === "quantity") {
-        const amount = calculateTransactionAmount(next.price, next.quantity);
-        if (amount) next.amount = amount;
+      if (field === "price" || field === "quantity" || field === "discount") {
+        next.amount = calculateTransactionAmount(next.price, next.quantity, next.discount);
       }
       return next;
     }));
@@ -527,25 +533,34 @@ export default function BudgetTab() {
     setTxLines((prev) => (prev.length <= 1 ? prev : prev.filter((line) => line.lineKey !== lineKey)));
   }
   function normalizeTxLineForPayload(line, index) {
-    const calculatedAmount = calculateTransactionAmount(line.price, line.quantity);
-    const amount = Number(line.amount || calculatedAmount);
+    const calculatedAmount = calculateTransactionAmount(line.price, line.quantity, line.discount);
+    const amount = Number(calculatedAmount || line.amount);
     const price = line.price === "" ? null : Number(line.price);
     const quantity = line.quantity === "" ? null : Number(line.quantity);
+    const discount = line.discount === "" ? null : Number(line.discount);
+    const grossAmount = price != null && quantity != null ? price * quantity : null;
 
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return { error: `Line ${index + 1}: amount must be greater than zero.` };
-    }
     if (price != null && (!Number.isFinite(price) || price < 0)) {
       return { error: `Line ${index + 1}: price cannot be negative.` };
     }
     if (quantity != null && (!Number.isFinite(quantity) || quantity < 0)) {
       return { error: `Line ${index + 1}: qty cannot be negative.` };
     }
+    if (discount != null && (!Number.isFinite(discount) || discount < 0)) {
+      return { error: `Line ${index + 1}: discount cannot be negative.` };
+    }
+    if (discount != null && grossAmount != null && discount >= grossAmount) {
+      return { error: `Line ${index + 1}: discount must be less than price times qty.` };
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return { error: `Line ${index + 1}: amount must be greater than zero.` };
+    }
 
     return {
       value: {
         price,
         quantity,
+        discount,
         amount,
         description: line.description,
         notes: line.notes
@@ -941,6 +956,7 @@ export default function BudgetTab() {
                     <th>Type</th>
                     <th className="bgt-col-amt">Price</th>
                     <th>Qty</th>
+                    <th className="bgt-col-amt">Discount</th>
                     <th className="bgt-col-amt">Amount</th>
                     <th className="bgt-col-actions" />
                   </tr>
@@ -976,6 +992,7 @@ export default function BudgetTab() {
                       </td>
                       <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
                       <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
+                      <td className="bgt-col-amt">{tx.discount == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.discount)}</>}</td>
                       <td className={`bgt-col-amt bgt-amount--${tx.type}`}>
                         <span className="bgt-amount-sign">{tx.type === "in" ? "+" : "−"}</span>
                         <span>₱{formatMoney(tx.amount)}</span>
@@ -1278,7 +1295,7 @@ export default function BudgetTab() {
                       ) : (
                         <div className="bgt-import-preview">
                           <table className="bgt-table bgt-table--compact">
-                            <thead><tr><th>Date</th><th>Description</th><th>Account</th><th className="bgt-col-amt">Price</th><th>Qty</th><th className="bgt-col-amt">Amount</th></tr></thead>
+                            <thead><tr><th>Date</th><th>Description</th><th>Account</th><th className="bgt-col-amt">Price</th><th>Qty</th><th className="bgt-col-amt">Discount</th><th className="bgt-col-amt">Amount</th></tr></thead>
                             <tbody>
                               {detailTx.map((tx) => (
                                 <tr key={tx.id}>
@@ -1287,6 +1304,7 @@ export default function BudgetTab() {
                                   <td><span className="bgt-account-chip">{tx.account_name}</span></td>
                                   <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
                                   <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
+                                  <td className="bgt-col-amt">{tx.discount == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.discount)}</>}</td>
                                   <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatMoney(tx.amount)}</td>
                                 </tr>
                               ))}
@@ -1453,8 +1471,12 @@ export default function BudgetTab() {
                         <input className="input" type="number" min="0" step="0.0001" placeholder="1" value={line.quantity} onChange={(e) => updateTxLineValue(line.lineKey, "quantity", e.target.value)} />
                       </div>
                       <div className="bgt-field">
+                        <label className="bgt-label">Discount (₱)</label>
+                        <input className="input" type="number" min="0" step="0.01" placeholder="0.00" value={line.discount} onChange={(e) => updateTxLineValue(line.lineKey, "discount", e.target.value)} />
+                      </div>
+                      <div className="bgt-field">
                         <label className="bgt-label">Amount (₱) <span className="bgt-req">*</span></label>
-                        <input className="input" type="number" min="0.01" step="0.01" placeholder="0.00" value={line.amount} onChange={(e) => updateTxLineValue(line.lineKey, "amount", e.target.value)} />
+                        <input className="input" type="number" min="0.01" step="0.01" placeholder="0.00" value={line.amount} readOnly={calculateTransactionAmount(line.price, line.quantity, line.discount) !== ""} onChange={(e) => updateTxLineValue(line.lineKey, "amount", e.target.value)} />
                       </div>
                       <div className="bgt-field bgt-line-notes">
                         <label className="bgt-label">Notes</label>
@@ -1553,6 +1575,7 @@ export default function BudgetTab() {
                           <th>Type</th>
                           <th className="bgt-col-amt">Price</th>
                           <th>Qty</th>
+                          <th className="bgt-col-amt">Discount</th>
                           <th className="bgt-col-amt">Amount</th>
                           <th className="bgt-col-actions">Action</th>
                         </tr>
@@ -1570,6 +1593,7 @@ export default function BudgetTab() {
                             </td>
                             <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
                             <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
+                            <td className="bgt-col-amt">{tx.discount == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.discount)}</>}</td>
                             <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatMoney(tx.amount)}</td>
                             <td className="bgt-col-actions">
                               <button
@@ -1591,6 +1615,7 @@ export default function BudgetTab() {
                             <td><span className="bgt-muted">—</span></td>
                             <td className="bgt-col-amt">{r.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(r.price)}</>}</td>
                             <td>{r.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(r.quantity)}</td>
+                            <td className="bgt-col-amt">{r.discount == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(r.discount)}</>}</td>
                             <td className="bgt-col-amt bgt-amount--out">₱{formatMoney(r.amount)}</td>
                             <td className="bgt-col-actions"><span className="bgt-muted">Reload required</span></td>
                           </tr>
@@ -1627,7 +1652,7 @@ export default function BudgetTab() {
                       Expected Excel format
                     </div>
                     <div className="bgt-import-cols">
-                      {["Date", "Description / Expenses", "Price", "Qty", "Sub Total"].map((col) => (
+                      {["Date", "Description / Expenses", "Price", "Qty", "Discount", "Sub Total"].map((col) => (
                         <span key={col} className="bgt-import-col-chip">{col}</span>
                       ))}
                     </div>

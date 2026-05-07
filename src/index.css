@@ -5902,7 +5902,7 @@ button {
 
 .bgt-line-grid {
   display: grid;
-  grid-template-columns: minmax(180px, 1.4fr) minmax(110px, 0.75fr) minmax(90px, 0.55fr) minmax(120px, 0.8fr);
+  grid-template-columns: minmax(180px, 1.4fr) minmax(110px, 0.7fr) minmax(90px, 0.5fr) minmax(110px, 0.65fr) minmax(120px, 0.75fr);
   gap: 12px;
   margin-top: 10px;
   align-items: start;

@@ -449,7 +449,7 @@ export default function SalesTab() {
                 ) : (
                   <div className="bgt-import-preview">
                     <table className="bgt-table bgt-table--compact">
-                      <thead><tr><th>Date</th><th>Description</th><th>Account</th><th className="bgt-col-amt">Price</th><th>Qty</th><th className="bgt-col-amt">Amount</th></tr></thead>
+                      <thead><tr><th>Date</th><th>Description</th><th>Account</th><th className="bgt-col-amt">Price</th><th>Qty</th><th className="bgt-col-amt">Discount</th><th className="bgt-col-amt">Amount</th></tr></thead>
                       <tbody>
                         {detailTx.map((tx) => (
                           <tr key={tx.id}>
@@ -458,6 +458,7 @@ export default function SalesTab() {
                             <td><span className="bgt-account-chip">{tx.account_name}</span></td>
                             <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
                             <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
+                            <td className="bgt-col-amt">{tx.discount == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.discount)}</>}</td>
                             <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatMoney(tx.amount)}</td>
                           </tr>
                         ))}
