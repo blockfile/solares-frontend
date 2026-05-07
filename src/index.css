@@ -5734,6 +5734,10 @@ button {
   animation: bgt-modal-in 0.25s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
+.bgt-modal--tx {
+  max-width: 860px;
+}
+
 @keyframes bgt-modal-in {
   from { opacity: 0; transform: scale(0.96) translateY(8px); }
   to   { opacity: 1; transform: scale(1)    translateY(0); }
@@ -5825,6 +5829,14 @@ button {
   gap: 14px;
 }
 
+.bgt-form-grid--tx-header {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.bgt-form-grid--tx-header .bgt-field--wide {
+  grid-column: span 2;
+}
+
 .bgt-field {
   display: flex;
   flex-direction: column;
@@ -5844,6 +5856,73 @@ button {
 .bgt-req {
   color: #b83a3a;
   margin-left: 2px;
+}
+
+.bgt-tx-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.bgt-tx-lines-head,
+.bgt-tx-line-head,
+.bgt-tx-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bgt-tx-lines-head > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bgt-tx-add-line {
+  flex-shrink: 0;
+}
+
+.bgt-tx-line {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: #fbfcfe;
+}
+
+.bgt-tx-line-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.bgt-line-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) minmax(110px, 0.75fr) minmax(90px, 0.55fr) minmax(120px, 0.8fr);
+  gap: 12px;
+  margin-top: 10px;
+  align-items: start;
+}
+
+.bgt-line-notes {
+  grid-column: 1 / -1;
+}
+
+.bgt-tx-total-row {
+  border-top: 1px dashed var(--border);
+  padding-top: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.bgt-tx-total-row strong {
+  font-size: 18px;
+  color: #147845;
 }
 
 /* ── Type toggle ──────────────────────────────────────────────────────────── */
@@ -6582,6 +6661,25 @@ button {
 
   .bgt-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .bgt-form-grid--tx-header,
+  .bgt-line-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bgt-form-grid--tx-header .bgt-field--wide {
+    grid-column: auto;
+  }
+
+  .bgt-tx-lines-head,
+  .bgt-tx-line-head,
+  .bgt-tx-total-row {
+    align-items: stretch;
+  }
+
+  .bgt-tx-lines-head {
+    flex-direction: column;
   }
 
   .bgt-type-toggle {

@@ -54,17 +54,34 @@ function calculateTransactionAmount(price, quantity) {
   return (Math.round(unitPrice * qty * 100) / 100).toFixed(AMOUNT_DECIMAL_PLACES);
 }
 
+let txLineSequence = 0;
+
+function createTxLine(overrides = {}) {
+  txLineSequence += 1;
+  return {
+    lineKey: `tx-line-${txLineSequence}`,
+    description: "",
+    price: "",
+    quantity: "",
+    amount: "",
+    notes: "",
+    ...overrides
+  };
+}
+
+function hasTxLineInput(line) {
+  return ["description", "price", "quantity", "amount", "notes"].some((field) => {
+    const value = line?.[field];
+    return value != null && String(value).trim() !== "";
+  });
+}
+
 const EMPTY_TX_FORM = {
   accountId: "",
   projectId: "",
   type: "out",
-  price: "",
-  quantity: "",
-  amount: "",
-  description: "",
   referenceNo: "",
-  transactionDate: localDateInput(),
-  notes: ""
+  transactionDate: localDateInput()
 };
 
 const EMPTY_ACCOUNT_FORM = { name: "", type: "expense", description: "" };
@@ -132,6 +149,7 @@ export default function BudgetTab() {
   const [view, setView] = useState("transactions"); // "transactions" | "accounts" | "sales"
 
   const [txForm, setTxForm] = useState(EMPTY_TX_FORM);
+  const [txLines, setTxLines] = useState(() => [createTxLine()]);
   const [editingTx, setEditingTx] = useState(null);
   const [txFormOpen, setTxFormOpen] = useState(false);
   const [txSaving, setTxSaving] = useState(false);
@@ -257,9 +275,6 @@ export default function BudgetTab() {
     () => projects.find((p) => String(p.id) === String(scopeProjectId)) || null,
     [projects, scopeProjectId]
   );
-  const projectProjectedIncome = projectScoped ? toNumber(summary.projectedIncome ?? summary.projectBudget ?? summary.totalIn, 0) : toNumber(summary.totalIn, 0);
-  const projectCollectedIncome = projectScoped ? toNumber(summary.collectedIncome ?? summary.totalIn, 0) : toNumber(summary.totalIn, 0);
-  const projectBalanceDue = projectScoped ? toNumber(summary.balanceDue, Math.max(0, projectProjectedIncome - projectCollectedIncome)) : 0;
   const salesCollected = useMemo(
     () => projects.reduce((sum, project) => sum + toNumber(project.total_income, 0), 0),
     [projects]
@@ -267,6 +282,10 @@ export default function BudgetTab() {
   const salesBalanceDue = useMemo(
     () => projects.reduce((sum, project) => sum + Math.max(0, toNumber(project.sale_amount, 0) - toNumber(project.total_income, 0)), 0),
     [projects]
+  );
+  const txLinesTotal = useMemo(
+    () => txLines.reduce((sum, line) => sum + toNumber(line.amount || calculateTransactionAmount(line.price, line.quantity), 0), 0),
+    [txLines]
   );
 
   useEffect(() => {
@@ -435,6 +454,7 @@ export default function BudgetTab() {
   }
 
   function openNewTx(overrides = {}) {
+    const { description, price, quantity, amount, notes, ...headerOverrides } = overrides;
     setEditingTx(null);
     setError("");
     setSuccess("");
@@ -442,8 +462,15 @@ export default function BudgetTab() {
       ...EMPTY_TX_FORM,
       transactionDate: localDateInput(),
       projectId: projectScoped && selectedScopeProject ? String(selectedScopeProject.id) : "",
-      ...overrides
+      ...headerOverrides
     });
+    setTxLines([createTxLine({
+      description: description || "",
+      price: price || "",
+      quantity: quantity || "",
+      amount: amount || "",
+      notes: notes || ""
+    })]);
     setTxFormOpen(true);
   }
   function openNewPayment(project = null) {
@@ -460,40 +487,98 @@ export default function BudgetTab() {
     setError("");
     setSuccess("");
     setTxForm({
-      accountId: String(tx.account_id), projectId: tx.project_id ? String(tx.project_id) : "", type: tx.type, price: formatFormNumber(tx.price), quantity: formatFormNumber(tx.quantity), amount: formatFixedFormNumber(tx.amount, AMOUNT_DECIMAL_PLACES),
-      description: tx.description || "", referenceNo: tx.reference_no || "",
-      transactionDate: tx.transaction_date ? localDateInput(tx.transaction_date) : localDateInput(),
-      notes: tx.notes || ""
+      accountId: String(tx.account_id),
+      projectId: tx.project_id ? String(tx.project_id) : "",
+      type: tx.type,
+      referenceNo: tx.reference_no || "",
+      transactionDate: tx.transaction_date ? localDateInput(tx.transaction_date) : localDateInput()
     });
+    setTxLines([createTxLine({
+      price: formatFormNumber(tx.price),
+      quantity: formatFormNumber(tx.quantity),
+      amount: formatFixedFormNumber(tx.amount, AMOUNT_DECIMAL_PLACES),
+      description: tx.description || "",
+      notes: tx.notes || ""
+    })]);
     setTxFormOpen(true);
   }
-  function closeTxForm() { setTxFormOpen(false); setEditingTx(null); setTxForm(EMPTY_TX_FORM); setError(""); }
-  function updateTxLineValue(field, value) {
-    setTxForm((prev) => {
-      const next = { ...prev, [field]: value };
-      const amount = calculateTransactionAmount(next.price, next.quantity);
-      if (amount) next.amount = amount;
+  function closeTxForm() {
+    setTxFormOpen(false);
+    setEditingTx(null);
+    setTxForm(EMPTY_TX_FORM);
+    setTxLines([createTxLine()]);
+    setError("");
+  }
+  function updateTxLineValue(lineKey, field, value) {
+    setTxLines((prev) => prev.map((line) => {
+      if (line.lineKey !== lineKey) return line;
+      const next = { ...line, [field]: value };
+      if (field === "price" || field === "quantity") {
+        const amount = calculateTransactionAmount(next.price, next.quantity);
+        if (amount) next.amount = amount;
+      }
       return next;
-    });
+    }));
+  }
+  function addTxLine() {
+    setTxLines((prev) => [...prev, createTxLine()]);
+  }
+  function removeTxLine(lineKey) {
+    setTxLines((prev) => (prev.length <= 1 ? prev : prev.filter((line) => line.lineKey !== lineKey)));
+  }
+  function normalizeTxLineForPayload(line, index) {
+    const calculatedAmount = calculateTransactionAmount(line.price, line.quantity);
+    const amount = Number(line.amount || calculatedAmount);
+    const price = line.price === "" ? null : Number(line.price);
+    const quantity = line.quantity === "" ? null : Number(line.quantity);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return { error: `Line ${index + 1}: amount must be greater than zero.` };
+    }
+    if (price != null && (!Number.isFinite(price) || price < 0)) {
+      return { error: `Line ${index + 1}: price cannot be negative.` };
+    }
+    if (quantity != null && (!Number.isFinite(quantity) || quantity < 0)) {
+      return { error: `Line ${index + 1}: qty cannot be negative.` };
+    }
+
+    return {
+      value: {
+        price,
+        quantity,
+        amount,
+        description: line.description,
+        notes: line.notes
+      }
+    };
   }
   async function saveTx(e) {
     e.preventDefault(); setTxSaving(true);
     try {
-      const calculatedAmount = calculateTransactionAmount(txForm.price, txForm.quantity);
-      const payload = {
+      const payloadLines = txLines
+        .filter(hasTxLineInput)
+        .map((line, index) => normalizeTxLineForPayload(line, index));
+      const invalidLine = payloadLines.find((line) => line.error);
+      if (invalidLine) { flash(invalidLine.error, "error"); return; }
+      const items = payloadLines.map((line) => line.value);
+      if (!items.length) { flash("Add at least one transaction line.", "error"); return; }
+
+      const sharedPayload = {
         accountId: Number(txForm.accountId),
         projectId: txForm.projectId ? Number(txForm.projectId) : null,
         type: txForm.type,
-        price: txForm.price === "" ? null : Number(txForm.price),
-        quantity: txForm.quantity === "" ? null : Number(txForm.quantity),
-        amount: Number(txForm.amount || calculatedAmount),
-        description: txForm.description,
         referenceNo: txForm.referenceNo,
-        transactionDate: txForm.transactionDate,
-        notes: txForm.notes
+        transactionDate: txForm.transactionDate
       };
-      if (editingTx) { await api.put(`/budget/${editingTx.id}`, payload); flash("Transaction updated."); }
-      else { await api.post("/budget", payload); flash("Transaction recorded."); }
+      if (editingTx) {
+        await api.put(`/budget/${editingTx.id}`, { ...sharedPayload, ...items[0] });
+        flash("Transaction updated.");
+      }
+      else {
+        const res = await api.post("/budget", { ...sharedPayload, items });
+        const createdCount = res.data?.created || items.length;
+        flash(`${createdCount} transaction${createdCount !== 1 ? "s" : ""} recorded.`);
+      }
       closeTxForm(); await loadAll(true);
     } catch (err) { flash(err?.response?.data?.message || "Failed to save transaction.", "error"); }
     finally { setTxSaving(false); }
@@ -1285,7 +1370,7 @@ export default function BudgetTab() {
       {/* ── Transaction modal ──────────────────────────────────────────────── */}
       {txFormOpen && (
         <div className="bgt-backdrop" onClick={(e) => { if (e.target === e.currentTarget) closeTxForm(); }}>
-          <div className="bgt-modal">
+          <div className="bgt-modal bgt-modal--tx">
             <div className="bgt-modal-head">
               <div>
                 <p className="bgt-modal-eyebrow">{editingTx ? "Editing record" : "New entry"}</p>
@@ -1306,7 +1391,7 @@ export default function BudgetTab() {
                 </button>
               </div>
 
-              <div className="bgt-form-grid">
+              <div className="bgt-form-grid bgt-form-grid--tx-header">
                 <div className="bgt-field bgt-field--wide">
                   <label className="bgt-label">Account <span className="bgt-req">*</span></label>
                   <select className="input" required value={txForm.accountId} onChange={(e) => setTxForm((f) => ({ ...f, accountId: e.target.value }))}>
@@ -1325,36 +1410,70 @@ export default function BudgetTab() {
                   <label className="bgt-label">Date <span className="bgt-req">*</span></label>
                   <input className="input" type="date" required value={txForm.transactionDate} onChange={(e) => setTxForm((f) => ({ ...f, transactionDate: e.target.value }))} />
                 </div>
-                <div className="bgt-field">
-                  <label className="bgt-label">Price (₱)</label>
-                  <input className="input" type="number" min="0" step="0.0001" placeholder="0.0000" value={txForm.price} onChange={(e) => updateTxLineValue("price", e.target.value)} />
-                </div>
-                <div className="bgt-field">
-                  <label className="bgt-label">Qty</label>
-                  <input className="input" type="number" min="0" step="0.0001" placeholder="1" value={txForm.quantity} onChange={(e) => updateTxLineValue("quantity", e.target.value)} />
-                </div>
-                <div className="bgt-field">
-                  <label className="bgt-label">Amount (₱) <span className="bgt-req">*</span></label>
-                  <input className="input" type="number" min="0.01" step="0.01" required placeholder="0.00" value={txForm.amount} onChange={(e) => setTxForm((f) => ({ ...f, amount: e.target.value }))} />
-                </div>
-                <div className="bgt-field bgt-field--wide">
-                  <label className="bgt-label">Description</label>
-                  <input className="input" type="text" placeholder="What is this for?" value={txForm.description} onChange={(e) => setTxForm((f) => ({ ...f, description: e.target.value }))} />
-                </div>
                 <div className="bgt-field bgt-field--wide">
                   <label className="bgt-label">Reference No.</label>
                   <input className="input" type="text" placeholder="OR, receipt, invoice number…" value={txForm.referenceNo} onChange={(e) => setTxForm((f) => ({ ...f, referenceNo: e.target.value }))} />
                 </div>
-                <div className="bgt-field bgt-field--wide">
-                  <label className="bgt-label">Notes</label>
-                  <textarea className="input" rows={3} placeholder="Additional notes…" value={txForm.notes} onChange={(e) => setTxForm((f) => ({ ...f, notes: e.target.value }))} />
+              </div>
+
+              <div className="bgt-tx-lines">
+                <div className="bgt-tx-lines-head">
+                  <div>
+                    <span className="bgt-label">Line Entries</span>
+                    <span className="bgt-field-note">All entries use the selected type, account, project, date, and reference.</span>
+                  </div>
+                  {!editingTx && (
+                    <button type="button" className="btn btn-ghost bgt-tx-add-line" onClick={addTxLine}>
+                      <IconPlus /> Add Line
+                    </button>
+                  )}
+                </div>
+
+                {txLines.map((line, index) => (
+                  <div className="bgt-tx-line" key={line.lineKey}>
+                    <div className="bgt-tx-line-head">
+                      <span className="bgt-tx-line-title">Entry {index + 1}</span>
+                      {!editingTx && txLines.length > 1 && (
+                        <button type="button" className="bgt-row-btn bgt-row-btn--del" onClick={() => removeTxLine(line.lineKey)}>
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    <div className="bgt-line-grid">
+                      <div className="bgt-field bgt-line-desc">
+                        <label className="bgt-label">Description</label>
+                        <input className="input" type="text" placeholder="What is this for?" value={line.description} onChange={(e) => updateTxLineValue(line.lineKey, "description", e.target.value)} />
+                      </div>
+                      <div className="bgt-field">
+                        <label className="bgt-label">Price (₱)</label>
+                        <input className="input" type="number" min="0" step="0.0001" placeholder="0.0000" value={line.price} onChange={(e) => updateTxLineValue(line.lineKey, "price", e.target.value)} />
+                      </div>
+                      <div className="bgt-field">
+                        <label className="bgt-label">Qty</label>
+                        <input className="input" type="number" min="0" step="0.0001" placeholder="1" value={line.quantity} onChange={(e) => updateTxLineValue(line.lineKey, "quantity", e.target.value)} />
+                      </div>
+                      <div className="bgt-field">
+                        <label className="bgt-label">Amount (₱) <span className="bgt-req">*</span></label>
+                        <input className="input" type="number" min="0.01" step="0.01" placeholder="0.00" value={line.amount} onChange={(e) => updateTxLineValue(line.lineKey, "amount", e.target.value)} />
+                      </div>
+                      <div className="bgt-field bgt-line-notes">
+                        <label className="bgt-label">Notes</label>
+                        <textarea className="input" rows={2} placeholder="Additional notes…" value={line.notes} onChange={(e) => updateTxLineValue(line.lineKey, "notes", e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="bgt-tx-total-row">
+                  <span>Total</span>
+                  <strong>₱{formatMoney(txLinesTotal)}</strong>
                 </div>
               </div>
 
               <div className="bgt-modal-foot">
                 <button type="button" className="btn btn-ghost" onClick={closeTxForm} disabled={txSaving}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={txSaving}>
-                  {txSaving ? "Saving…" : editingTx ? "Save Changes" : "Record Transaction"}
+                  {txSaving ? "Saving…" : editingTx ? "Save Changes" : `Record ${txLines.filter(hasTxLineInput).length || 1} Transaction${(txLines.filter(hasTxLineInput).length || 1) !== 1 ? "s" : ""}`}
                 </button>
               </div>
             </form>
