@@ -13,6 +13,7 @@ import RolesTab from "./RolesTab";
 import AuditTab from "./AuditTab";
 import BudgetTab from "./BudgetTab";
 import solaresLogo from "../components/assets/SOLARES.png";
+import { clearAuthToken } from "../auth/tokenStorage";
 import { normalizeModules, roleLabel } from "../constants/access";
 import useBodyScrollLock from "../hooks/useBodyScrollLock";
 
@@ -381,7 +382,7 @@ export default function Dashboard({ theme = "light", onToggleTheme }) {
           <button
             className="btn btn-ghost sidebar-logout-btn"
             onClick={() => {
-              localStorage.removeItem("token");
+              clearAuthToken();
               window.location.href = "/login";
             }}
           >

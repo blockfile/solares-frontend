@@ -388,7 +388,7 @@ export default function MaterialsTab() {
           </svg>
           <div className="module-card-head-text">
             <strong>Material Pricing Hub</strong>
-            <span>Upload supplier PDF or Excel price lists, compare supplier prices, and keep the active quote catalog in sync.</span>
+            <span>Upload supplier PDF, XLSX, CSV, or JSON price lists, compare supplier prices, and keep the active quote catalog in sync.</span>
           </div>
           <div className="module-card-head-filter materials-head-actions">
             <select
@@ -450,7 +450,7 @@ export default function MaterialsTab() {
                     key={supplierFileInputKey}
                     className="input"
                     type="file"
-                    accept=".pdf,.xlsx,.xls,.csv,.json"
+                    accept=".pdf,.xlsx,.csv,.json"
                     onChange={(e) => setSupplierFile(e.target.files?.[0] || null)}
                   />
                 </label>
@@ -496,7 +496,7 @@ export default function MaterialsTab() {
                   >
                     {syncingTemplateCatalog ? "Syncing..." : "Sync Template Links"}
                   </button>
-                  <span className="section-note">Supported: PDF, XLSX, XLS, CSV, JSON</span>
+                  <span className="section-note">Supported: PDF, XLSX, CSV, JSON</span>
                 </div>
                 <div className="materials-file-pill">
                   {supplierFile ? supplierFile.name : "No file selected yet"}

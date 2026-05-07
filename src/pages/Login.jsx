@@ -1,7 +1,11 @@
 import { useState } from "react";
 import api from "../api/client";
+import { setAuthToken } from "../auth/tokenStorage";
 import solaresLogo from "../components/assets/SOLARES.png";
 import useBodyScrollLock from "../hooks/useBodyScrollLock";
+
+const MAX_IDENTIFIER_LENGTH = 150;
+const MAX_PASSWORD_LENGTH = 72;
 
 export default function Login({ theme = "light", onToggleTheme }) {
   const [identifier, setIdentifier] = useState("");
@@ -9,6 +13,7 @@ export default function Login({ theme = "light", onToggleTheme }) {
   const [err, setErr] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [pendingLogin, setPendingLogin] = useState(null);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -19,16 +24,28 @@ export default function Login({ theme = "light", onToggleTheme }) {
   useBodyScrollLock(Boolean(pendingLogin));
 
   const finishLogin = (token) => {
-    localStorage.setItem("token", token);
-    localStorage.setItem("rememberMe", rememberMe ? "1" : "0");
+    setAuthToken(token, rememberMe);
     window.location.href = "/";
   };
 
   const submit = async (e) => {
     e.preventDefault();
     setErr("");
+    const trimmedIdentifier = identifier.trim();
+
+    if (!trimmedIdentifier || !password) {
+      setErr("Username or email and password are required");
+      return;
+    }
+
+    if (trimmedIdentifier.length > MAX_IDENTIFIER_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
+      setErr("Invalid credentials");
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      const res = await api.post("/auth/login", { identifier, password });
+      const res = await api.post("/auth/login", { identifier: trimmedIdentifier, password });
       if (res.data?.mustChangePassword || res.data?.user?.mustChangePassword) {
         setPendingLogin({
           token: res.data.token,
@@ -43,6 +60,8 @@ export default function Login({ theme = "light", onToggleTheme }) {
       finishLogin(res.data.token);
     } catch (e2) {
       setErr(e2?.response?.data?.message || "Login failed");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -124,6 +143,10 @@ export default function Login({ theme = "light", onToggleTheme }) {
               placeholder="Enter username or email"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
+              autoComplete="username"
+              maxLength={MAX_IDENTIFIER_LENGTH}
+              required
+              spellCheck="false"
             />
           </div>
 
@@ -137,11 +160,15 @@ export default function Login({ theme = "light", onToggleTheme }) {
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                maxLength={MAX_PASSWORD_LENGTH}
+                required
               />
               <button
                 type="button"
                 className="login-city-eye"
                 onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? "Hide" : "Show"}
               </button>
@@ -159,8 +186,8 @@ export default function Login({ theme = "light", onToggleTheme }) {
 
           {err && <div className="error-text">{err}</div>}
 
-          <button className="btn login-city-submit" type="submit">
-            Log In
+          <button className="btn login-city-submit" type="submit" disabled={submitting}>
+            {submitting ? "Checking..." : "Log In"}
           </button>
         </form>
 
@@ -190,6 +217,8 @@ export default function Login({ theme = "light", onToggleTheme }) {
                 placeholder="New password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+                maxLength={MAX_PASSWORD_LENGTH}
               />
               <input
                 className="input"
@@ -197,6 +226,8 @@ export default function Login({ theme = "light", onToggleTheme }) {
                 placeholder="Confirm new password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                maxLength={MAX_PASSWORD_LENGTH}
               />
 
               {changeErr && <div className="error-text">{changeErr}</div>}

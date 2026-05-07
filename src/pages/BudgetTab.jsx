@@ -1715,12 +1715,12 @@ export default function BudgetTab() {
                     <div className="bgt-field bgt-field--wide">
                       <label className="bgt-label">Excel File <span className="bgt-req">*</span></label>
                       <label className="bgt-file-drop">
-                        <input type="file" accept=".xlsx,.xls" required className="bgt-file-input" onChange={(e) => setImportFile(e.target.files[0] || null)} />
+                        <input type="file" accept=".xlsx" required className="bgt-file-input" onChange={(e) => setImportFile(e.target.files[0] || null)} />
                         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
                         <span className="bgt-file-label">
                           {importFile ? importFile.name : <><strong>Choose file</strong> or drag & drop</>}
                         </span>
-                        <span className="bgt-file-note">.xlsx or .xls · max 20 MB</span>
+                        <span className="bgt-file-note">.xlsx · max 20 MB</span>
                       </label>
                     </div>
                   </div>
