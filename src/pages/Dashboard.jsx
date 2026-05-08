@@ -22,7 +22,7 @@ const TAB_CONFIG = [
   { key: "quotes", label: "Quotes", group: "Workspace", icon: "quotes" },
   { key: "payroll", label: "Payroll", group: "Workspace", icon: "payroll" },
   { key: "templates", label: "Template Manager", group: "Catalog", icon: "templates" },
-  { key: "materials", label: "Material Prices", group: "Catalog", icon: "materials" },
+  { key: "materials", label: "Material Cost", group: "Catalog", icon: "materials" },
   { key: "inventory", label: "Inventory", group: "Catalog", icon: "inventory" },
   { key: "packages", label: "Package Prices", group: "Catalog", icon: "packages" },
   { key: "margins", label: "Margin Setup", group: "Catalog", icon: "margins" },

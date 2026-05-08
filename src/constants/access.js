@@ -16,7 +16,7 @@ export const MODULE_DEFINITIONS = [
   },
   {
     key: "materials",
-    label: "Material Prices",
+    label: "Material Cost",
     description: "Manage the material catalog and pricing."
   },
   {

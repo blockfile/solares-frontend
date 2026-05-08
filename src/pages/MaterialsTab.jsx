@@ -653,7 +653,7 @@ export default function MaterialsTab() {
 
         <div className="materials-table-toolbar">
           <div>
-            <strong>Active Material Prices</strong>
+            <strong>Active Material Cost</strong>
             <span>Search the catalog used by quotes and templates.</span>
           </div>
           <div className="materials-active-filters">
