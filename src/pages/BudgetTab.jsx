@@ -1100,7 +1100,7 @@ export default function BudgetTab() {
             </div>
             <div className="bgt-search-wrap">
               <span className="bgt-search-icon"><IconSearch /></span>
-              <input className="input bgt-search-input" placeholder={scopeMode === "project" ? "Search project, package, location…" : "Search description, reference, category…"} value={searchRaw} onChange={(e) => setSearchRaw(e.target.value)} />
+              <input className="input bgt-search-input" placeholder={scopeMode === "project" ? "Search client, project, package, location..." : "Search description, reference, category…"} value={searchRaw} onChange={(e) => setSearchRaw(e.target.value)} />
             </div>
             {scopeMode !== "project" && (
               <>
@@ -1146,6 +1146,7 @@ export default function BudgetTab() {
                     <tr>
                       <th>Start Date</th>
                       <th>End Date</th>
+                      <th>Client Name</th>
                       <th>Project</th>
                       <th>System Package</th>
                       <th>Location</th>
@@ -1159,11 +1160,9 @@ export default function BudgetTab() {
                       <tr key={project.id} className="bgt-table-row">
                         <td className="bgt-cell-date">{formatDate(project.start_date)}</td>
                         <td className="bgt-cell-date">{formatDate(project.end_date)}</td>
+                        <td><span className="bgt-account-chip">{project.customer_name || "-"}</span></td>
                         <td>
                           <strong>{project.project_name}</strong>
-                          {project.customer_name && (
-                            <div className="bgt-muted" style={{ marginTop: 5, fontSize: 11 }}>{project.customer_name}</div>
-                          )}
                         </td>
                         <td>{project.system_package || <span className="bgt-muted">—</span>}</td>
                         <td>{project.location || <span className="bgt-muted">—</span>}</td>
@@ -1679,6 +1678,15 @@ export default function BudgetTab() {
                   <input className="input" type="date" value={projForm.endDate} onChange={(e) => setProjForm((f) => ({ ...f, endDate: e.target.value }))} />
                 </div>
                 <div className="bgt-field bgt-field--wide">
+                  <label className="bgt-label">Client Name <span className="bgt-req">*</span></label>
+                  <select className="input" required value={projForm.customerId} onChange={(e) => setProjForm((f) => ({ ...f, customerId: e.target.value }))}>
+                    <option value="">{customers.length ? "Select client" : "No clients available"}</option>
+                    {customers.map((customer) => (
+                      <option key={customer.id} value={customer.id}>{customer.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="bgt-field bgt-field--wide">
                   <label className="bgt-label">Project <span className="bgt-req">*</span></label>
                   <input className="input" required placeholder="e.g. Solar Installation - Client Name" value={projForm.projectName} onChange={(e) => setProjForm((f) => ({ ...f, projectName: e.target.value }))} />
                 </div>
@@ -1796,6 +1804,7 @@ export default function BudgetTab() {
               <dl className="bgt-delete-fields bgt-delete-fields--wide">
                 <div><dt>Start Date</dt><dd>{formatDate(viewingProjDetails.start_date)}</dd></div>
                 <div><dt>End Date</dt><dd>{formatDate(viewingProjDetails.end_date)}</dd></div>
+                <div><dt>Client Name</dt><dd>{viewingProjDetails.customer_name || "-"}</dd></div>
                 <div><dt>System Package</dt><dd>{viewingProjDetails.system_package || "-"}</dd></div>
                 <div><dt>Location</dt><dd>{viewingProjDetails.location || "-"}</dd></div>
                 <div><dt>Selling Price</dt><dd>₱{formatMoney(viewingProjDetails.sale_amount)}</dd></div>
@@ -1827,6 +1836,7 @@ export default function BudgetTab() {
             <dl className="bgt-delete-fields">
               <div><dt>Start Date</dt><dd>{formatDate(deletingProj.start_date)}</dd></div>
               <div><dt>End Date</dt><dd>{formatDate(deletingProj.end_date)}</dd></div>
+              <div><dt>Client Name</dt><dd>{deletingProj.customer_name || "-"}</dd></div>
               <div><dt>Project</dt><dd>{deletingProj.project_name || "-"}</dd></div>
               <div><dt>System Package</dt><dd>{deletingProj.system_package || "-"}</dd></div>
               <div><dt>Location</dt><dd>{deletingProj.location || "-"}</dd></div>
