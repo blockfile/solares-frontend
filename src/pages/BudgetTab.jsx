@@ -172,6 +172,17 @@ function projectDetailsTotalCost(project) {
   );
 }
 
+function projectFormTotalCost(form) {
+  const materials = normalizeMaterialDetails(form?.materialsDetails);
+  const labor = normalizeAmountDetails(form?.laborDetails, "description", createLaborDetail);
+  const others = normalizeAmountDetails(form?.otherExpensesDetails, "expenses", createOtherExpenseDetail);
+  return (
+    materials.reduce((sum, row) => sum + materialDetailTotal(row), 0) +
+    labor.reduce((sum, row) => sum + toNumber(row.amount, 0), 0) +
+    others.reduce((sum, row) => sum + toNumber(row.amount, 0), 0)
+  );
+}
+
 function ProjectDetailsSummary({ project }) {
   const materials = normalizeMaterialDetails(project?.materials_details);
   const labor = normalizeAmountDetails(project?.labor_details, "description", createLaborDetail);
@@ -1754,9 +1765,15 @@ export default function BudgetTab() {
                 </div>
               </div>
 
-              <div className="bgt-modal-foot">
-                <button type="button" className="btn btn-ghost" onClick={closeProj} disabled={projSaving}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={projSaving}>{projSaving ? "Saving..." : editingProj ? "Save Changes" : "Create Project"}</button>
+              <div className="bgt-modal-foot bgt-modal-foot--with-total">
+                <div className="bgt-project-total-cost">
+                  <span>Total Cost</span>
+                  <strong>₱{formatMoney(projectFormTotalCost(projForm))}</strong>
+                </div>
+                <div className="bgt-modal-actions">
+                  <button type="button" className="btn btn-ghost" onClick={closeProj} disabled={projSaving}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" disabled={projSaving}>{projSaving ? "Saving..." : editingProj ? "Save Changes" : "Create Project"}</button>
+                </div>
               </div>
             </form>
           </div>

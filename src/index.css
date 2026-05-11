@@ -5944,6 +5944,13 @@ button {
   padding-top: 14px;
 }
 
+.bgt-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .bgt-modal-foot--center {
   justify-content: center;
   padding-top: 0;
@@ -6997,7 +7004,8 @@ button {
     flex-direction: column;
   }
 
-  .bgt-modal-foot--with-total .btn {
+  .bgt-modal-actions,
+  .bgt-modal-foot--with-total > .btn {
     align-self: flex-end;
   }
 
