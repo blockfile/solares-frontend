@@ -6788,12 +6788,13 @@ button {
 }
 
 .sl-proj-row-right {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 6px;
   min-width: 0;
-  max-width: 58%;
+  max-width: 68%;
   color: var(--text-soft);
 }
 

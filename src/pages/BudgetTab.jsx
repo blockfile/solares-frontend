@@ -369,6 +369,9 @@ export default function BudgetTab() {
   const [detailProj, setDetailProj] = useState(null);
   const [detailTx, setDetailTx] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [paymentDetailsProj, setPaymentDetailsProj] = useState(null);
+  const [paymentDetailsRows, setPaymentDetailsRows] = useState([]);
+  const [paymentDetailsLoading, setPaymentDetailsLoading] = useState(false);
 
   const [salesView, setSalesView] = useState("overview"); // "overview" | "projects"
 
@@ -652,6 +655,21 @@ export default function BudgetTab() {
     try { const res = await api.get(`/customers/projects/${proj.id}/transactions`); setDetailTx(res.data || []); }
     catch { setDetailTx([]); }
     finally { setDetailLoading(false); }
+  }
+  async function openPaymentDetails(project) {
+    if (!project?.id) return;
+    setPaymentDetailsProj(project);
+    setPaymentDetailsRows([]);
+    setPaymentDetailsLoading(true);
+    try {
+      const res = await api.get(`/customers/projects/${project.id}/transactions`);
+      setPaymentDetailsRows((res.data || []).filter((tx) => tx.type === "in"));
+    } catch {
+      setPaymentDetailsRows([]);
+      flash("Failed to load payment details.", "error");
+    } finally {
+      setPaymentDetailsLoading(false);
+    }
   }
 
   // ── Transaction form ────────────────────────────────────────────────────────
@@ -1126,7 +1144,7 @@ export default function BudgetTab() {
               <button className="btn btn-ghost bgt-btn-import" onClick={openImport}>
                 <IconUpload /> Import Expenses
               </button>
-              <button className="btn btn-ghost" onClick={() => openNewPayment(detailProj)} disabled={!defaultIncomeAccountId}><IconArrowDown /> Record Payment</button>
+              <button className="btn btn-ghost" onClick={() => openNewPayment(detailProj)} disabled={!defaultIncomeAccountId}><IconArrowDown /> Add Payment</button>
               <button className="btn btn-ghost bgt-btn-import" onClick={openNewCust}><IconPlus /> Add Client</button>
               <button className="btn btn-primary" onClick={() => openNewProj()}><IconPlus /> Add Project / Sale</button>
             </div>
@@ -1528,7 +1546,10 @@ export default function BudgetTab() {
                                   </div>
                                   <div className="sl-proj-row-right">
                                     <span className="sl-proj-margin" style={{ color: projectMargin >= 0 ? "#147845" : "#b83a3a" }}>₱{formatMoney(projectMargin)}</span>
-                                    <button className="bgt-row-btn" onClick={(e) => { e.stopPropagation(); openNewPayment(p); }}>Payment</button>
+                                    {toNumber(p.total_income, 0) > 0 && (
+                                      <button className="bgt-row-btn" onClick={(e) => { e.stopPropagation(); openPaymentDetails(p); }}>View Payment Details</button>
+                                    )}
+                                    <button className="bgt-row-btn" onClick={(e) => { e.stopPropagation(); openNewPayment(p); }}>Add Payment</button>
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
                                   </div>
                                 </button>
@@ -1575,7 +1596,10 @@ export default function BudgetTab() {
                                 <td className="bgt-col-amt" style={{ color: "#b83a3a", fontWeight: 700 }}>₱{formatMoney(projectExpense)}</td>
                                 <td className="bgt-col-amt" style={{ color: m >= 0 ? "#147845" : "#b83a3a", fontWeight: 700 }}>₱{formatMoney(m)}</td>
                                 <td className="bgt-col-actions" onClick={(e) => e.stopPropagation()}>
-                                  <button className="bgt-row-btn" onClick={() => openNewPayment(p)}>Payment</button>
+                                  {toNumber(p.total_income, 0) > 0 && (
+                                    <button className="bgt-row-btn" onClick={() => openPaymentDetails(p)}>View Payment Details</button>
+                                  )}
+                                  <button className="bgt-row-btn" onClick={() => openNewPayment(p)}>Add Payment</button>
                                   <button className="bgt-row-btn" onClick={() => openEditProj(p)}>Edit</button>
                                   <button className="bgt-row-btn bgt-row-btn--del" onClick={() => setDeletingProj(p)}>Delete</button>
                                 </td>
@@ -1607,7 +1631,10 @@ export default function BudgetTab() {
                       <div className="sl-dstat"><span className="sl-dstat-label">Margin</span><strong className={`sl-dstat-val ${toNumber(detailProj.sale_amount, 0) - projectDetailsTotalCost(detailProj) >= 0 ? "sl-dstat-val--sales" : "sl-dstat-val--exp"}`}>₱{formatMoney(toNumber(detailProj.sale_amount, 0) - projectDetailsTotalCost(detailProj))}</strong></div>
                     </div>
                     <div className="bgt-modal-foot" style={{ justifyContent: "flex-start", paddingTop: 0 }}>
-                      <button className="btn btn-ghost" onClick={() => openNewPayment(detailProj)} disabled={!defaultIncomeAccountId}><IconArrowDown /> Record Partial Payment</button>
+                      {toNumber(detailProj.total_income, 0) > 0 && (
+                        <button className="btn btn-ghost" onClick={() => openPaymentDetails(detailProj)}>View Payment Details</button>
+                      )}
+                      <button className="btn btn-ghost" onClick={() => openNewPayment(detailProj)} disabled={!defaultIncomeAccountId}><IconArrowDown /> Add Payment</button>
                       <button className="btn btn-ghost" onClick={() => openEditProj(detailProj)}>Edit Contract</button>
                     </div>
                     <div className="sl-drawer-section">
@@ -1640,6 +1667,56 @@ export default function BudgetTab() {
                     <div className="bgt-modal-foot">
                       <button className="btn btn-ghost" onClick={() => { setDetailProj(null); openEditProj(detailProj); }}>Edit Project</button>
                       <button className="btn btn-primary" onClick={() => setDetailProj(null)}>Close</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {paymentDetailsProj && (
+              <div className="bgt-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setPaymentDetailsProj(null); }}>
+                <div className="bgt-modal bgt-modal--project-details" onClick={(e) => e.stopPropagation()}>
+                  <div className="bgt-modal-head">
+                    <div>
+                      <p className="bgt-modal-eyebrow">{paymentDetailsProj.customer_name || "Customer"}</p>
+                      <h3 className="bgt-modal-title">Payment Details</h3>
+                    </div>
+                    <button className="bgt-modal-x" onClick={() => setPaymentDetailsProj(null)} aria-label="Close">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    </button>
+                  </div>
+                  <div className="bgt-modal-body">
+                    <dl className="bgt-delete-fields bgt-delete-fields--wide">
+                      <div><dt>Customer</dt><dd>{paymentDetailsProj.customer_name || "-"}</dd></div>
+                      <div><dt>Project</dt><dd>{paymentDetailsProj.project_name || "-"}</dd></div>
+                      <div><dt>Total Collected</dt><dd>₱{formatMoney(paymentDetailsRows.reduce((sum, tx) => sum + toNumber(tx.amount, 0), 0))}</dd></div>
+                      <div><dt>Payments</dt><dd>{paymentDetailsRows.length}</dd></div>
+                    </dl>
+                    {paymentDetailsLoading ? (
+                      <div className="bgt-empty" style={{ padding: 24 }}><div className="bgt-spinner" /></div>
+                    ) : paymentDetailsRows.length === 0 ? (
+                      <p className="bgt-project-details-empty">No payments recorded for this customer and project.</p>
+                    ) : (
+                      <div className="bgt-import-preview">
+                        <table className="bgt-table bgt-table--compact">
+                          <thead><tr><th>Date</th><th>Description</th><th>Reference</th><th>Category</th><th className="bgt-col-amt">Amount</th></tr></thead>
+                          <tbody>
+                            {paymentDetailsRows.map((tx) => (
+                              <tr key={tx.id}>
+                                <td className="bgt-cell-date">{formatDate(tx.transaction_date)}</td>
+                                <td>{tx.description || <span className="bgt-muted">-</span>}</td>
+                                <td>{tx.reference_no || <span className="bgt-muted">-</span>}</td>
+                                <td><span className="bgt-account-chip">{tx.account_name || "-"}</span></td>
+                                <td className="bgt-col-amt bgt-amount--in">₱{formatMoney(tx.amount)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    <div className="bgt-modal-foot">
+                      <button className="btn btn-ghost" onClick={() => { const project = paymentDetailsProj; setPaymentDetailsProj(null); openNewPayment(project); }} disabled={!defaultIncomeAccountId}>Add Payment</button>
+                      <button className="btn btn-primary" onClick={() => setPaymentDetailsProj(null)}>Close</button>
                     </div>
                   </div>
                 </div>
