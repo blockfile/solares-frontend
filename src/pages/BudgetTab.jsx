@@ -1201,6 +1201,7 @@ export default function BudgetTab() {
                       <th>Project</th>
                       <th>System Package</th>
                       <th>Location</th>
+                      <th className="bgt-col-amt">Total Cost</th>
                       <th className="bgt-col-amt">Selling Price</th>
                       <th>Status</th>
                       <th className="bgt-col-actions" />
@@ -1217,6 +1218,7 @@ export default function BudgetTab() {
                         </td>
                         <td>{project.system_package || <span className="bgt-muted">—</span>}</td>
                         <td>{project.location || <span className="bgt-muted">—</span>}</td>
+                        <td className="bgt-col-amt" style={{ color: "#b83a3a", fontWeight: 700 }}>₱{formatMoney(projectDetailsTotalCost(project))}</td>
                         <td className="bgt-col-amt" style={{ color: "#147845", fontWeight: 700 }}>₱{formatMoney(project.sale_amount)}</td>
                         <td><span className={`sl-pill ${STATUS_COLORS[project.status] || ""}`}>{STATUS_LABELS[project.status] || project.status || "Active"}</span></td>
                         <td className="bgt-col-actions">
