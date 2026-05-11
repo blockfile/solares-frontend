@@ -751,8 +751,7 @@ export default function BudgetTab() {
     openNewTx({
       type: "in",
       accountId: defaultIncomeAccountId,
-      projectId: targetProject?.id ? String(targetProject.id) : "",
-      description: "Partial client payment"
+      projectId: targetProject?.id ? String(targetProject.id) : ""
     });
   }
   function openEditTx(tx) {
