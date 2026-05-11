@@ -446,6 +446,15 @@ export default function BudgetTab() {
     () => projects.reduce((sum, project) => sum + toNumber(project.total_income, 0), 0),
     [projects]
   );
+  const salesContractValue = useMemo(
+    () => projects.reduce((sum, project) => sum + toNumber(project.sale_amount, 0), 0),
+    [projects]
+  );
+  const salesProjectCostingExpenses = useMemo(
+    () => projects.reduce((sum, project) => sum + projectDetailsTotalCost(project), 0),
+    [projects]
+  );
+  const salesProjectCostingMargin = salesContractValue - salesProjectCostingExpenses;
   const salesBalanceDue = useMemo(
     () => projects.reduce((sum, project) => sum + Math.max(0, toNumber(project.sale_amount, 0) - toNumber(project.total_income, 0)), 0),
     [projects]
@@ -1433,7 +1442,7 @@ export default function BudgetTab() {
       {view === "sales" && (() => {
         const STATUS_LABELS = { active: "Active", completed: "Completed", cancelled: "Cancelled" };
         const STATUS_COLORS = { active: "sl-pill--active", completed: "sl-pill--done", cancelled: "sl-pill--cancelled" };
-        const netPos = toNumber(salesSummary.totalMargin, 0) >= 0;
+        const netPos = salesProjectCostingMargin >= 0;
         return (
           <>
             {/* Sales KPI strip */}
@@ -1445,17 +1454,17 @@ export default function BudgetTab() {
               </div>
               <div className="sl-kpi sl-kpi--sales">
                 <span className="sl-kpi-label">Contract Value</span>
-                <strong className="sl-kpi-value">₱{formatMoney(salesSummary.totalSales)}</strong>
+                <strong className="sl-kpi-value">₱{formatMoney(salesContractValue)}</strong>
                 <span className="sl-kpi-sub">₱{formatMoney(salesBalanceDue)} still to collect</span>
               </div>
               <div className="sl-kpi sl-kpi--expenses">
                 <span className="sl-kpi-label">Total Expenses</span>
-                <strong className="sl-kpi-value">₱{formatMoney(salesSummary.totalExpenses)}</strong>
-                <span className="sl-kpi-sub">linked costs</span>
+                <strong className="sl-kpi-value">₱{formatMoney(salesProjectCostingExpenses)}</strong>
+                <span className="sl-kpi-sub">project costing</span>
               </div>
               <div className={`sl-kpi ${netPos ? "sl-kpi--pos" : "sl-kpi--neg"}`}>
                 <span className="sl-kpi-label">Net Margin</span>
-                <strong className="sl-kpi-value">₱{formatMoney(salesSummary.totalMargin)}</strong>
+                <strong className="sl-kpi-value">₱{formatMoney(salesProjectCostingMargin)}</strong>
                 <span className={`sl-kpi-badge ${netPos ? "sl-kpi-badge--pos" : "sl-kpi-badge--neg"}`}>{netPos ? "Profit" : "Loss"}</span>
               </div>
             </div>
@@ -1479,7 +1488,7 @@ export default function BudgetTab() {
                   {customers.map((cust) => {
                     const custProjs = projects.filter((p) => p.customer_id === cust.id);
                     const tSales = custProjs.reduce((s, p) => s + toNumber(p.sale_amount, 0), 0);
-                    const tExp = custProjs.reduce((s, p) => s + toNumber(p.total_expenses, 0), 0);
+                    const tExp = custProjs.reduce((s, p) => s + projectDetailsTotalCost(p), 0);
                     const margin = tSales - tExp;
                     return (
                       <div key={cust.id} className="sl-cust-card">
@@ -1503,22 +1512,26 @@ export default function BudgetTab() {
                         </div>
                         {custProjs.length > 0 && (
                           <div className="sl-cust-projects">
-                            {custProjs.map((p) => (
-                              <button key={p.id} className="sl-proj-row" onClick={() => openDetail(p)}>
-                                <div className="sl-proj-row-left">
-                                  <span className={`sl-pill ${STATUS_COLORS[p.status] || ""}`}>{STATUS_LABELS[p.status] || p.status}</span>
-                                  <div className="sl-proj-copy">
-                                    <span className="sl-proj-name">{p.project_name}</span>
-                                    <span className="sl-proj-sub">Collected ₱{formatMoney(p.total_income)} of ₱{formatMoney(p.sale_amount)}</span>
+                            {custProjs.map((p) => {
+                              const projectExpense = projectDetailsTotalCost(p);
+                              const projectMargin = toNumber(p.sale_amount, 0) - projectExpense;
+                              return (
+                                <button key={p.id} className="sl-proj-row" onClick={() => openDetail(p)}>
+                                  <div className="sl-proj-row-left">
+                                    <span className={`sl-pill ${STATUS_COLORS[p.status] || ""}`}>{STATUS_LABELS[p.status] || p.status}</span>
+                                    <div className="sl-proj-copy">
+                                      <span className="sl-proj-name">{p.project_name}</span>
+                                      <span className="sl-proj-sub">Expenses ₱{formatMoney(projectExpense)} • Collected ₱{formatMoney(p.total_income)} of ₱{formatMoney(p.sale_amount)}</span>
+                                    </div>
                                   </div>
-                                </div>
-                                <div className="sl-proj-row-right">
-                                  <span className="sl-proj-margin" style={{ color: toNumber(p.margin, 0) >= 0 ? "#147845" : "#b83a3a" }}>₱{formatMoney(p.margin)}</span>
-                                  <button className="bgt-row-btn" onClick={(e) => { e.stopPropagation(); openNewPayment(p); }}>Payment</button>
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-                                </div>
-                              </button>
-                            ))}
+                                  <div className="sl-proj-row-right">
+                                    <span className="sl-proj-margin" style={{ color: projectMargin >= 0 ? "#147845" : "#b83a3a" }}>₱{formatMoney(projectMargin)}</span>
+                                    <button className="bgt-row-btn" onClick={(e) => { e.stopPropagation(); openNewPayment(p); }}>Payment</button>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+                                  </div>
+                                </button>
+                              );
+                            })}
                           </div>
                         )}
                         <button className="sl-add-proj-btn" onClick={() => openNewProj(cust.id)}><IconPlus /> Add Project / Sale</button>
@@ -1548,7 +1561,8 @@ export default function BudgetTab() {
                         <thead><tr><th>Customer</th><th>Project</th><th>Date</th><th>Status</th><th className="bgt-col-amt">Contract</th><th className="bgt-col-amt">Expenses</th><th className="bgt-col-amt">Margin</th><th /></tr></thead>
                         <tbody>
                           {filtered.map((p) => {
-                            const m = toNumber(p.margin, 0);
+                            const projectExpense = projectDetailsTotalCost(p);
+                            const m = toNumber(p.sale_amount, 0) - projectExpense;
                             return (
                               <tr key={p.id} className="bgt-table-row" style={{ cursor: "pointer" }} onClick={() => openDetail(p)}>
                                 <td><span className="bgt-account-chip">{p.customer_name}</span></td>
@@ -1556,7 +1570,7 @@ export default function BudgetTab() {
                                 <td className="bgt-cell-date">{formatDate(p.project_date)}</td>
                                 <td><span className={`sl-pill ${STATUS_COLORS[p.status] || ""}`}>{STATUS_LABELS[p.status] || p.status}</span></td>
                                 <td className="bgt-col-amt" style={{ color: "#147845", fontWeight: 700 }}>₱{formatMoney(p.sale_amount)}</td>
-                                <td className="bgt-col-amt" style={{ color: "#b83a3a", fontWeight: 700 }}>₱{formatMoney(p.total_expenses)}</td>
+                                <td className="bgt-col-amt" style={{ color: "#b83a3a", fontWeight: 700 }}>₱{formatMoney(projectExpense)}</td>
                                 <td className="bgt-col-amt" style={{ color: m >= 0 ? "#147845" : "#b83a3a", fontWeight: 700 }}>₱{formatMoney(m)}</td>
                                 <td className="bgt-col-actions" onClick={(e) => e.stopPropagation()}>
                                   <button className="bgt-row-btn" onClick={() => openNewPayment(p)}>Payment</button>
@@ -1587,8 +1601,8 @@ export default function BudgetTab() {
                       <div className="sl-dstat"><span className="sl-dstat-label">Collected</span><strong className="sl-dstat-val sl-dstat-val--sales">₱{formatMoney(detailProj.total_income)}</strong></div>
                       <div className="sl-dstat"><span className="sl-dstat-label">Balance Due</span><strong className="sl-dstat-val" style={{ color: toNumber(detailProj.balance_due, 0) > 0 ? "#b86d12" : "#147845" }}>₱{formatMoney(detailProj.balance_due)}</strong></div>
                       <div className="sl-dstat"><span className="sl-dstat-label">Sale Amount</span><strong className="sl-dstat-val sl-dstat-val--sales">₱{formatMoney(detailProj.sale_amount)}</strong></div>
-                      <div className="sl-dstat"><span className="sl-dstat-label">Expenses</span><strong className="sl-dstat-val sl-dstat-val--exp">₱{formatMoney(detailProj.total_expenses)}</strong></div>
-                      <div className="sl-dstat"><span className="sl-dstat-label">Margin</span><strong className={`sl-dstat-val ${toNumber(detailProj.margin, 0) >= 0 ? "sl-dstat-val--sales" : "sl-dstat-val--exp"}`}>₱{formatMoney(detailProj.margin)}</strong></div>
+                      <div className="sl-dstat"><span className="sl-dstat-label">Expenses</span><strong className="sl-dstat-val sl-dstat-val--exp">₱{formatMoney(projectDetailsTotalCost(detailProj))}</strong></div>
+                      <div className="sl-dstat"><span className="sl-dstat-label">Margin</span><strong className={`sl-dstat-val ${toNumber(detailProj.sale_amount, 0) - projectDetailsTotalCost(detailProj) >= 0 ? "sl-dstat-val--sales" : "sl-dstat-val--exp"}`}>₱{formatMoney(toNumber(detailProj.sale_amount, 0) - projectDetailsTotalCost(detailProj))}</strong></div>
                     </div>
                     <div className="bgt-modal-foot" style={{ justifyContent: "flex-start", paddingTop: 0 }}>
                       <button className="btn btn-ghost" onClick={() => openNewPayment(detailProj)} disabled={!defaultIncomeAccountId}><IconArrowDown /> Record Partial Payment</button>
