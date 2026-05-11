@@ -161,6 +161,17 @@ function projectDetailsForForm(project, includeBlank = true) {
   };
 }
 
+function projectDetailsTotalCost(project) {
+  const materials = normalizeMaterialDetails(project?.materials_details);
+  const labor = normalizeAmountDetails(project?.labor_details, "description", createLaborDetail);
+  const others = normalizeAmountDetails(project?.other_expenses_details, "expenses", createOtherExpenseDetail);
+  return (
+    materials.reduce((sum, row) => sum + materialDetailTotal(row), 0) +
+    labor.reduce((sum, row) => sum + toNumber(row.amount, 0), 0) +
+    others.reduce((sum, row) => sum + toNumber(row.amount, 0), 0)
+  );
+}
+
 function ProjectDetailsSummary({ project }) {
   const materials = normalizeMaterialDetails(project?.materials_details);
   const labor = normalizeAmountDetails(project?.labor_details, "description", createLaborDetail);
@@ -1774,7 +1785,11 @@ export default function BudgetTab() {
                 <div><dt>Status</dt><dd>{STATUS_LABELS[viewingProjDetails.status] || viewingProjDetails.status || "Active"}</dd></div>
               </dl>
               <ProjectDetailsSummary project={viewingProjDetails} />
-              <div className="bgt-modal-foot">
+              <div className="bgt-modal-foot bgt-modal-foot--with-total">
+                <div className="bgt-project-total-cost">
+                  <span>Total Cost</span>
+                  <strong>₱{formatMoney(projectDetailsTotalCost(viewingProjDetails))}</strong>
+                </div>
                 <button type="button" className="btn btn-ghost" onClick={() => setViewingProjDetails(null)}>Close</button>
               </div>
             </div>

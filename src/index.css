@@ -5936,6 +5936,14 @@ button {
   padding-top: 8px;
 }
 
+.bgt-modal-foot--with-total {
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
 .bgt-modal-foot--center {
   justify-content: center;
   padding-top: 0;
@@ -6094,6 +6102,35 @@ button {
   margin: 8px 0 0;
   color: var(--text-soft);
   font-size: 12px;
+}
+
+.bgt-project-total-cost {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 9px 12px;
+  border: 1px solid rgba(240, 186, 31, 0.36);
+  border-radius: 10px;
+  background: rgba(240, 186, 31, 0.12);
+  color: var(--text);
+}
+
+.bgt-project-total-cost span {
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bgt-project-total-cost strong {
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .bgt-label {
@@ -6953,6 +6990,15 @@ button {
   .bgt-modal {
     border-radius: 16px;
     max-width: calc(100vw - 24px);
+  }
+
+  .bgt-modal-foot--with-total {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .bgt-modal-foot--with-total .btn {
+    align-self: flex-end;
   }
 
   .bgt-form-grid {
