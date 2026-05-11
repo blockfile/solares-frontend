@@ -351,7 +351,7 @@ export default function BudgetTab() {
   const [selectedCustomerFilter, setSelectedCustomerFilter] = useState(null);
 
   const EMPTY_CUST = { name: "", contact: "", address: "", notes: "" };
-  const EMPTY_PROJ = { customerId: "", projectName: "", systemPackage: "", location: "", saleAmount: "", projectDate: localDateInput(), startDate: localDateInput(), endDate: "", status: "active", projectCategory: "materials", notes: "", ...projectDetailsForForm(null, true) };
+  const EMPTY_PROJ = { projectId: "", customerId: "", projectName: "", systemPackage: "", location: "", saleAmount: "", projectDate: localDateInput(), startDate: localDateInput(), endDate: "", status: "active", projectCategory: "materials", notes: "", ...projectDetailsForForm(null, true) };
 
   const [custForm, setCustForm] = useState(EMPTY_CUST);
   const [editingCust, setEditingCust] = useState(null);
@@ -437,6 +437,10 @@ export default function BudgetTab() {
   const selectedScopeProject = useMemo(
     () => projects.find((p) => String(p.id) === String(scopeProjectId)) || null,
     [projects, scopeProjectId]
+  );
+  const projectCostingProjectOptions = useMemo(
+    () => projects.filter((project) => projForm.customerId && String(project.customer_id || "") === String(projForm.customerId)),
+    [projects, projForm.customerId]
   );
   const salesCollected = useMemo(
     () => projects.reduce((sum, project) => sum + toNumber(project.total_income, 0), 0),
@@ -554,9 +558,40 @@ export default function BudgetTab() {
     catch (err) { flash(err?.response?.data?.message || "Failed.", "error"); setDeletingCust(null); }
   }
 
-  function openNewProj(custId = "") { setEditingProj(null); setProjForm({ ...EMPTY_PROJ, ...projectDetailsForForm(null, true), customerId: custId ? String(custId) : "", projectDate: localDateInput(), startDate: localDateInput(), endDate: "", projectCategory: "materials" }); setProjOpen(true); }
-  function openEditProj(p) { setEditingProj(p); setProjForm({ customerId: p.customer_id ? String(p.customer_id) : "", projectName: p.project_name || "", systemPackage: p.system_package || "", location: p.location || "", saleAmount: String(p.sale_amount), projectDate: p.project_date ? localDateInput(p.project_date) : localDateInput(p.start_date || new Date()), startDate: p.start_date ? localDateInput(p.start_date) : p.project_date ? localDateInput(p.project_date) : "", endDate: p.end_date ? localDateInput(p.end_date) : "", status: p.status || "active", projectCategory: p.project_category || "materials", notes: p.notes || "", ...projectDetailsForForm(p, true) }); setProjOpen(true); }
+  function projectFormFromProject(p) {
+    return {
+      projectId: p?.id ? String(p.id) : "",
+      customerId: p?.customer_id ? String(p.customer_id) : "",
+      projectName: p?.project_name || "",
+      systemPackage: p?.system_package || "",
+      location: p?.location || "",
+      saleAmount: p?.sale_amount == null ? "" : String(p.sale_amount),
+      projectDate: p?.project_date ? localDateInput(p.project_date) : localDateInput(p?.start_date || new Date()),
+      startDate: p?.start_date ? localDateInput(p.start_date) : p?.project_date ? localDateInput(p.project_date) : "",
+      endDate: p?.end_date ? localDateInput(p.end_date) : "",
+      status: p?.status || "active",
+      projectCategory: p?.project_category || "materials",
+      notes: p?.notes || "",
+      ...projectDetailsForForm(p, true)
+    };
+  }
+  function openNewProj(custId = "") { setEditingProj(null); setProjForm({ ...EMPTY_PROJ, ...projectDetailsForForm(null, true), projectId: "", customerId: custId ? String(custId) : "", projectDate: localDateInput(), startDate: localDateInput(), endDate: "", projectCategory: "materials" }); setProjOpen(true); }
+  function openEditProj(p) { setEditingProj(p); setProjForm(projectFormFromProject(p)); setProjOpen(true); }
   function closeProj() { setProjOpen(false); setEditingProj(null); setProjForm(EMPTY_PROJ); }
+  function handleProjectCostingCustomerChange(customerId) {
+    setEditingProj(null);
+    setProjForm({ ...EMPTY_PROJ, ...projectDetailsForForm(null, true), projectId: "", customerId, projectDate: localDateInput(), startDate: localDateInput(), endDate: "", projectCategory: "materials" });
+  }
+  function handleProjectCostingProjectChange(projectId) {
+    const selectedProject = projects.find((project) => String(project.id) === String(projectId));
+    if (!selectedProject) {
+      setEditingProj(null);
+      setProjForm((form) => ({ ...form, projectId: "", projectName: "" }));
+      return;
+    }
+    setEditingProj(selectedProject);
+    setProjForm(projectFormFromProject(selectedProject));
+  }
   function updateProjectDetail(section, index, field, value) {
     setProjForm((form) => {
       const rows = [...(form[section] || [])];
@@ -581,12 +616,19 @@ export default function BudgetTab() {
     });
   }
   async function saveProj(e) {
-    e.preventDefault(); setProjSaving(true);
+    e.preventDefault();
+    const isProjectCostingForm = view === "transactions" && scopeMode === "project";
+    const selectedProject = isProjectCostingForm && projForm.projectId ? projects.find((project) => String(project.id) === String(projForm.projectId)) : null;
+    const targetProject = editingProj || selectedProject;
+    if (isProjectCostingForm && !targetProject) {
+      flash("Select an existing Sales project for project costing.", "error");
+      return;
+    }
+    setProjSaving(true);
     try {
-      const isProjectCostingForm = view === "transactions" && scopeMode === "project";
       const selectedProjectDate = isProjectCostingForm ? projForm.startDate : projForm.projectDate;
       const payload = { customerId: Number(projForm.customerId) || null, projectName: projForm.projectName, systemPackage: projForm.systemPackage, location: projForm.location, saleAmount: Number(projForm.saleAmount), projectDate: selectedProjectDate || null, startDate: isProjectCostingForm ? projForm.startDate : selectedProjectDate, endDate: projForm.endDate, status: projForm.status, projectCategory: projForm.projectCategory, notes: projForm.notes, materialsDetails: projForm.materialsDetails, laborDetails: projForm.laborDetails, otherExpensesDetails: projForm.otherExpensesDetails };
-      if (editingProj) { await api.put(`/customers/projects/${editingProj.id}`, payload); flash("Project updated."); }
+      if (targetProject) { await api.put(`/customers/projects/${targetProject.id}`, payload); flash("Project updated."); }
       else { await api.post("/customers/projects", payload); flash("Project created."); }
       closeProj(); await loadAll(true);
     } catch (err) { flash(err?.response?.data?.message || "Failed to save.", "error"); }
@@ -1100,7 +1142,7 @@ export default function BudgetTab() {
             </div>
             <div className="bgt-search-wrap">
               <span className="bgt-search-icon"><IconSearch /></span>
-              <input className="input bgt-search-input" placeholder={scopeMode === "project" ? "Search client, project, package, location..." : "Search description, reference, category…"} value={searchRaw} onChange={(e) => setSearchRaw(e.target.value)} />
+              <input className="input bgt-search-input" placeholder={scopeMode === "project" ? "Search customer, project, package, location..." : "Search description, reference, category…"} value={searchRaw} onChange={(e) => setSearchRaw(e.target.value)} />
             </div>
             {scopeMode !== "project" && (
               <>
@@ -1146,7 +1188,7 @@ export default function BudgetTab() {
                     <tr>
                       <th>Start Date</th>
                       <th>End Date</th>
-                      <th>Client Name</th>
+                      <th>Customer Name</th>
                       <th>Project</th>
                       <th>System Package</th>
                       <th>Location</th>
@@ -1678,9 +1720,9 @@ export default function BudgetTab() {
                   <input className="input" type="date" value={projForm.endDate} onChange={(e) => setProjForm((f) => ({ ...f, endDate: e.target.value }))} />
                 </div>
                 <div className="bgt-field bgt-field--wide">
-                  <label className="bgt-label">Client Name <span className="bgt-req">*</span></label>
-                  <select className="input" required value={projForm.customerId} onChange={(e) => setProjForm((f) => ({ ...f, customerId: e.target.value }))}>
-                    <option value="">{customers.length ? "Select client" : "No clients available"}</option>
+                  <label className="bgt-label">Customer Name <span className="bgt-req">*</span></label>
+                  <select className="input" required value={projForm.customerId} onChange={(e) => handleProjectCostingCustomerChange(e.target.value)}>
+                    <option value="">{customers.length ? "Select customer" : "No customers available"}</option>
                     {customers.map((customer) => (
                       <option key={customer.id} value={customer.id}>{customer.name}</option>
                     ))}
@@ -1688,7 +1730,16 @@ export default function BudgetTab() {
                 </div>
                 <div className="bgt-field bgt-field--wide">
                   <label className="bgt-label">Project <span className="bgt-req">*</span></label>
-                  <input className="input" required placeholder="e.g. Solar Installation - Client Name" value={projForm.projectName} onChange={(e) => setProjForm((f) => ({ ...f, projectName: e.target.value }))} />
+                  <select className="input" required value={projForm.projectId} onChange={(e) => handleProjectCostingProjectChange(e.target.value)}>
+                    <option value="">
+                      {!projForm.customerId ? "Select customer first" : projectCostingProjectOptions.length ? "Select project" : "No projects found for this customer"}
+                    </option>
+                    {projectCostingProjectOptions.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.project_name || "Untitled project"}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="bgt-field">
                   <label className="bgt-label">System Package</label>
@@ -1804,7 +1855,7 @@ export default function BudgetTab() {
               <dl className="bgt-delete-fields bgt-delete-fields--wide">
                 <div><dt>Start Date</dt><dd>{formatDate(viewingProjDetails.start_date)}</dd></div>
                 <div><dt>End Date</dt><dd>{formatDate(viewingProjDetails.end_date)}</dd></div>
-                <div><dt>Client Name</dt><dd>{viewingProjDetails.customer_name || "-"}</dd></div>
+                <div><dt>Customer Name</dt><dd>{viewingProjDetails.customer_name || "-"}</dd></div>
                 <div><dt>System Package</dt><dd>{viewingProjDetails.system_package || "-"}</dd></div>
                 <div><dt>Location</dt><dd>{viewingProjDetails.location || "-"}</dd></div>
                 <div><dt>Selling Price</dt><dd>₱{formatMoney(viewingProjDetails.sale_amount)}</dd></div>
@@ -1836,7 +1887,7 @@ export default function BudgetTab() {
             <dl className="bgt-delete-fields">
               <div><dt>Start Date</dt><dd>{formatDate(deletingProj.start_date)}</dd></div>
               <div><dt>End Date</dt><dd>{formatDate(deletingProj.end_date)}</dd></div>
-              <div><dt>Client Name</dt><dd>{deletingProj.customer_name || "-"}</dd></div>
+              <div><dt>Customer Name</dt><dd>{deletingProj.customer_name || "-"}</dd></div>
               <div><dt>Project</dt><dd>{deletingProj.project_name || "-"}</dd></div>
               <div><dt>System Package</dt><dd>{deletingProj.system_package || "-"}</dd></div>
               <div><dt>Location</dt><dd>{deletingProj.location || "-"}</dd></div>
