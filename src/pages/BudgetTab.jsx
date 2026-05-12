@@ -771,7 +771,8 @@ export default function BudgetTab() {
   }
 
   function openNewTx(overrides = {}) {
-    const { description, price, quantity, discount, amount, notes, ...headerOverrides } = overrides;
+    const safeOverrides = overrides && overrides.currentTarget ? {} : overrides;
+    const { description, price, quantity, discount, amount, notes, ...headerOverrides } = safeOverrides;
     const accountId = headerOverrides.accountId || "";
     setEditingTx(null);
     setError("");
@@ -1175,7 +1176,7 @@ export default function BudgetTab() {
                 <button className="btn btn-ghost" onClick={() => openNewPayment()} disabled={!defaultIncomeAccountId}>
                   <IconArrowDown /> Record Payment
                 </button>
-                <button className="btn btn-primary" onClick={openNewTx}>
+                <button className="btn btn-primary" onClick={() => openNewTx()}>
                   <IconPlus /> Record Transaction
                 </button>
               </>
@@ -1319,7 +1320,7 @@ export default function BudgetTab() {
             <div className="bgt-empty">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="bgt-empty-icon"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 9h18M9 13h1M14 13h1M9 17h1M14 17h1" /></svg>
               <p>{hasFilters ? "No transactions match your filters." : "No transactions yet. Record one or import from Excel."}</p>
-              {!hasFilters && <button className="btn btn-primary" onClick={openNewTx}><IconPlus /> Record First Transaction</button>}
+              {!hasFilters && <button className="btn btn-primary" onClick={() => openNewTx()}><IconPlus /> Record First Transaction</button>}
             </div>
           ) : (
             <div className="bgt-table-wrap">
