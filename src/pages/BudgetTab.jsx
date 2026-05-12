@@ -309,6 +309,13 @@ function IconUpload() {
     </svg>
   );
 }
+function IconDownload() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
 function IconPlus() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -377,6 +384,7 @@ export default function BudgetTab() {
   const [importBatches, setImportBatches] = useState([]);
   const [deletingImportBatch, setDeletingImportBatch] = useState(null);
   const [importBatchDeleting, setImportBatchDeleting] = useState(false);
+  const [exportingRawLogs, setExportingRawLogs] = useState(false);
   const [projects, setProjects] = useState([]);
 
   // ── Sales / Customers state ─────────────────────────────────────────────────
@@ -540,6 +548,62 @@ export default function BudgetTab() {
       return next.size === prev.size ? prev : next;
     });
   }, [visibleTxIds]);
+
+  function buildTransactionQueryParams({ includeProjectScope = true, limit } = {}) {
+    const params = new URLSearchParams();
+    if (filterType !== "all") params.set("type", filterType);
+    if (filterAccount !== "all") params.set("accountId", filterAccount);
+    if (includeProjectScope && scopeMode === "project" && scopeProjectId) params.set("projectId", scopeProjectId);
+    if (filterDateFrom) params.set("dateFrom", filterDateFrom);
+    if (filterDateTo) params.set("dateTo", filterDateTo);
+    if (String(searchRaw || "").trim()) params.set("q", String(searchRaw || "").trim());
+    if (limit) params.set("limit", String(limit));
+    return params;
+  }
+
+  function getFilenameFromDisposition(contentDisposition, fallback) {
+    const text = String(contentDisposition || "");
+    const match = text.match(/filename\*?=(?:UTF-8''|"?)([^";]+)/i);
+    if (!match) return fallback;
+    try {
+      return decodeURIComponent(match[1].replace(/"/g, ""));
+    } catch {
+      return match[1].replace(/"/g, "");
+    }
+  }
+
+  async function exportRawLogsExcel() {
+    setExportingRawLogs(true);
+    setError("");
+    try {
+      const params = buildTransactionQueryParams({ includeProjectScope: true });
+      const query = params.toString();
+      const res = await api.get(`/budget/export/raw-logs${query ? `?${query}` : ""}`, {
+        responseType: "blob"
+      });
+      const blob = new Blob([res.data], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      });
+      const url = window.URL.createObjectURL(blob);
+      const filename = getFilenameFromDisposition(
+        res.headers["content-disposition"],
+        `financial-raw-logs-${localDateInput()}.xlsx`
+      );
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      flash("Raw logs Excel exported.");
+    } catch (err) {
+      flash(err?.response?.data?.message || "Failed to export raw logs.", "error");
+    } finally {
+      setExportingRawLogs(false);
+    }
+  }
 
   // ── Import ──────────────────────────────────────────────────────────────────
   function openImport() {
@@ -1172,6 +1236,9 @@ export default function BudgetTab() {
                 </button>
                 <button className="btn btn-ghost bgt-btn-import" onClick={openImport}>
                   <IconUpload /> Import Excel
+                </button>
+                <button className="btn btn-ghost bgt-btn-import" onClick={exportRawLogsExcel} disabled={exportingRawLogs}>
+                  <IconDownload /> {exportingRawLogs ? "Exporting..." : "Export Raw Logs"}
                 </button>
                 <button className="btn btn-ghost" onClick={() => openNewPayment()} disabled={!defaultIncomeAccountId}>
                   <IconArrowDown /> Record Payment
