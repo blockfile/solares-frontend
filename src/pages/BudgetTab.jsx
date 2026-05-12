@@ -84,7 +84,7 @@ function hasTxLineInput(line) {
 const EMPTY_TX_FORM = {
   accountId: "",
   projectId: "",
-  type: "expense",
+  type: "",
   referenceNo: "",
   transactionDate: localDateInput()
 };
@@ -471,7 +471,7 @@ export default function BudgetTab() {
     setTxForm((form) => ({
       ...form,
       accountId,
-      type: accountId ? accountTypeForAccountId(accountId, form.type) : form.type
+      type: accountId ? accountTypeForAccountId(accountId, form.type) : ""
     }));
   }
   const defaultIncomeAccountId = incomeAccounts[0]?.id ? String(incomeAccounts[0].id) : "";
