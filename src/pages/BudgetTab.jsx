@@ -474,14 +474,6 @@ export default function BudgetTab() {
       type: accountId ? accountTypeForAccountId(accountId, form.type) : form.type
     }));
   }
-  function handleTxTypeChange(type) {
-    const nextType = normalizeAccountType(type);
-    setTxForm((form) => {
-      const selectedAccount = accounts.find((a) => String(a.id) === String(form.accountId));
-      const accountId = selectedAccount && normalizeAccountType(selectedAccount.type) === nextType ? form.accountId : "";
-      return { ...form, type: nextType, accountId };
-    });
-  }
   const defaultIncomeAccountId = incomeAccounts[0]?.id ? String(incomeAccounts[0].id) : "";
   const hasFilters = filterType !== "all" || filterAccount !== "all" || filterDateFrom || filterDateTo || searchRaw || scopeMode !== "overall";
   const projectCostingHasFilters = filterDateFrom || filterDateTo || searchRaw;
@@ -2071,7 +2063,7 @@ export default function BudgetTab() {
             </div>
 
             <form className="bgt-modal-body" onSubmit={saveTx}>
-              <div className="bgt-type-toggle bgt-type-toggle--transaction">
+              <div className="bgt-type-toggle bgt-type-toggle--transaction bgt-type-toggle--readonly">
                 {ACCOUNT_TYPE_OPTIONS.map((option) => {
                   const direction = transactionDirectionFromAccountType(option.value);
                   const TypeIcon = direction === "in" ? IconArrowDown : IconArrowUp;
@@ -2079,8 +2071,8 @@ export default function BudgetTab() {
                     <button
                       key={option.value}
                       type="button"
+                      disabled
                       className={`bgt-type-btn bgt-type-btn--${option.value}${txForm.type === option.value ? " bgt-type-btn--on" : ""}`}
-                      onClick={() => handleTxTypeChange(option.value)}
                     >
                       <TypeIcon /> {transactionTypeLabel(option.value)}
                     </button>
