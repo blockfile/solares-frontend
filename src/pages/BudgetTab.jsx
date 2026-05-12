@@ -84,7 +84,7 @@ function hasTxLineInput(line) {
 const EMPTY_TX_FORM = {
   accountId: "",
   projectId: "",
-  type: "out",
+  type: "expense",
   referenceNo: "",
   transactionDate: localDateInput()
 };
@@ -95,6 +95,12 @@ const ACCOUNT_TYPE_OPTIONS = [
   { value: "investment", label: "Investment" },
   { value: "withdrawal", label: "Withdrawal" }
 ];
+const ACCOUNT_TYPE_DIRECTIONS = {
+  expense: "out",
+  income: "in",
+  investment: "in",
+  withdrawal: "out"
+};
 const PROJECT_CATEGORY_OPTIONS = [
   { value: "materials", label: "Materials" },
   { value: "labor", label: "Labor" },
@@ -105,6 +111,34 @@ const STATUS_COLORS = { active: "sl-pill--active", completed: "sl-pill--done", c
 
 function accountTypeLabel(type) {
   return ACCOUNT_TYPE_OPTIONS.find((option) => option.value === type)?.label || "Expense";
+}
+
+function normalizeAccountType(type, fallback = "expense") {
+  const normalized = String(type || "").toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(ACCOUNT_TYPE_DIRECTIONS, normalized)) return normalized;
+  if (normalized === "in") return "income";
+  if (normalized === "out") return "expense";
+  return fallback;
+}
+
+function transactionDirectionFromAccountType(type) {
+  return ACCOUNT_TYPE_DIRECTIONS[normalizeAccountType(type)] || "out";
+}
+
+function accountTypeFromTransactionRecord(tx) {
+  return normalizeAccountType(tx?.account_type || tx?.type);
+}
+
+function transactionTypeLabel(type) {
+  const accountType = normalizeAccountType(type);
+  const direction = transactionDirectionFromAccountType(accountType) === "in" ? "In" : "Out";
+  return `${accountTypeLabel(accountType)} (${direction})`;
+}
+
+function transactionTypeShortLabel(type) {
+  const accountType = normalizeAccountType(type);
+  const direction = transactionDirectionFromAccountType(accountType);
+  return `${direction === "in" ? "↓" : "↑"} ${accountTypeLabel(accountType)}`;
 }
 
 function projectDisplayName(project) {
@@ -429,6 +463,25 @@ export default function BudgetTab() {
     () => activeAccounts.filter((a) => String(a.type || "").toLowerCase() === "income"),
     [activeAccounts]
   );
+  function accountTypeForAccountId(accountId, fallback = "expense") {
+    const account = accounts.find((a) => String(a.id) === String(accountId));
+    return account ? normalizeAccountType(account.type, fallback) : fallback;
+  }
+  function handleTxAccountChange(accountId) {
+    setTxForm((form) => ({
+      ...form,
+      accountId,
+      type: accountId ? accountTypeForAccountId(accountId, form.type) : form.type
+    }));
+  }
+  function handleTxTypeChange(type) {
+    const nextType = normalizeAccountType(type);
+    setTxForm((form) => {
+      const selectedAccount = accounts.find((a) => String(a.id) === String(form.accountId));
+      const accountId = selectedAccount && normalizeAccountType(selectedAccount.type) === nextType ? form.accountId : "";
+      return { ...form, type: nextType, accountId };
+    });
+  }
   const defaultIncomeAccountId = incomeAccounts[0]?.id ? String(incomeAccounts[0].id) : "";
   const hasFilters = filterType !== "all" || filterAccount !== "all" || filterDateFrom || filterDateTo || searchRaw || scopeMode !== "overall";
   const projectCostingHasFilters = filterDateFrom || filterDateTo || searchRaw;
@@ -663,7 +716,7 @@ export default function BudgetTab() {
     setPaymentDetailsLoading(true);
     try {
       const res = await api.get(`/customers/projects/${project.id}/transactions`);
-      setPaymentDetailsRows((res.data || []).filter((tx) => tx.type === "in"));
+      setPaymentDetailsRows((res.data || []).filter((tx) => accountTypeFromTransactionRecord(tx) === "income"));
     } catch {
       setPaymentDetailsRows([]);
       flash("Failed to load payment details.", "error");
@@ -727,6 +780,7 @@ export default function BudgetTab() {
 
   function openNewTx(overrides = {}) {
     const { description, price, quantity, discount, amount, notes, ...headerOverrides } = overrides;
+    const accountId = headerOverrides.accountId || "";
     setEditingTx(null);
     setError("");
     setSuccess("");
@@ -734,7 +788,9 @@ export default function BudgetTab() {
       ...EMPTY_TX_FORM,
       transactionDate: localDateInput(),
       projectId: projectScoped && selectedScopeProject ? String(selectedScopeProject.id) : "",
-      ...headerOverrides
+      ...headerOverrides,
+      accountId,
+      type: headerOverrides.type ? normalizeAccountType(headerOverrides.type) : accountTypeForAccountId(accountId, EMPTY_TX_FORM.type)
     });
     setTxLines([createTxLine({
       description: description || "",
@@ -749,7 +805,7 @@ export default function BudgetTab() {
   function openNewPayment(project = null) {
     const targetProject = project || selectedScopeProject || null;
     openNewTx({
-      type: "in",
+      type: "income",
       accountId: defaultIncomeAccountId,
       projectId: targetProject?.id ? String(targetProject.id) : ""
     });
@@ -761,7 +817,7 @@ export default function BudgetTab() {
     setTxForm({
       accountId: String(tx.account_id),
       projectId: tx.project_id ? String(tx.project_id) : "",
-      type: tx.type,
+      type: accountTypeFromTransactionRecord(tx),
       referenceNo: tx.reference_no || "",
       transactionDate: tx.transaction_date ? localDateInput(tx.transaction_date) : localDateInput()
     });
@@ -847,7 +903,7 @@ export default function BudgetTab() {
       const sharedPayload = {
         accountId: Number(txForm.accountId),
         projectId: txForm.projectId ? Number(txForm.projectId) : null,
-        type: txForm.type,
+        type: transactionDirectionFromAccountType(accountTypeForAccountId(txForm.accountId, txForm.type)),
         referenceNo: txForm.referenceNo,
         transactionDate: txForm.transactionDate
       };
@@ -1174,8 +1230,9 @@ export default function BudgetTab() {
               <>
                 <select className="input bgt-filter-select" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
                   <option value="all">All transaction types</option>
-                  <option value="in">Income (In)</option>
-                  <option value="out">Expense (Out)</option>
+                  {ACCOUNT_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{transactionTypeLabel(option.value)}</option>
+                  ))}
                 </select>
                 <select className="input bgt-filter-select" value={filterAccount} onChange={(e) => setFilterAccount(e.target.value)}>
                   <option value="all">All categories</option>
@@ -1298,7 +1355,10 @@ export default function BudgetTab() {
                   </tr>
                 </thead>
                 <tbody>
-                  {transactions.map((tx) => (
+                  {transactions.map((tx) => {
+                    const txAccountType = accountTypeFromTransactionRecord(tx);
+                    const txDirection = transactionDirectionFromAccountType(txAccountType);
+                    return (
                     <tr key={tx.id} className="bgt-table-row">
                       <td>
                         <input
@@ -1322,15 +1382,15 @@ export default function BudgetTab() {
                         {tx.reference_no ? <code className="bgt-ref-code">{tx.reference_no}</code> : <span className="bgt-muted">—</span>}
                       </td>
                       <td>
-                        <span className={`bgt-type-pill bgt-type-pill--${tx.type}`}>
-                          {tx.type === "in" ? "↓ In" : "↑ Out"}
+                        <span className={`bgt-type-pill bgt-type-pill--${txAccountType}`}>
+                          {transactionTypeShortLabel(txAccountType)}
                         </span>
                       </td>
                       <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
                       <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
                       <td className="bgt-col-amt">{tx.discount == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.discount)}</>}</td>
-                      <td className={`bgt-col-amt bgt-amount--${tx.type}`}>
-                        <span className="bgt-amount-sign">{tx.type === "in" ? "+" : "−"}</span>
+                      <td className={`bgt-col-amt bgt-amount--${txDirection}`}>
+                        <span className="bgt-amount-sign">{txDirection === "in" ? "+" : "−"}</span>
                         <span>₱{formatMoney(tx.amount)}</span>
                       </td>
                       <td className="bgt-col-actions">
@@ -1344,7 +1404,8 @@ export default function BudgetTab() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
               <div className="bgt-table-footer">
@@ -2010,19 +2071,27 @@ export default function BudgetTab() {
             </div>
 
             <form className="bgt-modal-body" onSubmit={saveTx}>
-              <div className="bgt-type-toggle">
-                <button type="button" className={`bgt-type-btn bgt-type-btn--out${txForm.type === "out" ? " bgt-type-btn--on" : ""}`} onClick={() => setTxForm((f) => ({ ...f, type: "out" }))}>
-                  <IconArrowUp /> Expense (Out)
-                </button>
-                <button type="button" className={`bgt-type-btn bgt-type-btn--in${txForm.type === "in" ? " bgt-type-btn--on" : ""}`} onClick={() => setTxForm((f) => ({ ...f, type: "in" }))}>
-                  <IconArrowDown /> Income (In)
-                </button>
+              <div className="bgt-type-toggle bgt-type-toggle--transaction">
+                {ACCOUNT_TYPE_OPTIONS.map((option) => {
+                  const direction = transactionDirectionFromAccountType(option.value);
+                  const TypeIcon = direction === "in" ? IconArrowDown : IconArrowUp;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`bgt-type-btn bgt-type-btn--${option.value}${txForm.type === option.value ? " bgt-type-btn--on" : ""}`}
+                      onClick={() => handleTxTypeChange(option.value)}
+                    >
+                      <TypeIcon /> {transactionTypeLabel(option.value)}
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="bgt-form-grid bgt-form-grid--tx-header">
                 <div className="bgt-field bgt-field--wide">
                   <label className="bgt-label">Category <span className="bgt-req">*</span></label>
-                  <select className="input" required value={txForm.accountId} onChange={(e) => setTxForm((f) => ({ ...f, accountId: e.target.value }))}>
+                  <select className="input" required value={txForm.accountId} onChange={(e) => handleTxAccountChange(e.target.value)}>
                     <option value="">— Select category —</option>
                     {activeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                   </select>
@@ -2192,20 +2261,23 @@ export default function BudgetTab() {
                         </tr>
                       </thead>
                       <tbody>
-                        {(importResult.transactions || []).map((tx) => (
+                        {(importResult.transactions || []).map((tx) => {
+                          const txAccountType = accountTypeFromTransactionRecord(tx);
+                          const txDirection = transactionDirectionFromAccountType(txAccountType);
+                          return (
                           <tr key={tx.id}>
                             <td className="bgt-cell-date">{formatDate(tx.transaction_date)}</td>
                             <td>{tx.description || <span className="bgt-muted">—</span>}</td>
                             <td><span className="bgt-account-chip">{tx.account_name || "—"}</span></td>
                             <td>
-                              <span className={`bgt-type-pill bgt-type-pill--${tx.type}`}>
-                                {tx.type === "in" ? "↓ In" : "↑ Out"}
+                              <span className={`bgt-type-pill bgt-type-pill--${txAccountType}`}>
+                                {transactionTypeShortLabel(txAccountType)}
                               </span>
                             </td>
                             <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
                             <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
                             <td className="bgt-col-amt">{tx.discount == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.discount)}</>}</td>
-                            <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatMoney(tx.amount)}</td>
+                            <td className={`bgt-col-amt bgt-amount--${txDirection}`}>₱{formatMoney(tx.amount)}</td>
                             <td className="bgt-col-actions">
                               <button
                                 type="button"
@@ -2217,7 +2289,8 @@ export default function BudgetTab() {
                               </button>
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                         {(!importResult.transactions || importResult.transactions.length === 0) && (importResult.rows || []).map((r, i) => (
                           <tr key={i}>
                             <td className="bgt-cell-date">{formatDate(r.transactionDate)}</td>
@@ -2449,7 +2522,7 @@ export default function BudgetTab() {
             </div>
             <h3 className="bgt-confirm-title">Delete Transaction?</h3>
             <p className="bgt-confirm-body">
-              This will permanently delete the {deletingTx.type === "in" ? "income" : "expense"} of <strong>₱{formatMoney(deletingTx.amount)}</strong>
+              This will permanently delete the {accountTypeLabel(accountTypeFromTransactionRecord(deletingTx)).toLowerCase()} of <strong>₱{formatMoney(deletingTx.amount)}</strong>
               {deletingTx.description ? ` — "${deletingTx.description}"` : ""}. This cannot be undone.
             </p>
             <div className="bgt-modal-foot bgt-modal-foot--center">
