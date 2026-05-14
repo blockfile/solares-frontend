@@ -104,7 +104,7 @@ export default function PackagePricesTab() {
   const [editActive, setEditActive] = useState(true);
 
   const loadTemplates = async () => {
-    const res = await api.get("/templates");
+    const res = await api.get("/templates", { params: { includeAll: 1 } });
     setTemplates(Array.isArray(res.data) ? res.data : []);
   };
 

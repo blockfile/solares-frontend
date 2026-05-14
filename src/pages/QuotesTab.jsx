@@ -705,7 +705,7 @@ export default function QuotesTab() {
 
   const loadTemplates = async () => {
     try {
-      const res = await api.get("/templates");
+      const res = await api.get("/templates", { params: { includeAll: 1 } });
       setTemplates(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       setTemplates([]);
