@@ -27,6 +27,7 @@ const TAB_CONFIG = [
   { key: "packages", label: "Package Prices", group: "Catalog", icon: "packages" },
   { key: "margins", label: "Margin Setup", group: "Catalog", icon: "margins" },
   { key: "budget", label: "Financial Management", group: "Workspace", icon: "budget" },
+  { key: "accounting", label: "Accounting Management", group: "Workspace", icon: "accounting" },
   { key: "users", label: "Users", group: "System Admin", icon: "users" },
   { key: "roles", label: "Roles", group: "System Admin", icon: "roles" },
   { key: "audit", label: "Audit", group: "System Admin", icon: "audit" }
@@ -165,6 +166,15 @@ function SidebarIcon({ icon }) {
           <path d="M12 3.5v2.5" />
           <path d="M8 3.5v2.5" />
           <path d="M16 3.5v2.5" />
+        </svg>
+      );
+    case "accounting":
+      return (
+        <svg {...common}>
+          <path d="M6.5 4.5h11A1.5 1.5 0 0 1 19 6v13.5l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2-2 1.2V6A1.5 1.5 0 0 1 6.5 4.5Z" />
+          <path d="M8.5 8.5h7" />
+          <path d="M8.5 12h7" />
+          <path d="M8.5 15.5h4.5" />
         </svg>
       );
     default:
@@ -439,7 +449,8 @@ export default function Dashboard({ theme = "light", onToggleTheme }) {
           {tab === "users" && <UsersTab currentUser={user} />}
           {tab === "roles" && <RolesTab />}
           {tab === "audit" && <AuditTab />}
-          {tab === "budget" && <BudgetTab />}
+          {tab === "budget" && <BudgetTab key="budget" />}
+          {tab === "accounting" && <BudgetTab key="accounting" lockedView="accounts" />}
         </section>
       </main>
     </div>

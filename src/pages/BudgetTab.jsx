@@ -331,7 +331,11 @@ function IconSearch() {
   );
 }
 
-export default function BudgetTab() {
+export default function BudgetTab({ initialView = "transactions", lockedView = "" } = {}) {
+  const initialResolvedView = lockedView || initialView || "transactions";
+  const isViewLocked = Boolean(lockedView);
+  const isAccountsOnly = lockedView === "accounts";
+
   const [transactions, setTransactions] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [summary, setSummary] = useState({ totalIn: 0, totalOut: 0, netBalance: 0, transactionCount: 0, activeAccounts: 0 });
@@ -348,7 +352,7 @@ export default function BudgetTab() {
   const [searchRaw, setSearchRaw] = useState("");
   const search = useDeferredValue(searchRaw);
 
-  const [view, setView] = useState("transactions"); // "transactions" | "accounts" | "sales"
+  const [view, setView] = useState(initialResolvedView); // "transactions" | "accounts" | "sales"
 
   const [txForm, setTxForm] = useState(EMPTY_TX_FORM);
   const [txLines, setTxLines] = useState(() => [createTxLine()]);
@@ -432,6 +436,22 @@ export default function BudgetTab() {
       if (scopeMode === "project" && scopeProjectId) summaryParams.set("projectId", scopeProjectId);
       if (filterDateFrom) summaryParams.set("dateFrom", filterDateFrom);
       if (filterDateTo) summaryParams.set("dateTo", filterDateTo);
+
+      if (isAccountsOnly) {
+        const [accRes, sumRes] = await Promise.all([
+          api.get("/budget/accounts"),
+          api.get(`/budget/summary?${summaryParams}`)
+        ]);
+        setTransactions([]);
+        setAccounts(accRes.data || []);
+        setSummary(sumRes.data || { totalIn: 0, totalOut: 0, netBalance: 0, transactionCount: 0, activeAccounts: 0 });
+        setProjects([]);
+        setCustomers([]);
+        setSalesSummary({});
+        setImportBatches([]);
+        return;
+      }
+
       const [txRes, accRes, sumRes, projRes, custRes, salesSumRes, importBatchRes] = await Promise.all([
         api.get(`/budget?${params}`),
         api.get("/budget/accounts"),
@@ -458,7 +478,15 @@ export default function BudgetTab() {
   useEffect(() => {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterType, filterAccount, filterDateFrom, filterDateTo, search, scopeMode, scopeProjectId]);
+  }, [filterType, filterAccount, filterDateFrom, filterDateTo, search, scopeMode, scopeProjectId, isAccountsOnly]);
+
+  useEffect(() => {
+    if (lockedView && view !== lockedView) setView(lockedView);
+  }, [lockedView, view]);
+
+  useEffect(() => {
+    if (scopeMode === "transaction") setScopeMode("overall");
+  }, [scopeMode]);
 
   function flash(msg, type = "success") {
     if (type === "success") { setSuccess(msg); setError(""); }
@@ -1205,20 +1233,22 @@ export default function BudgetTab() {
 
       {/* ── Toolbar ────────────────────────────────────────────────────────── */}
       <div className="bgt-toolbar">
-        <div className="bgt-seg">
-          <button className={`bgt-seg-btn${view === "transactions" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("transactions")}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12h6M9 16h4" /></svg>
-            Transactions
-          </button>
-          <button className={`bgt-seg-btn${view === "accounts" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("accounts")}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /><path d="M7 15h2M12 15h2" /></svg>
-            Category
-          </button>
-          <button className={`bgt-seg-btn${view === "sales" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("sales")}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-            Sales
-          </button>
-        </div>
+        {!isViewLocked && (
+          <div className="bgt-seg">
+            <button className={`bgt-seg-btn${view === "transactions" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("transactions")}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12h6M9 16h4" /></svg>
+              Transactions
+            </button>
+            <button className={`bgt-seg-btn${view === "accounts" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("accounts")}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /><path d="M7 15h2M12 15h2" /></svg>
+              Category
+            </button>
+            <button className={`bgt-seg-btn${view === "sales" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("sales")}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+              Sales
+            </button>
+          </div>
+        )}
 
         <div className="bgt-toolbar-actions">
           {view === "transactions" && (
@@ -1277,9 +1307,6 @@ export default function BudgetTab() {
               </button>
               <button className={`bgt-seg-btn${scopeMode === "project" ? " bgt-seg-btn--on" : ""}`} onClick={() => { setScopeMode("project"); setScopeProjectId(""); setFilterType("all"); setFilterAccount("all"); }}>
                 Project Costing
-              </button>
-              <button className={`bgt-seg-btn${scopeMode === "transaction" ? " bgt-seg-btn--on" : ""}`} onClick={() => { setScopeMode("transaction"); setScopeProjectId(""); }}>
-                Entity
               </button>
             </div>
             <div className="bgt-search-wrap">
