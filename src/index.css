@@ -5549,6 +5549,10 @@ button {
   min-width: 640px;
 }
 
+.bgt-table--bookkeeping {
+  min-width: 1040px;
+}
+
 .bgt-cell-date {
   white-space: nowrap;
   color: var(--text-soft);
@@ -5834,17 +5838,39 @@ button {
 
 .bgt-bookkeeping-form {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   align-items: end;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 12px;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: #ffffff;
 }
 
-.bgt-bookkeeping-field-wide {
+.bgt-bookkeeping-form .bgt-field,
+.bgt-bookkeeping-submit {
+  min-width: 0;
+}
+
+.bgt-bookkeeping-field--date,
+.bgt-bookkeeping-field--money,
+.bgt-bookkeeping-submit {
   grid-column: span 2;
+}
+
+.bgt-bookkeeping-field--description,
+.bgt-bookkeeping-field--client,
+.bgt-bookkeeping-field--pr-code,
+.bgt-bookkeeping-field--due-date {
+  grid-column: span 3;
+}
+
+.bgt-bookkeeping-field--supplier {
+  grid-column: span 4;
+}
+
+.bgt-bookkeeping-field--note {
+  grid-column: span 10;
 }
 
 .bgt-bookkeeping-submit {
@@ -5854,6 +5880,27 @@ button {
 
 .bgt-bookkeeping-submit .btn {
   width: 100%;
+  min-width: 0;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .bgt-bookkeeping-form {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .bgt-bookkeeping-form .bgt-field,
+  .bgt-bookkeeping-submit {
+    grid-column: span 3;
+  }
+
+  .bgt-bookkeeping-field--description,
+  .bgt-bookkeeping-field--client,
+  .bgt-bookkeeping-field--supplier,
+  .bgt-bookkeeping-field--note {
+    grid-column: 1 / -1;
+  }
 }
 
 /* ── Modals ───────────────────────────────────────────────────────────────── */
@@ -7054,8 +7101,9 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .bgt-bookkeeping-field-wide {
-    grid-column: auto;
+  .bgt-bookkeeping-form .bgt-field,
+  .bgt-bookkeeping-submit {
+    grid-column: 1 / -1;
   }
 
   .bgt-filters {
