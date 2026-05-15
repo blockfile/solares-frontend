@@ -445,7 +445,7 @@ export default function SalesTab() {
                 {detailLoading ? (
                   <div className="bgt-empty" style={{ padding: 24 }}><div className="bgt-spinner" /></div>
                 ) : detailTx.length === 0 ? (
-                  <p className="bgt-muted" style={{ padding: "12px 0", fontSize: 13 }}>No expenses linked to this project yet. Assign transactions via Financial Management.</p>
+                  <p className="bgt-muted" style={{ padding: "12px 0", fontSize: 13 }}>No expenses linked to this project yet. Assign transactions via Financial & Accounting Management.</p>
                 ) : (
                   <div className="bgt-import-preview">
                     <table className="bgt-table bgt-table--compact">

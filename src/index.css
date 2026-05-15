@@ -5821,6 +5821,41 @@ button {
   border-color: #f5c0c0 !important;
 }
 
+/* Bookkeeping */
+.bgt-bookkeeping-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.bgt-bookkeeping-tabs {
+  justify-self: start;
+  flex-wrap: wrap;
+}
+
+.bgt-bookkeeping-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.bgt-bookkeeping-field-wide {
+  grid-column: span 2;
+}
+
+.bgt-bookkeeping-submit {
+  display: flex;
+  align-items: end;
+}
+
+.bgt-bookkeeping-submit .btn {
+  width: 100%;
+}
+
 /* ── Modals ───────────────────────────────────────────────────────────────── */
 .bgt-backdrop {
   position: fixed;
@@ -7015,6 +7050,14 @@ button {
     flex: 1;
   }
 
+  .bgt-bookkeeping-form {
+    grid-template-columns: 1fr;
+  }
+
+  .bgt-bookkeeping-field-wide {
+    grid-column: auto;
+  }
+
   .bgt-filters {
     flex-direction: column;
     align-items: stretch;
@@ -7388,4 +7431,9 @@ button {
   background: #111b2b;
   border-color: var(--border);
   color: var(--text);
+}
+
+:root[data-theme="dark"] .bgt-bookkeeping-form {
+  background: var(--surface);
+  border-color: var(--border);
 }

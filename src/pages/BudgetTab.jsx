@@ -108,6 +108,37 @@ const PROJECT_CATEGORY_OPTIONS = [
 ];
 const STATUS_LABELS = { active: "Active", completed: "Completed", cancelled: "Cancelled" };
 const STATUS_COLORS = { active: "sl-pill--active", completed: "sl-pill--done", cancelled: "sl-pill--cancelled" };
+const BOOKKEEPING_SECTIONS = [
+  { key: "sales", label: "Sales" },
+  { key: "expense", label: "Expense" },
+  { key: "accounts_receivable", label: "Accounts Receivable" },
+  { key: "accounts_payable", label: "Accounts Payable" }
+];
+const EMPTY_BOOKKEEPING_ROWS = {
+  sales: [],
+  expense: [],
+  accounts_receivable: [],
+  accounts_payable: []
+};
+
+function createBookkeepingForm(section) {
+  if (section === "accounts_receivable") {
+    return { client: "", total: "", paid: "", remaining: "" };
+  }
+  if (section === "accounts_payable") {
+    return { supplier: "", amountDue: "", dueDate: localDateInput() };
+  }
+  return { date: localDateInput(), description: "", debit: "", credit: "" };
+}
+
+function createBookkeepingForms() {
+  return {
+    sales: createBookkeepingForm("sales"),
+    expense: createBookkeepingForm("expense"),
+    accounts_receivable: createBookkeepingForm("accounts_receivable"),
+    accounts_payable: createBookkeepingForm("accounts_payable")
+  };
+}
 
 function accountTypeLabel(type) {
   return ACCOUNT_TYPE_OPTIONS.find((option) => option.value === type)?.label || "Expense";
@@ -330,12 +361,15 @@ function IconSearch() {
     </svg>
   );
 }
+function IconRefresh() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 11a8 8 0 0 0-14.7-4.4L3 9" /><path d="M3 4v5h5" /><path d="M4 13a8 8 0 0 0 14.7 4.4L21 15" /><path d="M16 15h5v5" />
+    </svg>
+  );
+}
 
-export default function BudgetTab({ initialView = "transactions", lockedView = "" } = {}) {
-  const initialResolvedView = lockedView || initialView || "transactions";
-  const isViewLocked = Boolean(lockedView);
-  const isAccountsOnly = lockedView === "accounts";
-
+export default function BudgetTab() {
   const [transactions, setTransactions] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [summary, setSummary] = useState({ totalIn: 0, totalOut: 0, netBalance: 0, transactionCount: 0, activeAccounts: 0 });
@@ -352,7 +386,7 @@ export default function BudgetTab({ initialView = "transactions", lockedView = "
   const [searchRaw, setSearchRaw] = useState("");
   const search = useDeferredValue(searchRaw);
 
-  const [view, setView] = useState(initialResolvedView); // "transactions" | "accounts" | "sales"
+  const [view, setView] = useState("transactions"); // "transactions" | "accounts" | "sales" | "bookkeeping"
 
   const [txForm, setTxForm] = useState(EMPTY_TX_FORM);
   const [txLines, setTxLines] = useState(() => [createTxLine()]);
@@ -420,6 +454,12 @@ export default function BudgetTab({ initialView = "transactions", lockedView = "
   const [paymentDetailsLoading, setPaymentDetailsLoading] = useState(false);
 
   const [salesView, setSalesView] = useState("overview"); // "overview" | "projects"
+  const [bookkeepingView, setBookkeepingView] = useState("sales");
+  const [bookkeepingRows, setBookkeepingRows] = useState(EMPTY_BOOKKEEPING_ROWS);
+  const [bookkeepingForms, setBookkeepingForms] = useState(() => createBookkeepingForms());
+  const [bookkeepingLoading, setBookkeepingLoading] = useState(false);
+  const [bookkeepingSaving, setBookkeepingSaving] = useState(false);
+  const [deletingBookkeeping, setDeletingBookkeeping] = useState("");
 
   const loadAll = async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -436,21 +476,6 @@ export default function BudgetTab({ initialView = "transactions", lockedView = "
       if (scopeMode === "project" && scopeProjectId) summaryParams.set("projectId", scopeProjectId);
       if (filterDateFrom) summaryParams.set("dateFrom", filterDateFrom);
       if (filterDateTo) summaryParams.set("dateTo", filterDateTo);
-
-      if (isAccountsOnly) {
-        const [accRes, sumRes] = await Promise.all([
-          api.get("/budget/accounts"),
-          api.get(`/budget/summary?${summaryParams}`)
-        ]);
-        setTransactions([]);
-        setAccounts(accRes.data || []);
-        setSummary(sumRes.data || { totalIn: 0, totalOut: 0, netBalance: 0, transactionCount: 0, activeAccounts: 0 });
-        setProjects([]);
-        setCustomers([]);
-        setSalesSummary({});
-        setImportBatches([]);
-        return;
-      }
 
       const [txRes, accRes, sumRes, projRes, custRes, salesSumRes, importBatchRes] = await Promise.all([
         api.get(`/budget?${params}`),
@@ -475,23 +500,108 @@ export default function BudgetTab({ initialView = "transactions", lockedView = "
     }
   };
 
+  const loadBookkeeping = async (quiet = false) => {
+    if (!quiet) setBookkeepingLoading(true);
+    try {
+      const res = await api.get("/budget/bookkeeping");
+      setBookkeepingRows({ ...EMPTY_BOOKKEEPING_ROWS, ...(res.data || {}) });
+    } catch (err) {
+      setBookkeepingRows(EMPTY_BOOKKEEPING_ROWS);
+      if (!quiet) setError(err?.response?.data?.message || "Failed to load bookkeeping records.");
+    } finally {
+      if (!quiet) setBookkeepingLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterType, filterAccount, filterDateFrom, filterDateTo, search, scopeMode, scopeProjectId, isAccountsOnly]);
+  }, [filterType, filterAccount, filterDateFrom, filterDateTo, search, scopeMode, scopeProjectId]);
 
   useEffect(() => {
-    if (lockedView && view !== lockedView) setView(lockedView);
-  }, [lockedView, view]);
-
-  useEffect(() => {
-    if (scopeMode === "transaction") setScopeMode("overall");
-  }, [scopeMode]);
+    loadBookkeeping(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function flash(msg, type = "success") {
     if (type === "success") { setSuccess(msg); setError(""); }
     else { setError(msg); setSuccess(""); }
     setTimeout(() => { setSuccess(""); setError(""); }, 3500);
+  }
+
+  function updateBookkeepingField(section, field, value) {
+    setBookkeepingForms((forms) => ({
+      ...forms,
+      [section]: {
+        ...(forms[section] || createBookkeepingForm(section)),
+        [field]: value
+      }
+    }));
+  }
+
+  function buildBookkeepingPayload(section) {
+    const form = bookkeepingForms[section] || createBookkeepingForm(section);
+    if (section === "accounts_receivable") {
+      return {
+        client: form.client,
+        total: form.total,
+        paid: form.paid,
+        remaining: form.remaining
+      };
+    }
+    if (section === "accounts_payable") {
+      return {
+        supplier: form.supplier,
+        amountDue: form.amountDue,
+        dueDate: form.dueDate
+      };
+    }
+    return {
+      date: form.date,
+      description: form.description,
+      debit: form.debit,
+      credit: form.credit
+    };
+  }
+
+  async function submitBookkeepingEntry(e) {
+    e.preventDefault();
+    const section = bookkeepingView;
+    setBookkeepingSaving(true);
+    try {
+      const res = await api.post(`/budget/bookkeeping/${section}`, buildBookkeepingPayload(section));
+      const created = res.data;
+      setBookkeepingRows((rows) => ({
+        ...rows,
+        [section]: [created, ...(rows[section] || [])]
+      }));
+      setBookkeepingForms((forms) => ({
+        ...forms,
+        [section]: createBookkeepingForm(section)
+      }));
+      flash("Bookkeeping entry recorded.");
+    } catch (err) {
+      flash(err?.response?.data?.message || "Failed to save bookkeeping entry.", "error");
+    } finally {
+      setBookkeepingSaving(false);
+    }
+  }
+
+  async function deleteBookkeepingEntry(section, id) {
+    const marker = `${section}:${id}`;
+    setDeletingBookkeeping(marker);
+    try {
+      await api.delete(`/budget/bookkeeping/${section}/${id}`);
+      setBookkeepingRows((rows) => ({
+        ...rows,
+        [section]: (rows[section] || []).filter((row) => Number(row.id) !== Number(id))
+      }));
+      flash("Bookkeeping entry deleted.");
+    } catch (err) {
+      flash(err?.response?.data?.message || "Failed to delete bookkeeping entry.", "error");
+    } finally {
+      setDeletingBookkeeping("");
+    }
   }
 
   const activeAccounts = useMemo(() => accounts.filter((a) => Number(a.is_active) === 1), [accounts]);
@@ -1233,22 +1343,24 @@ export default function BudgetTab({ initialView = "transactions", lockedView = "
 
       {/* ── Toolbar ────────────────────────────────────────────────────────── */}
       <div className="bgt-toolbar">
-        {!isViewLocked && (
-          <div className="bgt-seg">
-            <button className={`bgt-seg-btn${view === "transactions" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("transactions")}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12h6M9 16h4" /></svg>
-              Transactions
-            </button>
-            <button className={`bgt-seg-btn${view === "accounts" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("accounts")}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /><path d="M7 15h2M12 15h2" /></svg>
-              Category
-            </button>
-            <button className={`bgt-seg-btn${view === "sales" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("sales")}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-              Sales
-            </button>
-          </div>
-        )}
+        <div className="bgt-seg">
+          <button className={`bgt-seg-btn${view === "transactions" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("transactions")}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12h6M9 16h4" /></svg>
+            Transactions
+          </button>
+          <button className={`bgt-seg-btn${view === "accounts" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("accounts")}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /><path d="M7 15h2M12 15h2" /></svg>
+            Category
+          </button>
+          <button className={`bgt-seg-btn${view === "sales" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("sales")}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+            Sales
+          </button>
+          <button className={`bgt-seg-btn${view === "bookkeeping" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("bookkeeping")}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3.5h12a1.5 1.5 0 0 1 1.5 1.5v15.5l-2.2-1.2-2.2 1.2-2.2-1.2-2.2 1.2-2.2-1.2-2.2 1.2V5A1.5 1.5 0 0 1 6 3.5Z" /><path d="M8.5 8h7" /><path d="M8.5 11.5h7" /><path d="M8.5 15h4.5" /></svg>
+            Bookkeeping
+          </button>
+        </div>
 
         <div className="bgt-toolbar-actions">
           {view === "transactions" && (
@@ -1294,6 +1406,11 @@ export default function BudgetTab({ initialView = "transactions", lockedView = "
               <button className="btn btn-primary" onClick={() => openNewProj()}><IconPlus /> Add Project / Sale</button>
             </div>
           )}
+          {view === "bookkeeping" && (
+            <button className="btn btn-ghost bgt-btn-import" onClick={() => loadBookkeeping()} disabled={bookkeepingLoading}>
+              <IconRefresh /> {bookkeepingLoading ? "Refreshing..." : "Refresh"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -1307,6 +1424,9 @@ export default function BudgetTab({ initialView = "transactions", lockedView = "
               </button>
               <button className={`bgt-seg-btn${scopeMode === "project" ? " bgt-seg-btn--on" : ""}`} onClick={() => { setScopeMode("project"); setScopeProjectId(""); setFilterType("all"); setFilterAccount("all"); }}>
                 Project Costing
+              </button>
+              <button className={`bgt-seg-btn${scopeMode === "transaction" ? " bgt-seg-btn--on" : ""}`} onClick={() => { setScopeMode("transaction"); setScopeProjectId(""); }}>
+                Entity
               </button>
             </div>
             <div className="bgt-search-wrap">
@@ -1606,6 +1726,167 @@ export default function BudgetTab({ initialView = "transactions", lockedView = "
       )}
 
       {/* ── Sales view ─────────────────────────────────────────────────────── */}
+      {view === "bookkeeping" && (() => {
+        const activeSection = BOOKKEEPING_SECTIONS.find((section) => section.key === bookkeepingView) || BOOKKEEPING_SECTIONS[0];
+        const form = bookkeepingForms[activeSection.key] || createBookkeepingForm(activeSection.key);
+        const rows = bookkeepingRows[activeSection.key] || [];
+        const isLedgerSection = activeSection.key === "sales" || activeSection.key === "expense";
+        const isReceivableSection = activeSection.key === "accounts_receivable";
+        const isPayableSection = activeSection.key === "accounts_payable";
+
+        return (
+          <div className="bgt-bookkeeping-shell">
+            <div className="bgt-seg bgt-bookkeeping-tabs">
+              {BOOKKEEPING_SECTIONS.map((section) => (
+                <button
+                  key={section.key}
+                  className={`bgt-seg-btn${bookkeepingView === section.key ? " bgt-seg-btn--on" : ""}`}
+                  onClick={() => setBookkeepingView(section.key)}
+                  type="button"
+                >
+                  {section.label}
+                </button>
+              ))}
+            </div>
+
+            <form className="bgt-bookkeeping-form" onSubmit={submitBookkeepingEntry}>
+              {isLedgerSection && (
+                <>
+                  <div className="bgt-field">
+                    <label className="bgt-label">Date <span className="bgt-req">*</span></label>
+                    <input className="input" type="date" required value={form.date} onChange={(e) => updateBookkeepingField(activeSection.key, "date", e.target.value)} />
+                  </div>
+                  <div className="bgt-field bgt-bookkeeping-field-wide">
+                    <label className="bgt-label">Description <span className="bgt-req">*</span></label>
+                    <input className="input" required placeholder={`${activeSection.label} description`} value={form.description} onChange={(e) => updateBookkeepingField(activeSection.key, "description", e.target.value)} />
+                  </div>
+                  <div className="bgt-field">
+                    <label className="bgt-label">Debit</label>
+                    <input className="input" type="number" min="0" step="0.01" placeholder="0.00" value={form.debit} onChange={(e) => updateBookkeepingField(activeSection.key, "debit", e.target.value)} />
+                  </div>
+                  <div className="bgt-field">
+                    <label className="bgt-label">Credit</label>
+                    <input className="input" type="number" min="0" step="0.01" placeholder="0.00" value={form.credit} onChange={(e) => updateBookkeepingField(activeSection.key, "credit", e.target.value)} />
+                  </div>
+                </>
+              )}
+
+              {isReceivableSection && (
+                <>
+                  <div className="bgt-field bgt-bookkeeping-field-wide">
+                    <label className="bgt-label">Client <span className="bgt-req">*</span></label>
+                    <input className="input" required placeholder="Client name" value={form.client} onChange={(e) => updateBookkeepingField(activeSection.key, "client", e.target.value)} />
+                  </div>
+                  <div className="bgt-field">
+                    <label className="bgt-label">Total <span className="bgt-req">*</span></label>
+                    <input className="input" type="number" min="0" step="0.01" required placeholder="0.00" value={form.total} onChange={(e) => updateBookkeepingField(activeSection.key, "total", e.target.value)} />
+                  </div>
+                  <div className="bgt-field">
+                    <label className="bgt-label">Paid</label>
+                    <input className="input" type="number" min="0" step="0.01" placeholder="0.00" value={form.paid} onChange={(e) => updateBookkeepingField(activeSection.key, "paid", e.target.value)} />
+                  </div>
+                  <div className="bgt-field">
+                    <label className="bgt-label">Remaining</label>
+                    <input className="input" type="number" min="0" step="0.01" placeholder="0.00" value={form.remaining} onChange={(e) => updateBookkeepingField(activeSection.key, "remaining", e.target.value)} />
+                  </div>
+                </>
+              )}
+
+              {isPayableSection && (
+                <>
+                  <div className="bgt-field bgt-bookkeeping-field-wide">
+                    <label className="bgt-label">Supplier <span className="bgt-req">*</span></label>
+                    <input className="input" required placeholder="Supplier name" value={form.supplier} onChange={(e) => updateBookkeepingField(activeSection.key, "supplier", e.target.value)} />
+                  </div>
+                  <div className="bgt-field">
+                    <label className="bgt-label">Amount Due <span className="bgt-req">*</span></label>
+                    <input className="input" type="number" min="0" step="0.01" required placeholder="0.00" value={form.amountDue} onChange={(e) => updateBookkeepingField(activeSection.key, "amountDue", e.target.value)} />
+                  </div>
+                  <div className="bgt-field">
+                    <label className="bgt-label">Due Date <span className="bgt-req">*</span></label>
+                    <input className="input" type="date" required value={form.dueDate} onChange={(e) => updateBookkeepingField(activeSection.key, "dueDate", e.target.value)} />
+                  </div>
+                </>
+              )}
+
+              <div className="bgt-bookkeeping-submit">
+                <button className="btn btn-primary" type="submit" disabled={bookkeepingSaving}>
+                  <IconPlus /> {bookkeepingSaving ? "Recording..." : `Record ${activeSection.label}`}
+                </button>
+              </div>
+            </form>
+
+            {bookkeepingLoading && rows.length === 0 ? (
+              <div className="bgt-empty">
+                <div className="bgt-spinner" />
+                <p>Loading bookkeeping records...</p>
+              </div>
+            ) : rows.length === 0 ? (
+              <div className="bgt-empty">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="bgt-empty-icon"><path d="M6 3h12a1.5 1.5 0 0 1 1.5 1.5V21l-2.5-1.4-2.5 1.4-2.5-1.4L9.5 21 7 19.6 4.5 21V4.5A1.5 1.5 0 0 1 6 3Z" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>
+                <p>No {activeSection.label.toLowerCase()} bookkeeping records yet.</p>
+              </div>
+            ) : (
+              <div className="bgt-table-wrap">
+                <table className="bgt-table">
+                  <thead>
+                    {isLedgerSection && (
+                      <tr><th>Date</th><th>Description</th><th className="bgt-col-amt">Debit</th><th className="bgt-col-amt">Credit</th><th className="bgt-col-actions" /></tr>
+                    )}
+                    {isReceivableSection && (
+                      <tr><th>Client</th><th className="bgt-col-amt">Total</th><th className="bgt-col-amt">Paid</th><th className="bgt-col-amt">Remaining</th><th className="bgt-col-actions" /></tr>
+                    )}
+                    {isPayableSection && (
+                      <tr><th>Supplier</th><th className="bgt-col-amt">Amount Due</th><th>Due Date</th><th className="bgt-col-actions" /></tr>
+                    )}
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => {
+                      const deleting = deletingBookkeeping === `${activeSection.key}:${row.id}`;
+                      return (
+                        <tr key={row.id} className="bgt-table-row">
+                          {isLedgerSection && (
+                            <>
+                              <td className="bgt-cell-date">{formatDate(row.entry_date)}</td>
+                              <td className="bgt-cell-desc">{row.description || <span className="bgt-muted">-</span>}</td>
+                              <td className="bgt-col-amt">â‚±{formatMoney(row.debit)}</td>
+                              <td className="bgt-col-amt">â‚±{formatMoney(row.credit)}</td>
+                            </>
+                          )}
+                          {isReceivableSection && (
+                            <>
+                              <td><span className="bgt-account-chip">{row.client || "-"}</span></td>
+                              <td className="bgt-col-amt">â‚±{formatMoney(row.total)}</td>
+                              <td className="bgt-col-amt">â‚±{formatMoney(row.paid)}</td>
+                              <td className="bgt-col-amt">â‚±{formatMoney(row.remaining)}</td>
+                            </>
+                          )}
+                          {isPayableSection && (
+                            <>
+                              <td><span className="bgt-account-chip">{row.supplier || "-"}</span></td>
+                              <td className="bgt-col-amt">â‚±{formatMoney(row.amount_due)}</td>
+                              <td className="bgt-cell-date">{formatDate(row.due_date)}</td>
+                            </>
+                          )}
+                          <td className="bgt-col-actions">
+                            <button className="bgt-row-btn bgt-row-btn--del" type="button" disabled={deleting} onClick={() => deleteBookkeepingEntry(activeSection.key, row.id)}>
+                              {deleting ? "Deleting..." : "Delete"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div className="bgt-table-footer">
+                  {rows.length} record{rows.length !== 1 ? "s" : ""}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {view === "sales" && (() => {
         const STATUS_LABELS = { active: "Active", completed: "Completed", cancelled: "Cancelled" };
         const STATUS_COLORS = { active: "sl-pill--active", completed: "sl-pill--done", cancelled: "sl-pill--cancelled" };
