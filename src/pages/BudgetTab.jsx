@@ -156,10 +156,10 @@ const EMPTY_BOOKKEEPING_ROWS = {
 
 function createBookkeepingForm(section) {
   if (section === "accounts_receivable") {
-    return { client: "", total: "", paid: "", remaining: "", prCode: "", note: "" };
+    return { client: "", total: "", paid: "", remaining: "", note: "" };
   }
   if (section === "accounts_payable") {
-    return { supplier: "", amountDue: "", dueDate: localDateInput(), prCode: "", note: "" };
+    return { supplier: "", amountDue: "", dueDate: localDateInput(), note: "" };
   }
   return { date: localDateInput(), description: "", debit: "", credit: "", prCode: "", note: "" };
 }
@@ -592,7 +592,6 @@ export default function BudgetTab() {
         total: form.total,
         paid: form.paid,
         remaining: form.remaining,
-        prCode: form.prCode,
         note: form.note
       };
     }
@@ -601,7 +600,6 @@ export default function BudgetTab() {
         supplier: form.supplier,
         amountDue: form.amountDue,
         dueDate: form.dueDate,
-        prCode: form.prCode,
         note: form.note
       };
     }
@@ -1860,15 +1858,17 @@ export default function BudgetTab() {
                 </>
               )}
 
-              <div className="bgt-field bgt-bookkeeping-field--pr-code">
-                <label className="bgt-label">PR Code</label>
-                <select className="input select" value={form.prCode || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "prCode", e.target.value)}>
-                  <option value="">Select PR code</option>
-                  {BOOKKEEPING_PR_CODE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </div>
+              {isLedgerSection && (
+                <div className="bgt-field bgt-bookkeeping-field--pr-code">
+                  <label className="bgt-label">PR Code</label>
+                  <select className="input select" value={form.prCode || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "prCode", e.target.value)}>
+                    <option value="">Select PR code</option>
+                    {BOOKKEEPING_PR_CODE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="bgt-field bgt-bookkeeping-field--note">
                 <label className="bgt-label">Note</label>
                 <input className="input" placeholder="Optional note" value={form.note || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "note", e.target.value)} />
@@ -1899,10 +1899,10 @@ export default function BudgetTab() {
                       <tr><th>Date</th><th>PR Code</th><th>Description</th><th>Note</th><th className="bgt-col-amt">Debit</th><th className="bgt-col-amt">Credit</th><th className="bgt-col-actions" /></tr>
                     )}
                     {isReceivableSection && (
-                      <tr><th>PR Code</th><th>Client</th><th>Note</th><th className="bgt-col-amt">Total</th><th className="bgt-col-amt">Paid</th><th className="bgt-col-amt">Remaining</th><th className="bgt-col-actions" /></tr>
+                      <tr><th>Client</th><th>Note</th><th className="bgt-col-amt">Total</th><th className="bgt-col-amt">Paid</th><th className="bgt-col-amt">Remaining</th><th className="bgt-col-actions" /></tr>
                     )}
                     {isPayableSection && (
-                      <tr><th>PR Code</th><th>Supplier</th><th>Note</th><th className="bgt-col-amt">Amount Due</th><th>Due Date</th><th className="bgt-col-actions" /></tr>
+                      <tr><th>Supplier</th><th>Note</th><th className="bgt-col-amt">Amount Due</th><th>Due Date</th><th className="bgt-col-actions" /></tr>
                     )}
                   </thead>
                   <tbody>
@@ -1922,7 +1922,6 @@ export default function BudgetTab() {
                           )}
                           {isReceivableSection && (
                             <>
-                              <td className="bgt-cell-ref">{row.pr_code ? <code className="bgt-ref-code">{bookkeepingPrCodeLabel(row.pr_code)}</code> : <span className="bgt-muted">-</span>}</td>
                               <td><span className="bgt-account-chip">{row.client || "-"}</span></td>
                               <td className="bgt-cell-desc">{row.note || <span className="bgt-muted">-</span>}</td>
                               <td className="bgt-col-amt">â‚±{formatMoney(row.total)}</td>
@@ -1932,7 +1931,6 @@ export default function BudgetTab() {
                           )}
                           {isPayableSection && (
                             <>
-                              <td className="bgt-cell-ref">{row.pr_code ? <code className="bgt-ref-code">{bookkeepingPrCodeLabel(row.pr_code)}</code> : <span className="bgt-muted">-</span>}</td>
                               <td><span className="bgt-account-chip">{row.supplier || "-"}</span></td>
                               <td className="bgt-cell-desc">{row.note || <span className="bgt-muted">-</span>}</td>
                               <td className="bgt-col-amt">â‚±{formatMoney(row.amount_due)}</td>
