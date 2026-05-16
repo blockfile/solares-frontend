@@ -5894,8 +5894,8 @@ button {
 }
 
 .bgt-modal--bookkeeping {
-  width: min(960px, calc(100vw - 32px));
-  max-width: 960px;
+  width: min(1180px, calc(100vw - 32px));
+  max-width: 1180px;
 }
 
 .bgt-modal--bookkeeping .bgt-bookkeeping-form {
@@ -5906,9 +5906,9 @@ button {
 }
 
 .bgt-modal--bookkeeping .bgt-bookkeeping-form--modal {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
   align-items: start;
-  gap: 14px;
+  gap: 16px;
 }
 
 .bgt-modal--bookkeeping .bgt-bookkeeping-form--modal .bgt-field {
@@ -5979,10 +5979,6 @@ button {
     width: min(720px, calc(100vw - 24px));
   }
 
-  .bgt-modal--bookkeeping .bgt-bookkeeping-form--modal {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .bgt-modal--bookkeeping .bgt-bookkeeping-form--modal :is(
     .bgt-bookkeeping-field--description,
     .bgt-bookkeeping-field--note,
@@ -5997,7 +5993,7 @@ button {
   }
 }
 
-@media (max-width: 520px) {
+@media (max-width: 640px) {
   .bgt-modal--bookkeeping .bgt-modal-head {
     padding-inline: 18px;
   }
