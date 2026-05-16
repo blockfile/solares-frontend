@@ -149,7 +149,8 @@ const BOOKKEEPING_PR_CODE_OPTIONS = [
   { value: "506", label: "506 - Office Supplies" },
   { value: "507", label: "507 - Insurance" },
   { value: "508", label: "508 - Advertising" },
-  { value: "509", label: "509 - Depreciation expense" }
+  { value: "509", label: "509 - Depreciation expense" },
+  { value: "510", label: "510 - Permits & Licenses" }
 ];
 const EMPTY_BOOKKEEPING_ROWS = {
   sales: [],
@@ -179,6 +180,45 @@ function createBookkeepingForms() {
     expense: createBookkeepingForm("expense"),
     accounts_receivable: createBookkeepingForm("accounts_receivable"),
     accounts_payable: createBookkeepingForm("accounts_payable")
+  };
+}
+
+function bookkeepingSortValue(row) {
+  return row?.entry_date || row?.due_date || row?.created_at || "9999-12-31";
+}
+
+function sortBookkeepingRows(rows = []) {
+  return [...rows].sort((a, b) => {
+    const dateCompare = String(bookkeepingSortValue(a)).localeCompare(String(bookkeepingSortValue(b)));
+    if (dateCompare !== 0) return dateCompare;
+    return toNumber(a?.id, 0) - toNumber(b?.id, 0);
+  });
+}
+
+function bookkeepingFormAmount(value) {
+  if (value == null || value === "") return "";
+  return String(value).replace(/[^0-9.-]/g, "");
+}
+
+function bookkeepingFormFromRow(section, row = {}) {
+  if (section === "accounts_receivable" || section === "accounts_payable") {
+    return {
+      date: row.entry_date || row.due_date || localDateInput(),
+      customer: row.client || row.supplier || "",
+      invoiceNo: row.invoice_no || "",
+      description: row.description || row.note || "",
+      modeOfPayment: row.mode_of_payment || "",
+      amount: bookkeepingFormAmount(row.amount ?? row.total ?? row.amount_due),
+      referenceNo: row.reference_no || ""
+    };
+  }
+  return {
+    date: row.entry_date || localDateInput(),
+    description: row.description || "",
+    debit: bookkeepingFormAmount(row.debit),
+    credit: bookkeepingFormAmount(row.credit),
+    prCode: row.pr_code || "",
+    note: row.note || ""
   };
 }
 
@@ -508,6 +548,7 @@ export default function BudgetTab() {
   const [bookkeepingSaving, setBookkeepingSaving] = useState(false);
   const [deletingBookkeeping, setDeletingBookkeeping] = useState("");
   const [bookkeepingFormOpen, setBookkeepingFormOpen] = useState(false);
+  const [editingBookkeeping, setEditingBookkeeping] = useState(null);
 
   const loadAll = async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -552,7 +593,13 @@ export default function BudgetTab() {
     if (!quiet) setBookkeepingLoading(true);
     try {
       const res = await api.get("/budget/bookkeeping");
-      setBookkeepingRows({ ...EMPTY_BOOKKEEPING_ROWS, ...(res.data || {}) });
+      const grouped = { ...EMPTY_BOOKKEEPING_ROWS, ...(res.data || {}) };
+      setBookkeepingRows({
+        sales: sortBookkeepingRows(grouped.sales),
+        expense: sortBookkeepingRows(grouped.expense),
+        accounts_receivable: sortBookkeepingRows(grouped.accounts_receivable),
+        accounts_payable: sortBookkeepingRows(grouped.accounts_payable)
+      });
     } catch (err) {
       setBookkeepingRows(EMPTY_BOOKKEEPING_ROWS);
       if (!quiet) setError(err?.response?.data?.message || "Failed to load bookkeeping records.");
@@ -594,6 +641,32 @@ export default function BudgetTab() {
     }));
   }
 
+  function openNewBookkeepingEntry() {
+    const section = bookkeepingView;
+    setEditingBookkeeping(null);
+    setBookkeepingForms((forms) => ({
+      ...forms,
+      [section]: createBookkeepingForm(section)
+    }));
+    setBookkeepingFormOpen(true);
+  }
+
+  function openEditBookkeepingEntry(section, row) {
+    setBookkeepingView(section);
+    setEditingBookkeeping({ section, id: row.id });
+    setBookkeepingForms((forms) => ({
+      ...forms,
+      [section]: bookkeepingFormFromRow(section, row)
+    }));
+    setBookkeepingFormOpen(true);
+  }
+
+  function closeBookkeepingForm() {
+    if (bookkeepingSaving) return;
+    setBookkeepingFormOpen(false);
+    setEditingBookkeeping(null);
+  }
+
   function buildBookkeepingPayload(section) {
     const form = bookkeepingForms[section] || createBookkeepingForm(section);
     if (section === "accounts_receivable") {
@@ -631,20 +704,29 @@ export default function BudgetTab() {
   async function submitBookkeepingEntry(e) {
     e.preventDefault();
     const section = bookkeepingView;
+    const editing = editingBookkeeping && editingBookkeeping.section === section ? editingBookkeeping : null;
     setBookkeepingSaving(true);
     try {
-      const res = await api.post(`/budget/bookkeeping/${section}`, buildBookkeepingPayload(section));
-      const created = res.data;
-      setBookkeepingRows((rows) => ({
-        ...rows,
-        [section]: [created, ...(rows[section] || [])]
-      }));
+      const res = editing
+        ? await api.put(`/budget/bookkeeping/${section}/${editing.id}`, buildBookkeepingPayload(section))
+        : await api.post(`/budget/bookkeeping/${section}`, buildBookkeepingPayload(section));
+      const saved = res.data;
+      setBookkeepingRows((rows) => {
+        const nextRows = editing
+          ? (rows[section] || []).map((row) => (Number(row.id) === Number(saved.id) ? saved : row))
+          : [...(rows[section] || []), saved];
+        return {
+          ...rows,
+          [section]: sortBookkeepingRows(nextRows)
+        };
+      });
       setBookkeepingForms((forms) => ({
         ...forms,
         [section]: createBookkeepingForm(section)
       }));
       setBookkeepingFormOpen(false);
-      flash("Bookkeeping entry recorded.");
+      setEditingBookkeeping(null);
+      flash(editing ? "Bookkeeping entry updated." : "Bookkeeping entry recorded.");
     } catch (err) {
       flash(err?.response?.data?.message || "Failed to save bookkeeping entry.", "error");
     } finally {
@@ -1809,6 +1891,7 @@ export default function BudgetTab() {
                   onClick={() => {
                     setBookkeepingView(section.key);
                     setBookkeepingFormOpen(false);
+                    setEditingBookkeeping(null);
                   }}
                   type="button"
                 >
@@ -1818,20 +1901,20 @@ export default function BudgetTab() {
             </div>
 
             <div className="bgt-bookkeeping-actions">
-              <button className="btn btn-primary" type="button" onClick={() => setBookkeepingFormOpen(true)}>
+              <button className="btn btn-primary" type="button" onClick={openNewBookkeepingEntry}>
                 <IconPlus /> Record {activeSection.label}
               </button>
             </div>
 
             {bookkeepingFormOpen && (
-              <div className="bgt-backdrop" onClick={(e) => { if (e.target === e.currentTarget && !bookkeepingSaving) setBookkeepingFormOpen(false); }}>
+              <div className="bgt-backdrop" onClick={(e) => { if (e.target === e.currentTarget) closeBookkeepingForm(); }}>
                 <div className="bgt-modal bgt-modal--bookkeeping" onClick={(e) => e.stopPropagation()}>
                   <div className="bgt-modal-head">
                     <div>
                       <p className="bgt-modal-eyebrow">Bookkeeping</p>
-                      <h3 className="bgt-modal-title">Record {activeSection.label}</h3>
+                      <h3 className="bgt-modal-title">{editingBookkeeping ? "Edit" : "Record"} {activeSection.label}</h3>
                     </div>
-                    <button className="bgt-modal-x" type="button" onClick={() => !bookkeepingSaving && setBookkeepingFormOpen(false)} aria-label="Close">
+                    <button className="bgt-modal-x" type="button" onClick={closeBookkeepingForm} aria-label="Close">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                     </button>
                   </div>
@@ -1944,7 +2027,7 @@ export default function BudgetTab() {
 
               <div className="bgt-bookkeeping-submit">
                 <button className="btn btn-primary" type="submit" disabled={bookkeepingSaving}>
-                  <IconPlus /> {bookkeepingSaving ? "Recording..." : `Record ${activeSection.label}`}
+                  <IconPlus /> {bookkeepingSaving ? "Saving..." : editingBookkeeping ? "Save Changes" : `Record ${activeSection.label}`}
                 </button>
               </div>
                   </form>
@@ -2014,6 +2097,9 @@ export default function BudgetTab() {
                             </>
                           )}
                           <td className="bgt-col-actions">
+                            <button className="bgt-row-btn" type="button" disabled={deleting} onClick={() => openEditBookkeepingEntry(activeSection.key, row)}>
+                              Edit
+                            </button>
                             <button className="bgt-row-btn bgt-row-btn--del" type="button" disabled={deleting} onClick={() => deleteBookkeepingEntry(activeSection.key, row.id)}>
                               {deleting ? "Deleting..." : "Delete"}
                             </button>
