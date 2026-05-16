@@ -21,6 +21,11 @@ function formatMoney(value, fractionDigits = 2) {
   return toNumber(value, 0).toLocaleString("en-PH", { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits });
 }
 
+function formatPhpCurrency(value, fractionDigits = 2) {
+  if (value == null || value === "") return "\u20B1-";
+  return `\u20B1${formatMoney(value, fractionDigits)}`;
+}
+
 function formatQuantity(value) {
   if (value == null || value === "") return "—";
   return toNumber(value, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: PRICE_DECIMAL_PLACES });
@@ -1982,8 +1987,8 @@ export default function BudgetTab() {
                               <td className="bgt-cell-ref">{row.pr_code ? <code className="bgt-ref-code">{bookkeepingPrCodeLabel(row.pr_code)}</code> : <span className="bgt-muted">-</span>}</td>
                               <td className="bgt-cell-desc">{row.description || <span className="bgt-muted">-</span>}</td>
                               <td className="bgt-cell-desc">{row.note || <span className="bgt-muted">-</span>}</td>
-                              <td className="bgt-col-amt">â‚±{formatMoney(row.debit)}</td>
-                              <td className="bgt-col-amt">â‚±{formatMoney(row.credit)}</td>
+                              <td className="bgt-col-amt">{formatPhpCurrency(row.debit)}</td>
+                              <td className="bgt-col-amt">{formatPhpCurrency(row.credit)}</td>
                             </>
                           )}
                           {isReceivableSection && (
@@ -1993,7 +1998,7 @@ export default function BudgetTab() {
                               <td className="bgt-cell-ref">{row.invoice_no ? <code className="bgt-ref-code">{row.invoice_no}</code> : <span className="bgt-muted">-</span>}</td>
                               <td className="bgt-cell-desc">{row.description || <span className="bgt-muted">-</span>}</td>
                               <td>{row.mode_of_payment || <span className="bgt-muted">-</span>}</td>
-                              <td className="bgt-col-amt">â‚±{formatMoney(row.amount ?? row.total)}</td>
+                              <td className="bgt-col-amt">{formatPhpCurrency(row.amount ?? row.total)}</td>
                               <td className="bgt-cell-ref">{row.reference_no ? <code className="bgt-ref-code">{row.reference_no}</code> : <span className="bgt-muted">-</span>}</td>
                             </>
                           )}
@@ -2004,7 +2009,7 @@ export default function BudgetTab() {
                               <td className="bgt-cell-ref">{row.invoice_no ? <code className="bgt-ref-code">{row.invoice_no}</code> : <span className="bgt-muted">-</span>}</td>
                               <td className="bgt-cell-desc">{row.description || row.note || <span className="bgt-muted">-</span>}</td>
                               <td>{row.mode_of_payment || <span className="bgt-muted">-</span>}</td>
-                              <td className="bgt-col-amt">â‚±{formatMoney(row.amount ?? row.total ?? row.amount_due)}</td>
+                              <td className="bgt-col-amt">{formatPhpCurrency(row.amount ?? row.total ?? row.amount_due)}</td>
                               <td className="bgt-cell-ref">{row.reference_no ? <code className="bgt-ref-code">{row.reference_no}</code> : <span className="bgt-muted">-</span>}</td>
                             </>
                           )}
