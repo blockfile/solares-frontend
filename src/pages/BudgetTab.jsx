@@ -183,6 +183,15 @@ function createBookkeepingForms() {
   };
 }
 
+function createBookkeepingDrafts() {
+  return {
+    sales: [createBookkeepingForm("sales")],
+    expense: [createBookkeepingForm("expense")],
+    accounts_receivable: [createBookkeepingForm("accounts_receivable")],
+    accounts_payable: [createBookkeepingForm("accounts_payable")]
+  };
+}
+
 function bookkeepingSortValue(row) {
   return row?.entry_date || row?.due_date || row?.created_at || "9999-12-31";
 }
@@ -220,6 +229,91 @@ function bookkeepingFormFromRow(section, row = {}) {
     prCode: row.pr_code || "",
     note: row.note || ""
   };
+}
+
+function validateBookkeepingDrafts(section, rows = []) {
+  if (section === "sales" || section === "expense") {
+    const invalidIndex = rows.findIndex((row) => !String(row.debit || "").trim() && !String(row.credit || "").trim());
+    if (invalidIndex >= 0) return `Record ${invalidIndex + 1}: enter debit or credit.`;
+  }
+  return "";
+}
+
+function BookkeepingEntryFields({ section, form, onFieldChange }) {
+  const isLedgerSection = section === "sales" || section === "expense";
+  const isReceivableSection = section === "accounts_receivable";
+  const isPayableSection = section === "accounts_payable";
+
+  return (
+    <>
+      {isLedgerSection && (
+        <>
+          <div className="bgt-field bgt-bookkeeping-field--date">
+            <label className="bgt-label">Date <span className="bgt-req">*</span></label>
+            <input className="input" type="date" required value={form.date || ""} onChange={(e) => onFieldChange("date", e.target.value)} />
+          </div>
+          <div className="bgt-field bgt-bookkeeping-field--description">
+            <label className="bgt-label">Description <span className="bgt-req">*</span></label>
+            <input className="input" required placeholder={`${section === "sales" ? "General Journal" : "Expense"} description`} value={form.description || ""} onChange={(e) => onFieldChange("description", e.target.value)} />
+          </div>
+          <div className="bgt-field bgt-bookkeeping-field--money">
+            <label className="bgt-label">Debit</label>
+            <input className="input" type="number" min="0" step="0.01" placeholder="0.00" value={form.debit || ""} onChange={(e) => onFieldChange("debit", e.target.value)} />
+          </div>
+          <div className="bgt-field bgt-bookkeeping-field--money">
+            <label className="bgt-label">Credit</label>
+            <input className="input" type="number" min="0" step="0.01" placeholder="0.00" value={form.credit || ""} onChange={(e) => onFieldChange("credit", e.target.value)} />
+          </div>
+          <div className="bgt-field bgt-bookkeeping-field--pr-code">
+            <label className="bgt-label">PR Code</label>
+            <select className="input select" value={form.prCode || ""} onChange={(e) => onFieldChange("prCode", e.target.value)}>
+              <option value="">Select PR code</option>
+              {BOOKKEEPING_PR_CODE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="bgt-field bgt-bookkeeping-field--note">
+            <label className="bgt-label">Note</label>
+            <input className="input" placeholder="Optional note" value={form.note || ""} onChange={(e) => onFieldChange("note", e.target.value)} />
+          </div>
+        </>
+      )}
+
+      {(isReceivableSection || isPayableSection) && (
+        <>
+          <div className="bgt-field bgt-bookkeeping-field--date">
+            <label className="bgt-label">Date <span className="bgt-req">*</span></label>
+            <input className="input" type="date" required value={form.date || ""} onChange={(e) => onFieldChange("date", e.target.value)} />
+          </div>
+          <div className="bgt-field bgt-bookkeeping-field--client">
+            <label className="bgt-label">Customer <span className="bgt-req">*</span></label>
+            <input className="input" required placeholder="Customer name" value={form.customer || ""} onChange={(e) => onFieldChange("customer", e.target.value)} />
+          </div>
+          <div className="bgt-field bgt-bookkeeping-field--invoice">
+            <label className="bgt-label">Invoice No</label>
+            <input className="input" placeholder="Invoice no" value={form.invoiceNo || ""} onChange={(e) => onFieldChange("invoiceNo", e.target.value)} />
+          </div>
+          <div className="bgt-field bgt-bookkeeping-field--payment-mode">
+            <label className="bgt-label">Mode of Payment</label>
+            <input className="input" placeholder="Payment mode" value={form.modeOfPayment || ""} onChange={(e) => onFieldChange("modeOfPayment", e.target.value)} />
+          </div>
+          <div className="bgt-field bgt-bookkeeping-field--description">
+            <label className="bgt-label">Description</label>
+            <input className="input" placeholder="Description" value={form.description || ""} onChange={(e) => onFieldChange("description", e.target.value)} />
+          </div>
+          <div className="bgt-field bgt-bookkeeping-field--money">
+            <label className="bgt-label">Amount <span className="bgt-req">*</span></label>
+            <input className="input" type="number" min="0" step="0.01" required placeholder="0.00" value={form.amount || ""} onChange={(e) => onFieldChange("amount", e.target.value)} />
+          </div>
+          <div className="bgt-field bgt-bookkeeping-field--reference">
+            <label className="bgt-label">Reference</label>
+            <input className="input" placeholder="Reference" value={form.referenceNo || ""} onChange={(e) => onFieldChange("referenceNo", e.target.value)} />
+          </div>
+        </>
+      )}
+    </>
+  );
 }
 
 function bookkeepingPrCodeLabel(value) {
@@ -544,6 +638,7 @@ export default function BudgetTab() {
   const [bookkeepingView, setBookkeepingView] = useState("sales");
   const [bookkeepingRows, setBookkeepingRows] = useState(EMPTY_BOOKKEEPING_ROWS);
   const [bookkeepingForms, setBookkeepingForms] = useState(() => createBookkeepingForms());
+  const [bookkeepingDrafts, setBookkeepingDrafts] = useState(() => createBookkeepingDrafts());
   const [bookkeepingLoading, setBookkeepingLoading] = useState(false);
   const [bookkeepingSaving, setBookkeepingSaving] = useState(false);
   const [deletingBookkeeping, setDeletingBookkeeping] = useState("");
@@ -641,9 +736,40 @@ export default function BudgetTab() {
     }));
   }
 
+  function updateBookkeepingDraftField(section, index, field, value) {
+    setBookkeepingDrafts((drafts) => {
+      const rows = drafts[section] || [createBookkeepingForm(section)];
+      return {
+        ...drafts,
+        [section]: rows.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row))
+      };
+    });
+  }
+
+  function addBookkeepingDraft(section) {
+    setBookkeepingDrafts((drafts) => ({
+      ...drafts,
+      [section]: [...(drafts[section] || []), createBookkeepingForm(section)]
+    }));
+  }
+
+  function removeBookkeepingDraft(section, index) {
+    setBookkeepingDrafts((drafts) => {
+      const nextRows = (drafts[section] || []).filter((_, rowIndex) => rowIndex !== index);
+      return {
+        ...drafts,
+        [section]: nextRows.length ? nextRows : [createBookkeepingForm(section)]
+      };
+    });
+  }
+
   function openNewBookkeepingEntry() {
     const section = bookkeepingView;
     setEditingBookkeeping(null);
+    setBookkeepingDrafts((drafts) => ({
+      ...drafts,
+      [section]: [createBookkeepingForm(section)]
+    }));
     setBookkeepingForms((forms) => ({
       ...forms,
       [section]: createBookkeepingForm(section)
@@ -667,8 +793,8 @@ export default function BudgetTab() {
     setEditingBookkeeping(null);
   }
 
-  function buildBookkeepingPayload(section) {
-    const form = bookkeepingForms[section] || createBookkeepingForm(section);
+  function buildBookkeepingPayload(section, sourceForm) {
+    const form = sourceForm || bookkeepingForms[section] || createBookkeepingForm(section);
     if (section === "accounts_receivable") {
       return {
         date: form.date,
@@ -705,16 +831,23 @@ export default function BudgetTab() {
     e.preventDefault();
     const section = bookkeepingView;
     const editing = editingBookkeeping && editingBookkeeping.section === section ? editingBookkeeping : null;
+    const draftRows = editing
+      ? [bookkeepingForms[section] || createBookkeepingForm(section)]
+      : (bookkeepingDrafts[section] || [createBookkeepingForm(section)]);
+    const draftError = validateBookkeepingDrafts(section, draftRows);
+    if (draftError) {
+      flash(draftError, "error");
+      return;
+    }
     setBookkeepingSaving(true);
     try {
-      const res = editing
-        ? await api.put(`/budget/bookkeeping/${section}/${editing.id}`, buildBookkeepingPayload(section))
-        : await api.post(`/budget/bookkeeping/${section}`, buildBookkeepingPayload(section));
-      const saved = res.data;
+      const savedRows = editing
+        ? [(await api.put(`/budget/bookkeeping/${section}/${editing.id}`, buildBookkeepingPayload(section, draftRows[0]))).data]
+        : (await Promise.all(draftRows.map((draft) => api.post(`/budget/bookkeeping/${section}`, buildBookkeepingPayload(section, draft))))).map((res) => res.data);
       setBookkeepingRows((rows) => {
         const nextRows = editing
-          ? (rows[section] || []).map((row) => (Number(row.id) === Number(saved.id) ? saved : row))
-          : [...(rows[section] || []), saved];
+          ? (rows[section] || []).map((row) => (Number(row.id) === Number(savedRows[0].id) ? savedRows[0] : row))
+          : [...(rows[section] || []), ...savedRows];
         return {
           ...rows,
           [section]: sortBookkeepingRows(nextRows)
@@ -724,9 +857,13 @@ export default function BudgetTab() {
         ...forms,
         [section]: createBookkeepingForm(section)
       }));
+      setBookkeepingDrafts((drafts) => ({
+        ...drafts,
+        [section]: [createBookkeepingForm(section)]
+      }));
       setBookkeepingFormOpen(false);
       setEditingBookkeeping(null);
-      flash(editing ? "Bookkeeping entry updated." : "Bookkeeping entry recorded.");
+      flash(editing ? "Bookkeeping entry updated." : `${savedRows.length} bookkeeping record${savedRows.length !== 1 ? "s" : ""} recorded.`);
     } catch (err) {
       flash(err?.response?.data?.message || "Failed to save bookkeeping entry.", "error");
     } finally {
@@ -1920,116 +2057,42 @@ export default function BudgetTab() {
                   </div>
 
                   <form className={`${formClassName} bgt-bookkeeping-form--modal`} onSubmit={submitBookkeepingEntry}>
-              {isLedgerSection && (
-                <>
-                  <div className="bgt-field bgt-bookkeeping-field--date">
-                    <label className="bgt-label">Date <span className="bgt-req">*</span></label>
-                    <input className="input" type="date" required value={form.date || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "date", e.target.value)} />
-                  </div>
-                  <div className="bgt-field bgt-bookkeeping-field--description">
-                    <label className="bgt-label">Description <span className="bgt-req">*</span></label>
-                    <input className="input" required placeholder={`${activeSection.label} description`} value={form.description} onChange={(e) => updateBookkeepingField(activeSection.key, "description", e.target.value)} />
-                  </div>
-                  <div className="bgt-field bgt-bookkeeping-field--money">
-                    <label className="bgt-label">Debit</label>
-                    <input className="input" type="number" min="0" step="0.01" placeholder="0.00" value={form.debit} onChange={(e) => updateBookkeepingField(activeSection.key, "debit", e.target.value)} />
-                  </div>
-                  <div className="bgt-field bgt-bookkeeping-field--money">
-                    <label className="bgt-label">Credit</label>
-                    <input className="input" type="number" min="0" step="0.01" placeholder="0.00" value={form.credit} onChange={(e) => updateBookkeepingField(activeSection.key, "credit", e.target.value)} />
-                  </div>
-                </>
-              )}
-
-              {isReceivableSection && (
-                <>
-                  <div className="bgt-field bgt-bookkeeping-field--date">
-                    <label className="bgt-label">Date <span className="bgt-req">*</span></label>
-                    <input className="input" type="date" required value={form.date || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "date", e.target.value)} />
-                  </div>
-                  <div className="bgt-field bgt-bookkeeping-field--client">
-                    <label className="bgt-label">Customer <span className="bgt-req">*</span></label>
-                    <input className="input" required placeholder="Customer name" value={form.customer || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "customer", e.target.value)} />
-                  </div>
-                  <div className="bgt-field bgt-bookkeeping-field--invoice">
-                    <label className="bgt-label">Invoice No</label>
-                    <input className="input" placeholder="Invoice no" value={form.invoiceNo || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "invoiceNo", e.target.value)} />
-                  </div>
-                  <div className="bgt-field bgt-bookkeeping-field--description">
-                    <label className="bgt-label">Description</label>
-                    <input className="input" placeholder="Description" value={form.description || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "description", e.target.value)} />
-                  </div>
-                  <div className="bgt-field bgt-bookkeeping-field--payment-mode">
-                    <label className="bgt-label">Mode of Payment</label>
-                    <input className="input" placeholder="Payment mode" value={form.modeOfPayment || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "modeOfPayment", e.target.value)} />
-                  </div>
-                  <div className="bgt-field bgt-bookkeeping-field--money">
-                    <label className="bgt-label">Amount <span className="bgt-req">*</span></label>
-                    <input className="input" type="number" min="0" step="0.01" required placeholder="0.00" value={form.amount || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "amount", e.target.value)} />
-                  </div>
-                  <div className="bgt-field bgt-bookkeeping-field--reference">
-                    <label className="bgt-label">Reference</label>
-                    <input className="input" placeholder="Reference" value={form.referenceNo || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "referenceNo", e.target.value)} />
-                  </div>
-                </>
-              )}
-
-              {isPayableSection && (
-                <>
-                  <div className="bgt-field bgt-bookkeeping-field--date">
-                    <label className="bgt-label">Date <span className="bgt-req">*</span></label>
-                    <input className="input" type="date" required value={form.date || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "date", e.target.value)} />
-                  </div>
-                  <div className="bgt-field bgt-bookkeeping-field--client">
-                    <label className="bgt-label">Customer <span className="bgt-req">*</span></label>
-                    <input className="input" required placeholder="Customer name" value={form.customer || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "customer", e.target.value)} />
-                  </div>
-                  <div className="bgt-field bgt-bookkeeping-field--invoice">
-                    <label className="bgt-label">Invoice No</label>
-                    <input className="input" placeholder="Invoice no" value={form.invoiceNo || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "invoiceNo", e.target.value)} />
-                  </div>
-                  <div className="bgt-field bgt-bookkeeping-field--description">
-                    <label className="bgt-label">Description</label>
-                    <input className="input" placeholder="Description" value={form.description || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "description", e.target.value)} />
-                  </div>
-                  <div className="bgt-field bgt-bookkeeping-field--payment-mode">
-                    <label className="bgt-label">Mode of Payment</label>
-                    <input className="input" placeholder="Payment mode" value={form.modeOfPayment || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "modeOfPayment", e.target.value)} />
-                  </div>
-                  <div className="bgt-field bgt-bookkeeping-field--money">
-                    <label className="bgt-label">Amount <span className="bgt-req">*</span></label>
-                    <input className="input" type="number" min="0" step="0.01" required placeholder="0.00" value={form.amount || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "amount", e.target.value)} />
-                  </div>
-                  <div className="bgt-field bgt-bookkeeping-field--reference">
-                    <label className="bgt-label">Reference</label>
-                    <input className="input" placeholder="Reference" value={form.referenceNo || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "referenceNo", e.target.value)} />
-                  </div>
-                </>
-              )}
-
-              {isLedgerSection && (
-                <div className="bgt-field bgt-bookkeeping-field--pr-code">
-                  <label className="bgt-label">PR Code</label>
-                  <select className="input select" value={form.prCode || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "prCode", e.target.value)}>
-                    <option value="">Select PR code</option>
-                    {BOOKKEEPING_PR_CODE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
+                    {(editingBookkeeping ? [form] : (bookkeepingDrafts[activeSection.key] || [createBookkeepingForm(activeSection.key)])).map((entryForm, index, entryRows) => (
+                      <div className="bgt-bookkeeping-entry" key={editingBookkeeping ? `edit-${editingBookkeeping.id}` : `${activeSection.key}-${index}`}>
+                        {!editingBookkeeping && (
+                          <div className="bgt-bookkeeping-entry-head">
+                            <strong>Record {index + 1}</strong>
+                            {entryRows.length > 1 && (
+                              <button className="bgt-row-btn bgt-row-btn--del" type="button" onClick={() => removeBookkeepingDraft(activeSection.key, index)}>
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        <BookkeepingEntryFields
+                          section={activeSection.key}
+                          form={entryForm}
+                          onFieldChange={(field, value) => {
+                            if (editingBookkeeping) updateBookkeepingField(activeSection.key, field, value);
+                            else updateBookkeepingDraftField(activeSection.key, index, field, value);
+                          }}
+                        />
+                      </div>
                     ))}
-                  </select>
-                </div>
-              )}
-              {!isReceivableSection && !isPayableSection && (
-                <div className="bgt-field bgt-bookkeeping-field--note">
-                  <label className="bgt-label">Note</label>
-                  <input className="input" placeholder="Optional note" value={form.note || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "note", e.target.value)} />
-                </div>
-              )}
 
-              <div className="bgt-bookkeeping-submit">
-                <button className="btn btn-primary" type="submit" disabled={bookkeepingSaving}>
-                  <IconPlus /> {bookkeepingSaving ? "Saving..." : editingBookkeeping ? "Save Changes" : `Record ${activeSection.label}`}
-                </button>
-              </div>
+                    {!editingBookkeeping && (
+                      <div className="bgt-bookkeeping-bulk-actions">
+                        <button className="btn btn-ghost bgt-bookkeeping-add-row" type="button" onClick={() => addBookkeepingDraft(activeSection.key)}>
+                          <IconPlus /> Add Another Record
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="bgt-bookkeeping-submit">
+                      <button className="btn btn-primary" type="submit" disabled={bookkeepingSaving}>
+                        <IconPlus /> {bookkeepingSaving ? "Saving..." : editingBookkeeping ? "Save Changes" : `Record ${(bookkeepingDrafts[activeSection.key] || []).length || 1} ${activeSection.label}${((bookkeepingDrafts[activeSection.key] || []).length || 1) !== 1 ? " Records" : ""}`}
+                      </button>
+                    </div>
                   </form>
                 </div>
               </div>

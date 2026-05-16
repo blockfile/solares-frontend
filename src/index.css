@@ -5907,9 +5907,36 @@ button {
 }
 
 .bgt-modal--bookkeeping .bgt-bookkeeping-form--modal {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+}
+
+.bgt-bookkeeping-entry {
+  display: grid;
   grid-template-columns: repeat(2, minmax(280px, 1fr));
   align-items: start;
-  gap: 16px;
+  gap: 14px 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.bgt-bookkeeping-entry-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 2px;
+}
+
+.bgt-bookkeeping-entry-head strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .bgt-modal--bookkeeping .bgt-bookkeeping-form--modal .bgt-field {
@@ -5941,9 +5968,18 @@ button {
 }
 
 .bgt-modal--bookkeeping .bgt-bookkeeping-submit {
-  grid-column: 1 / -1;
+  display: flex;
   justify-content: flex-end;
   padding-top: 4px;
+}
+
+.bgt-bookkeeping-bulk-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.bgt-bookkeeping-add-row {
+  min-height: 38px;
 }
 
 .bgt-modal--bookkeeping .bgt-bookkeeping-submit .btn {
@@ -6001,8 +6037,12 @@ button {
   }
 
   .bgt-modal--bookkeeping .bgt-bookkeeping-form--modal {
-    grid-template-columns: 1fr;
     padding: 18px;
+  }
+
+  .bgt-bookkeeping-entry {
+    grid-template-columns: 1fr;
+    padding: 12px;
   }
 
   .bgt-modal--bookkeeping .bgt-bookkeeping-form--modal .bgt-field,
