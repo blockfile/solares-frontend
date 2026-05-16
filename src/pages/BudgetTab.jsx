@@ -109,10 +109,9 @@ const PROJECT_CATEGORY_OPTIONS = [
 const STATUS_LABELS = { active: "Active", completed: "Completed", cancelled: "Cancelled" };
 const STATUS_COLORS = { active: "sl-pill--active", completed: "sl-pill--done", cancelled: "sl-pill--cancelled" };
 const BOOKKEEPING_SECTIONS = [
-  { key: "sales", label: "Sales" },
-  { key: "expense", label: "Expense" },
-  { key: "accounts_receivable", label: "Accounts Receivable" },
-  { key: "accounts_payable", label: "Accounts Payable" }
+  { key: "sales", label: "General Journal" },
+  { key: "accounts_receivable", label: "Receipt Journal" },
+  { key: "accounts_payable", label: "Disbursment Journal" }
 ];
 const BOOKKEEPING_PR_CODE_OPTIONS = [
   { value: "100", label: "100 - Assets" },
