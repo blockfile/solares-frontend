@@ -5836,6 +5836,11 @@ button {
   flex-wrap: wrap;
 }
 
+.bgt-bookkeeping-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .bgt-bookkeeping-form {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -5886,6 +5891,17 @@ button {
   min-width: 0;
   justify-content: center;
   white-space: nowrap;
+}
+
+.bgt-modal--bookkeeping {
+  max-width: 900px;
+}
+
+.bgt-modal--bookkeeping .bgt-bookkeeping-form {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 20px 24px 24px;
 }
 
 @media (max-width: 1180px) {
@@ -7488,4 +7504,9 @@ button {
 :root[data-theme="dark"] .bgt-bookkeeping-form {
   background: var(--surface);
   border-color: var(--border);
+}
+
+:root[data-theme="dark"] .bgt-modal--bookkeeping .bgt-bookkeeping-form {
+  background: transparent;
+  border-color: transparent;
 }

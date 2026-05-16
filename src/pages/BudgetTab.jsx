@@ -154,7 +154,7 @@ const EMPTY_BOOKKEEPING_ROWS = {
 };
 
 function createBookkeepingForm(section) {
-  if (section === "accounts_receivable") {
+  if (section === "accounts_receivable" || section === "accounts_payable") {
     return {
       date: localDateInput(),
       customer: "",
@@ -164,9 +164,6 @@ function createBookkeepingForm(section) {
       amount: "",
       referenceNo: ""
     };
-  }
-  if (section === "accounts_payable") {
-    return { supplier: "", amountDue: "", dueDate: localDateInput(), note: "" };
   }
   return { date: localDateInput(), description: "", debit: "", credit: "", prCode: "", note: "" };
 }
@@ -505,6 +502,7 @@ export default function BudgetTab() {
   const [bookkeepingLoading, setBookkeepingLoading] = useState(false);
   const [bookkeepingSaving, setBookkeepingSaving] = useState(false);
   const [deletingBookkeeping, setDeletingBookkeeping] = useState("");
+  const [bookkeepingFormOpen, setBookkeepingFormOpen] = useState(false);
 
   const loadAll = async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -606,10 +604,13 @@ export default function BudgetTab() {
     }
     if (section === "accounts_payable") {
       return {
-        supplier: form.supplier,
-        amountDue: form.amountDue,
-        dueDate: form.dueDate,
-        note: form.note
+        date: form.date,
+        customer: form.customer,
+        invoiceNo: form.invoiceNo,
+        description: form.description,
+        modeOfPayment: form.modeOfPayment,
+        amount: form.amount,
+        referenceNo: form.referenceNo
       };
     }
     return {
@@ -637,6 +638,7 @@ export default function BudgetTab() {
         ...forms,
         [section]: createBookkeepingForm(section)
       }));
+      setBookkeepingFormOpen(false);
       flash("Bookkeeping entry recorded.");
     } catch (err) {
       flash(err?.response?.data?.message || "Failed to save bookkeeping entry.", "error");
@@ -1799,7 +1801,10 @@ export default function BudgetTab() {
                 <button
                   key={section.key}
                   className={`bgt-seg-btn${bookkeepingView === section.key ? " bgt-seg-btn--on" : ""}`}
-                  onClick={() => setBookkeepingView(section.key)}
+                  onClick={() => {
+                    setBookkeepingView(section.key);
+                    setBookkeepingFormOpen(false);
+                  }}
                   type="button"
                 >
                   {section.label}
@@ -1807,7 +1812,26 @@ export default function BudgetTab() {
               ))}
             </div>
 
-            <form className={formClassName} onSubmit={submitBookkeepingEntry}>
+            <div className="bgt-bookkeeping-actions">
+              <button className="btn btn-primary" type="button" onClick={() => setBookkeepingFormOpen(true)}>
+                <IconPlus /> Record {activeSection.label}
+              </button>
+            </div>
+
+            {bookkeepingFormOpen && (
+              <div className="bgt-backdrop" onClick={(e) => { if (e.target === e.currentTarget && !bookkeepingSaving) setBookkeepingFormOpen(false); }}>
+                <div className="bgt-modal bgt-modal--bookkeeping" onClick={(e) => e.stopPropagation()}>
+                  <div className="bgt-modal-head">
+                    <div>
+                      <p className="bgt-modal-eyebrow">Bookkeeping</p>
+                      <h3 className="bgt-modal-title">Record {activeSection.label}</h3>
+                    </div>
+                    <button className="bgt-modal-x" type="button" onClick={() => !bookkeepingSaving && setBookkeepingFormOpen(false)} aria-label="Close">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    </button>
+                  </div>
+
+                  <form className={`${formClassName} bgt-bookkeeping-form--modal`} onSubmit={submitBookkeepingEntry}>
               {isLedgerSection && (
                 <>
                   <div className="bgt-field bgt-bookkeeping-field--date">
@@ -1864,17 +1888,33 @@ export default function BudgetTab() {
 
               {isPayableSection && (
                 <>
-                  <div className="bgt-field bgt-bookkeeping-field--supplier">
-                    <label className="bgt-label">Supplier <span className="bgt-req">*</span></label>
-                    <input className="input" required placeholder="Supplier name" value={form.supplier} onChange={(e) => updateBookkeepingField(activeSection.key, "supplier", e.target.value)} />
+                  <div className="bgt-field bgt-bookkeeping-field--date">
+                    <label className="bgt-label">Date <span className="bgt-req">*</span></label>
+                    <input className="input" type="date" required value={form.date || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "date", e.target.value)} />
+                  </div>
+                  <div className="bgt-field bgt-bookkeeping-field--client">
+                    <label className="bgt-label">Customer <span className="bgt-req">*</span></label>
+                    <input className="input" required placeholder="Customer name" value={form.customer || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "customer", e.target.value)} />
+                  </div>
+                  <div className="bgt-field bgt-bookkeeping-field--invoice">
+                    <label className="bgt-label">Invoice No</label>
+                    <input className="input" placeholder="Invoice no" value={form.invoiceNo || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "invoiceNo", e.target.value)} />
+                  </div>
+                  <div className="bgt-field bgt-bookkeeping-field--description">
+                    <label className="bgt-label">Description</label>
+                    <input className="input" placeholder="Description" value={form.description || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "description", e.target.value)} />
+                  </div>
+                  <div className="bgt-field bgt-bookkeeping-field--payment-mode">
+                    <label className="bgt-label">Mode of Payment</label>
+                    <input className="input" placeholder="Payment mode" value={form.modeOfPayment || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "modeOfPayment", e.target.value)} />
                   </div>
                   <div className="bgt-field bgt-bookkeeping-field--money">
-                    <label className="bgt-label">Amount Due <span className="bgt-req">*</span></label>
-                    <input className="input" type="number" min="0" step="0.01" required placeholder="0.00" value={form.amountDue} onChange={(e) => updateBookkeepingField(activeSection.key, "amountDue", e.target.value)} />
+                    <label className="bgt-label">Amount <span className="bgt-req">*</span></label>
+                    <input className="input" type="number" min="0" step="0.01" required placeholder="0.00" value={form.amount || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "amount", e.target.value)} />
                   </div>
-                  <div className="bgt-field bgt-bookkeeping-field--due-date">
-                    <label className="bgt-label">Due Date <span className="bgt-req">*</span></label>
-                    <input className="input" type="date" required value={form.dueDate} onChange={(e) => updateBookkeepingField(activeSection.key, "dueDate", e.target.value)} />
+                  <div className="bgt-field bgt-bookkeeping-field--reference">
+                    <label className="bgt-label">Reference</label>
+                    <input className="input" placeholder="Reference" value={form.referenceNo || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "referenceNo", e.target.value)} />
                   </div>
                 </>
               )}
@@ -1890,7 +1930,7 @@ export default function BudgetTab() {
                   </select>
                 </div>
               )}
-              {!isReceivableSection && (
+              {!isReceivableSection && !isPayableSection && (
                 <div className="bgt-field bgt-bookkeeping-field--note">
                   <label className="bgt-label">Note</label>
                   <input className="input" placeholder="Optional note" value={form.note || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "note", e.target.value)} />
@@ -1902,7 +1942,10 @@ export default function BudgetTab() {
                   <IconPlus /> {bookkeepingSaving ? "Recording..." : `Record ${activeSection.label}`}
                 </button>
               </div>
-            </form>
+                  </form>
+                </div>
+              </div>
+            )}
 
             {bookkeepingLoading && rows.length === 0 ? (
               <div className="bgt-empty">
@@ -1925,7 +1968,7 @@ export default function BudgetTab() {
                       <tr><th>Date</th><th>Customer</th><th>Invoice No</th><th>Description</th><th>Mode of Payment</th><th className="bgt-col-amt">Amount</th><th>Reference</th><th className="bgt-col-actions" /></tr>
                     )}
                     {isPayableSection && (
-                      <tr><th>Supplier</th><th>Note</th><th className="bgt-col-amt">Amount Due</th><th>Due Date</th><th className="bgt-col-actions" /></tr>
+                      <tr><th>Date</th><th>Customer</th><th>Invoice No</th><th>Description</th><th>Mode of Payment</th><th className="bgt-col-amt">Amount</th><th>Reference</th><th className="bgt-col-actions" /></tr>
                     )}
                   </thead>
                   <tbody>
@@ -1956,10 +1999,13 @@ export default function BudgetTab() {
                           )}
                           {isPayableSection && (
                             <>
-                              <td><span className="bgt-account-chip">{row.supplier || "-"}</span></td>
-                              <td className="bgt-cell-desc">{row.note || <span className="bgt-muted">-</span>}</td>
-                              <td className="bgt-col-amt">â‚±{formatMoney(row.amount_due)}</td>
-                              <td className="bgt-cell-date">{formatDate(row.due_date)}</td>
+                              <td className="bgt-cell-date">{formatDate(row.entry_date || row.due_date)}</td>
+                              <td><span className="bgt-account-chip">{row.client || row.supplier || "-"}</span></td>
+                              <td className="bgt-cell-ref">{row.invoice_no ? <code className="bgt-ref-code">{row.invoice_no}</code> : <span className="bgt-muted">-</span>}</td>
+                              <td className="bgt-cell-desc">{row.description || row.note || <span className="bgt-muted">-</span>}</td>
+                              <td>{row.mode_of_payment || <span className="bgt-muted">-</span>}</td>
+                              <td className="bgt-col-amt">â‚±{formatMoney(row.amount ?? row.total ?? row.amount_due)}</td>
+                              <td className="bgt-cell-ref">{row.reference_no ? <code className="bgt-ref-code">{row.reference_no}</code> : <span className="bgt-muted">-</span>}</td>
                             </>
                           )}
                           <td className="bgt-col-actions">
