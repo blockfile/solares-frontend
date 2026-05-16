@@ -155,7 +155,15 @@ const EMPTY_BOOKKEEPING_ROWS = {
 
 function createBookkeepingForm(section) {
   if (section === "accounts_receivable") {
-    return { client: "", total: "", paid: "", remaining: "", note: "" };
+    return {
+      date: localDateInput(),
+      customer: "",
+      invoiceNo: "",
+      description: "",
+      modeOfPayment: "",
+      amount: "",
+      referenceNo: ""
+    };
   }
   if (section === "accounts_payable") {
     return { supplier: "", amountDue: "", dueDate: localDateInput(), note: "" };
@@ -587,11 +595,13 @@ export default function BudgetTab() {
     const form = bookkeepingForms[section] || createBookkeepingForm(section);
     if (section === "accounts_receivable") {
       return {
-        client: form.client,
-        total: form.total,
-        paid: form.paid,
-        remaining: form.remaining,
-        note: form.note
+        date: form.date,
+        customer: form.customer,
+        invoiceNo: form.invoiceNo,
+        description: form.description,
+        modeOfPayment: form.modeOfPayment,
+        amount: form.amount,
+        referenceNo: form.referenceNo
       };
     }
     if (section === "accounts_payable") {
@@ -1802,7 +1812,7 @@ export default function BudgetTab() {
                 <>
                   <div className="bgt-field bgt-bookkeeping-field--date">
                     <label className="bgt-label">Date <span className="bgt-req">*</span></label>
-                    <input className="input" type="date" required value={form.date} onChange={(e) => updateBookkeepingField(activeSection.key, "date", e.target.value)} />
+                    <input className="input" type="date" required value={form.date || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "date", e.target.value)} />
                   </div>
                   <div className="bgt-field bgt-bookkeeping-field--description">
                     <label className="bgt-label">Description <span className="bgt-req">*</span></label>
@@ -1821,21 +1831,33 @@ export default function BudgetTab() {
 
               {isReceivableSection && (
                 <>
+                  <div className="bgt-field bgt-bookkeeping-field--date">
+                    <label className="bgt-label">Date <span className="bgt-req">*</span></label>
+                    <input className="input" type="date" required value={form.date || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "date", e.target.value)} />
+                  </div>
                   <div className="bgt-field bgt-bookkeeping-field--client">
-                    <label className="bgt-label">Client <span className="bgt-req">*</span></label>
-                    <input className="input" required placeholder="Client name" value={form.client} onChange={(e) => updateBookkeepingField(activeSection.key, "client", e.target.value)} />
+                    <label className="bgt-label">Customer <span className="bgt-req">*</span></label>
+                    <input className="input" required placeholder="Customer name" value={form.customer || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "customer", e.target.value)} />
+                  </div>
+                  <div className="bgt-field bgt-bookkeeping-field--invoice">
+                    <label className="bgt-label">Invoice No</label>
+                    <input className="input" placeholder="Invoice no" value={form.invoiceNo || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "invoiceNo", e.target.value)} />
+                  </div>
+                  <div className="bgt-field bgt-bookkeeping-field--description">
+                    <label className="bgt-label">Description</label>
+                    <input className="input" placeholder="Description" value={form.description || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "description", e.target.value)} />
+                  </div>
+                  <div className="bgt-field bgt-bookkeeping-field--payment-mode">
+                    <label className="bgt-label">Mode of Payment</label>
+                    <input className="input" placeholder="Payment mode" value={form.modeOfPayment || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "modeOfPayment", e.target.value)} />
                   </div>
                   <div className="bgt-field bgt-bookkeeping-field--money">
-                    <label className="bgt-label">Total <span className="bgt-req">*</span></label>
-                    <input className="input" type="number" min="0" step="0.01" required placeholder="0.00" value={form.total} onChange={(e) => updateBookkeepingField(activeSection.key, "total", e.target.value)} />
+                    <label className="bgt-label">Amount <span className="bgt-req">*</span></label>
+                    <input className="input" type="number" min="0" step="0.01" required placeholder="0.00" value={form.amount || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "amount", e.target.value)} />
                   </div>
-                  <div className="bgt-field bgt-bookkeeping-field--money">
-                    <label className="bgt-label">Paid</label>
-                    <input className="input" type="number" min="0" step="0.01" placeholder="0.00" value={form.paid} onChange={(e) => updateBookkeepingField(activeSection.key, "paid", e.target.value)} />
-                  </div>
-                  <div className="bgt-field bgt-bookkeeping-field--money">
-                    <label className="bgt-label">Remaining</label>
-                    <input className="input" type="number" min="0" step="0.01" placeholder="0.00" value={form.remaining} onChange={(e) => updateBookkeepingField(activeSection.key, "remaining", e.target.value)} />
+                  <div className="bgt-field bgt-bookkeeping-field--reference">
+                    <label className="bgt-label">Reference</label>
+                    <input className="input" placeholder="Reference" value={form.referenceNo || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "referenceNo", e.target.value)} />
                   </div>
                 </>
               )}
@@ -1868,10 +1890,12 @@ export default function BudgetTab() {
                   </select>
                 </div>
               )}
-              <div className="bgt-field bgt-bookkeeping-field--note">
-                <label className="bgt-label">Note</label>
-                <input className="input" placeholder="Optional note" value={form.note || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "note", e.target.value)} />
-              </div>
+              {!isReceivableSection && (
+                <div className="bgt-field bgt-bookkeeping-field--note">
+                  <label className="bgt-label">Note</label>
+                  <input className="input" placeholder="Optional note" value={form.note || ""} onChange={(e) => updateBookkeepingField(activeSection.key, "note", e.target.value)} />
+                </div>
+              )}
 
               <div className="bgt-bookkeeping-submit">
                 <button className="btn btn-primary" type="submit" disabled={bookkeepingSaving}>
@@ -1898,7 +1922,7 @@ export default function BudgetTab() {
                       <tr><th>Date</th><th>PR Code</th><th>Description</th><th>Note</th><th className="bgt-col-amt">Debit</th><th className="bgt-col-amt">Credit</th><th className="bgt-col-actions" /></tr>
                     )}
                     {isReceivableSection && (
-                      <tr><th>Client</th><th>Note</th><th className="bgt-col-amt">Total</th><th className="bgt-col-amt">Paid</th><th className="bgt-col-amt">Remaining</th><th className="bgt-col-actions" /></tr>
+                      <tr><th>Date</th><th>Customer</th><th>Invoice No</th><th>Description</th><th>Mode of Payment</th><th className="bgt-col-amt">Amount</th><th>Reference</th><th className="bgt-col-actions" /></tr>
                     )}
                     {isPayableSection && (
                       <tr><th>Supplier</th><th>Note</th><th className="bgt-col-amt">Amount Due</th><th>Due Date</th><th className="bgt-col-actions" /></tr>
@@ -1921,11 +1945,13 @@ export default function BudgetTab() {
                           )}
                           {isReceivableSection && (
                             <>
+                              <td className="bgt-cell-date">{formatDate(row.entry_date)}</td>
                               <td><span className="bgt-account-chip">{row.client || "-"}</span></td>
-                              <td className="bgt-cell-desc">{row.note || <span className="bgt-muted">-</span>}</td>
-                              <td className="bgt-col-amt">â‚±{formatMoney(row.total)}</td>
-                              <td className="bgt-col-amt">â‚±{formatMoney(row.paid)}</td>
-                              <td className="bgt-col-amt">â‚±{formatMoney(row.remaining)}</td>
+                              <td className="bgt-cell-ref">{row.invoice_no ? <code className="bgt-ref-code">{row.invoice_no}</code> : <span className="bgt-muted">-</span>}</td>
+                              <td className="bgt-cell-desc">{row.description || <span className="bgt-muted">-</span>}</td>
+                              <td>{row.mode_of_payment || <span className="bgt-muted">-</span>}</td>
+                              <td className="bgt-col-amt">â‚±{formatMoney(row.amount ?? row.total)}</td>
+                              <td className="bgt-cell-ref">{row.reference_no ? <code className="bgt-ref-code">{row.reference_no}</code> : <span className="bgt-muted">-</span>}</td>
                             </>
                           )}
                           {isPayableSection && (

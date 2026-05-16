@@ -5853,7 +5853,9 @@ button {
 }
 
 .bgt-bookkeeping-field--date,
+.bgt-bookkeeping-field--invoice,
 .bgt-bookkeeping-field--money,
+.bgt-bookkeeping-field--payment-mode,
 .bgt-bookkeeping-submit {
   grid-column: span 2;
 }
@@ -5861,6 +5863,7 @@ button {
 .bgt-bookkeeping-field--description,
 .bgt-bookkeeping-field--client,
 .bgt-bookkeeping-field--pr-code,
+.bgt-bookkeeping-field--reference,
 .bgt-bookkeeping-field--due-date {
   grid-column: span 3;
 }
@@ -5897,6 +5900,7 @@ button {
 
   .bgt-bookkeeping-field--description,
   .bgt-bookkeeping-field--client,
+  .bgt-bookkeeping-field--reference,
   .bgt-bookkeeping-field--supplier,
   .bgt-bookkeeping-field--note {
     grid-column: 1 / -1;
