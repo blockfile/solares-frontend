@@ -5924,6 +5924,21 @@ button {
   background: rgba(255, 255, 255, 0.025);
 }
 
+.bgt-bookkeeping-shared-date {
+  display: grid;
+  grid-template-columns: minmax(240px, 360px);
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.bgt-bookkeeping-shared-date .bgt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .bgt-bookkeeping-entry-head {
   grid-column: 1 / -1;
   display: flex;
@@ -6041,6 +6056,11 @@ button {
   }
 
   .bgt-bookkeeping-entry {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .bgt-bookkeeping-shared-date {
     grid-template-columns: 1fr;
     padding: 12px;
   }

@@ -239,7 +239,7 @@ function validateBookkeepingDrafts(section, rows = []) {
   return "";
 }
 
-function BookkeepingEntryFields({ section, form, onFieldChange }) {
+function BookkeepingEntryFields({ section, form, onFieldChange, hideDate = false }) {
   const isLedgerSection = section === "sales" || section === "expense";
   const isReceivableSection = section === "accounts_receivable";
   const isPayableSection = section === "accounts_payable";
@@ -248,10 +248,12 @@ function BookkeepingEntryFields({ section, form, onFieldChange }) {
     <>
       {isLedgerSection && (
         <>
-          <div className="bgt-field bgt-bookkeeping-field--date">
-            <label className="bgt-label">Date <span className="bgt-req">*</span></label>
-            <input className="input" type="date" required value={form.date || ""} onChange={(e) => onFieldChange("date", e.target.value)} />
-          </div>
+          {!hideDate && (
+            <div className="bgt-field bgt-bookkeeping-field--date">
+              <label className="bgt-label">Date <span className="bgt-req">*</span></label>
+              <input className="input" type="date" required value={form.date || ""} onChange={(e) => onFieldChange("date", e.target.value)} />
+            </div>
+          )}
           <div className="bgt-field bgt-bookkeeping-field--description">
             <label className="bgt-label">Description <span className="bgt-req">*</span></label>
             <input className="input" required placeholder={`${section === "sales" ? "General Journal" : "Expense"} description`} value={form.description || ""} onChange={(e) => onFieldChange("description", e.target.value)} />
@@ -282,10 +284,12 @@ function BookkeepingEntryFields({ section, form, onFieldChange }) {
 
       {(isReceivableSection || isPayableSection) && (
         <>
-          <div className="bgt-field bgt-bookkeeping-field--date">
-            <label className="bgt-label">Date <span className="bgt-req">*</span></label>
-            <input className="input" type="date" required value={form.date || ""} onChange={(e) => onFieldChange("date", e.target.value)} />
-          </div>
+          {!hideDate && (
+            <div className="bgt-field bgt-bookkeeping-field--date">
+              <label className="bgt-label">Date <span className="bgt-req">*</span></label>
+              <input className="input" type="date" required value={form.date || ""} onChange={(e) => onFieldChange("date", e.target.value)} />
+            </div>
+          )}
           <div className="bgt-field bgt-bookkeeping-field--client">
             <label className="bgt-label">Customer <span className="bgt-req">*</span></label>
             <input className="input" required placeholder="Customer name" value={form.customer || ""} onChange={(e) => onFieldChange("customer", e.target.value)} />
@@ -746,11 +750,25 @@ export default function BudgetTab() {
     });
   }
 
+  function updateBookkeepingDraftDate(section, value) {
+    setBookkeepingDrafts((drafts) => {
+      const rows = drafts[section] || [createBookkeepingForm(section)];
+      return {
+        ...drafts,
+        [section]: rows.map((row) => ({ ...row, date: value }))
+      };
+    });
+  }
+
   function addBookkeepingDraft(section) {
-    setBookkeepingDrafts((drafts) => ({
-      ...drafts,
-      [section]: [...(drafts[section] || []), createBookkeepingForm(section)]
-    }));
+    setBookkeepingDrafts((drafts) => {
+      const rows = drafts[section] || [createBookkeepingForm(section)];
+      const sharedDate = rows[0]?.date || localDateInput();
+      return {
+        ...drafts,
+        [section]: [...rows, { ...createBookkeepingForm(section), date: sharedDate }]
+      };
+    });
   }
 
   function removeBookkeepingDraft(section, index) {
@@ -2057,6 +2075,21 @@ export default function BudgetTab() {
                   </div>
 
                   <form className={`${formClassName} bgt-bookkeeping-form--modal`} onSubmit={submitBookkeepingEntry}>
+                    {!editingBookkeeping && (
+                      <div className="bgt-bookkeeping-shared-date">
+                        <div className="bgt-field bgt-bookkeeping-field--date">
+                          <label className="bgt-label">Date <span className="bgt-req">*</span></label>
+                          <input
+                            className="input"
+                            type="date"
+                            required
+                            value={(bookkeepingDrafts[activeSection.key] || [createBookkeepingForm(activeSection.key)])[0]?.date || ""}
+                            onChange={(e) => updateBookkeepingDraftDate(activeSection.key, e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     {(editingBookkeeping ? [form] : (bookkeepingDrafts[activeSection.key] || [createBookkeepingForm(activeSection.key)])).map((entryForm, index, entryRows) => (
                       <div className="bgt-bookkeeping-entry" key={editingBookkeeping ? `edit-${editingBookkeeping.id}` : `${activeSection.key}-${index}`}>
                         {!editingBookkeeping && (
@@ -2072,6 +2105,7 @@ export default function BudgetTab() {
                         <BookkeepingEntryFields
                           section={activeSection.key}
                           form={entryForm}
+                          hideDate={!editingBookkeeping}
                           onFieldChange={(field, value) => {
                             if (editingBookkeeping) updateBookkeepingField(activeSection.key, field, value);
                             else updateBookkeepingDraftField(activeSection.key, index, field, value);
