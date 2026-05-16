@@ -5893,9 +5893,10 @@ button {
   white-space: nowrap;
 }
 
-.bgt-modal--bookkeeping {
+.bgt-modal.bgt-modal--bookkeeping {
   width: min(1180px, calc(100vw - 32px));
   max-width: 1180px;
+  overflow-x: hidden;
 }
 
 .bgt-modal--bookkeeping .bgt-bookkeeping-form {
@@ -5975,8 +5976,9 @@ button {
 }
 
 @media (max-width: 760px) {
-  .bgt-modal--bookkeeping {
+  .bgt-modal.bgt-modal--bookkeeping {
     width: min(720px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
   }
 
   .bgt-modal--bookkeeping .bgt-bookkeeping-form--modal :is(
