@@ -629,11 +629,13 @@ function filterInverterCandidatesByKw(description, candidates) {
 }
 
 function recomputePanelDependent(items) {
-  const panel = items.find((it) => it.isPanel);
-  if (!panel) return items;
-
-  const panelQty = Number(panel.qty || 0);
-  if (!Number.isFinite(panelQty) || panelQty <= 0) return items;
+  const panelQty = items
+    .filter((it) => isPanelItemLike(it))
+    .reduce((sum, it) => sum + Number(it.qty || 0), 0);
+  if (!Number.isFinite(panelQty)) return items;
+  if (panelQty <= 0) {
+    return items.map((it) => (it.autoFromPanel ? { ...it, qty: 0 } : it));
+  }
 
   const calcRail = (n) => Math.ceil((n / 2) * 3 * 1.1);
   const calcLFoot = (n) => Math.ceil((n / 2) * 9 * 1.1);
@@ -1581,6 +1583,9 @@ export default function QuotesTab() {
           autoFromPanel: item.autoFromPanel,
           panelRatio: item.panelRatio,
           catalogMaterialId: item.catalogMaterialId || null,
+          isPanel: isPanelItemLike(item),
+          subgroup: item.subgroup || null,
+          panelWatt: parsePanelWatt(item.description),
           isManual: item.isManual === true
         }));
 
