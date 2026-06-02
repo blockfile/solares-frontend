@@ -5583,6 +5583,17 @@ button {
   gap: 10px;
 }
 
+.bgt-report-shell {
+  display: grid;
+  gap: 16px;
+  margin-top: 10px;
+  padding: 16px;
+}
+
+.bgt-report-shell > :is(.sl-kpi-row, .bgt-table-wrap) {
+  min-width: 0;
+}
+
 .crm-module > .crm-toolbar {
   margin-bottom: 18px;
 }
@@ -7451,6 +7462,12 @@ button {
 
   .bgt-toolbar-actions .btn {
     flex: 1;
+  }
+
+  .bgt-report-shell {
+    gap: 12px;
+    margin-top: 8px;
+    padding: 12px;
   }
 
   .bgt-bookkeeping-form {
