@@ -423,6 +423,17 @@ function roundPeso(value) {
   return Math.round(Number(value || 0));
 }
 
+function roundMoney(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function formatPlainMoney(value) {
+  return Number(value || 0).toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
 function normalizeRate(rate, fallback) {
   const parsed = Number(rate);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
@@ -642,6 +653,356 @@ function recomputePanelDependent(items) {
   });
 }
 
+function previewSearchText(item) {
+  return String(
+    [
+      item?.description,
+      item?.template_description,
+      item?.catalog_material_name,
+      item?.catalog_source_section
+    ]
+      .filter(Boolean)
+      .join(" ")
+  ).trim();
+}
+
+function isPreviewBatteryItem(item) {
+  const text = normalizeText(previewSearchText(item));
+  return (
+    (text.includes("battery") || text.includes("lifepo") || text.includes("lipo4") || /\bah\b/.test(text)) &&
+    !text.includes("battery cable")
+  );
+}
+
+function isPreviewInverterItem(item) {
+  const text = normalizeText(previewSearchText(item));
+  return (
+    text.includes("inverter") ||
+    text.includes("deye") ||
+    text.includes("solis") ||
+    text.includes("hybrid") ||
+    text.includes("grid tie")
+  );
+}
+
+function isPreviewMountingItem(item) {
+  const text = normalizeText(previewSearchText(item));
+  if (text.includes("din rail")) return false;
+  return (
+    text.includes("mounting") ||
+    text.includes("rail") ||
+    text.includes("l-foot") ||
+    text.includes("lfoot") ||
+    text.includes("l foot") ||
+    text.includes("clamp") ||
+    text.includes("splice") ||
+    text.includes("mc4") ||
+    text.includes("conduit") ||
+    text.includes("fittings connector") ||
+    text.includes("grounding lug") ||
+    text.includes("clip/plate")
+  );
+}
+
+function buildPreviewLine(rows, description, qty, unit) {
+  if (!rows.length) return null;
+  const lineTotal = roundMoney(
+    rows.reduce((sum, row) => sum + Number(row.unit_price || 0) * Number(row.qty || 0), 0)
+  );
+  const parsedQty = Number(qty || 0);
+  const unitPrice = parsedQty > 0 ? lineTotal / parsedQty : lineTotal;
+  return {
+    description,
+    qtyDisplay: parsedQty > 0 ? parsedQty : qty,
+    unit: unit || "",
+    unitPrice,
+    lineTotal
+  };
+}
+
+function getFirstDescription(rows, fallback) {
+  return String(rows[0]?.description || rows[0]?.catalog_material_name || rows[0]?.template_description || fallback || "");
+}
+
+function parsePreviewDiscountItems(quote) {
+  if (quote?.discount_items) {
+    try {
+      const parsed = typeof quote.discount_items === "string" ? JSON.parse(quote.discount_items) : quote.discount_items;
+      if (Array.isArray(parsed) && parsed.length) {
+        return parsed
+          .map((row) => ({ label: row.label || "Discount", amount: Math.max(0, Number(row.amount || 0)) }))
+          .filter((row) => row.amount > 0);
+      }
+    } catch {}
+  }
+  const amount = Math.max(0, Number(quote?.discount_amount || 0));
+  return amount > 0 ? [{ label: "Promotional Discount", amount }] : [];
+}
+
+function normalizeQuotePrintPreviewData(quote, meta, preview) {
+  if (!preview || !Array.isArray(preview.lines)) return null;
+
+  const discountTotal = Number(preview.discountTotal ?? preview.discountAmount ?? 0);
+  const subtotal = Number(preview.subtotal || 0);
+  return {
+    lines: preview.lines.map((line, index) => ({
+      itemNo: Number(line.itemNo || line.item_no || index + 1),
+      description: line.description || "",
+      qtyDisplay: line.qtyDisplay ?? line.qty ?? "",
+      unit: line.unit || "",
+      unitPrice: Number(line.unitPrice ?? line.unit_price ?? 0),
+      lineTotal: Number(line.lineTotal ?? line.line_total ?? 0)
+    })),
+    subtotal,
+    discountTotal,
+    total: Number(preview.total ?? roundMoney(subtotal - discountTotal)),
+    discountItems: Array.isArray(preview.discountItems) ? preview.discountItems : [],
+    suggestedSetup: preview.suggestedSetup || "",
+    specs: {
+      panel: preview.specs?.panel || "",
+      inverter: preview.specs?.inverter || "",
+      battery: preview.specs?.battery || ""
+    },
+    quoteRef: preview.quoteRef || quote?.quote_ref || meta?.quoteRef || "",
+    customerName: preview.customerName || quote?.customer_name || meta?.customerName || "",
+    quoteDate: preview.quoteDate || quote?.quote_date || meta?.quoteDate || "",
+    validUntil: preview.validUntil || quote?.valid_until || meta?.validUntil || ""
+  };
+}
+
+function buildQuotePrintPreviewData(quote, meta, items, preview) {
+  const backendPreview = normalizeQuotePrintPreviewData(quote, meta, preview);
+  if (backendPreview) return backendPreview;
+
+  const sourceItems = Array.isArray(items) ? items : [];
+  const nonInstallation = sourceItems.filter((item) => Number(item.is_installation) !== 1);
+  const installationItems = sourceItems.filter((item) => Number(item.is_installation) === 1);
+  const inverterItems = nonInstallation.filter(isPreviewInverterItem);
+  const panelItems = nonInstallation.filter((item) => isPanelDescription(previewSearchText(item)));
+  const batteryItems = nonInstallation.filter(isPreviewBatteryItem);
+  const taken = new Set([...inverterItems, ...panelItems, ...batteryItems].map((item) => item.id));
+  const remaining = nonInstallation.filter((item) => !taken.has(item.id));
+  const mountingItems = remaining.filter(isPreviewMountingItem);
+  const safetyItems = remaining.filter((item) => !isPreviewMountingItem(item));
+
+  const lines = [];
+  const inverterQty = inverterItems.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+  const panelQty = panelItems.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+  const batteryQty = batteryItems.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+
+  const inverterLine = buildPreviewLine(inverterItems, getFirstDescription(inverterItems, "Inverter"), inverterQty, inverterItems[0]?.unit || "PCS");
+  if (inverterLine) lines.push(inverterLine);
+  const panelLine = buildPreviewLine(panelItems, getFirstDescription(panelItems, "Solar Panel"), panelQty, panelItems[0]?.unit || "PCS");
+  if (panelLine) lines.push(panelLine);
+  const batteryLine = buildPreviewLine(batteryItems, getFirstDescription(batteryItems, "Battery"), batteryQty, batteryItems[0]?.unit || "PCS");
+  if (batteryLine) lines.push(batteryLine);
+  const safetyLine = buildPreviewLine(safetyItems, "Complete Safety Breakers/SPD", 1, "SET");
+  if (safetyLine && safetyLine.lineTotal > 0) lines.push(safetyLine);
+  const mountingLine = buildPreviewLine(mountingItems, "Complete Mounting Fixtures", 1, "SET");
+  if (mountingLine && mountingLine.lineTotal > 0) lines.push(mountingLine);
+
+  const materialTotal = roundMoney(lines.reduce((sum, line) => sum + Number(line.lineTotal || 0), 0));
+  const packagePriceTarget = Number(quote?.package_price_target || 0);
+  const isFixedPackage = String(quote?.pricing_mode || "").trim() === "fixed_package" && packagePriceTarget > 0;
+  const storedLineSubtotal = roundMoney(
+    sourceItems.reduce((sum, row) => sum + Number(row.unit_price || 0) * Number(row.qty || 0), 0)
+  );
+  const storedSubtotal = roundMoney(Number(quote?.subtotal || 0));
+  const installationStored = roundMoney(
+    installationItems.reduce((sum, row) => sum + Number(row.line_total || 0), 0)
+  );
+  const totalTarget = isFixedPackage
+    ? roundMoney(packagePriceTarget)
+    : storedLineSubtotal > 0
+      ? storedLineSubtotal
+      : storedSubtotal > 0
+      ? roundMoney(storedSubtotal)
+      : Number.isFinite(Number(quote?.total))
+        ? roundMoney(quote.total)
+        : roundMoney(materialTotal + installationStored);
+  const resolvedInstallation = totalTarget > 0 ? roundMoney(totalTarget - materialTotal) : installationStored;
+  const installationTotal = Math.max(0, resolvedInstallation);
+  if (installationItems.length || installationTotal > 0) {
+    lines.push({
+      description: "Complete Installation",
+      qtyDisplay: "1 JOB",
+      unit: "JOB",
+      unitPrice: installationTotal,
+      lineTotal: installationTotal
+    });
+  }
+
+  const numberedLines = lines.map((line, index) => ({ ...line, itemNo: index + 1 }));
+  const subtotal = roundMoney(numberedLines.reduce((sum, line) => sum + Number(line.lineTotal || 0), 0));
+  const discountItems = parsePreviewDiscountItems(quote);
+  const discountTotal = roundMoney(discountItems.reduce((sum, item) => sum + Number(item.amount || 0), 0));
+
+  const panelKw = panelItems.reduce((sum, item) => {
+    const watt = parsePanelWatt(previewSearchText(item));
+    return sum + (watt > 0 ? watt * Number(item.qty || 0) : 0);
+  }, 0) / 1000;
+  const inverterKw = inverterItems.reduce((max, item) => Math.max(max, Number(parseKW(previewSearchText(item)) || 0)), 0);
+  const suggestedKw = panelKw > 0 ? panelKw : inverterKw;
+
+  return {
+    lines: numberedLines,
+    subtotal,
+    discountTotal,
+    total: roundMoney(subtotal - discountTotal),
+    discountItems,
+    suggestedSetup: suggestedKw > 0 ? `${suggestedKw.toFixed(1).replace(/\.0$/, "")}KW` : "",
+    specs: {
+      panel: getFirstDescription(panelItems, ""),
+      inverter: getFirstDescription(inverterItems, ""),
+      battery: getFirstDescription(batteryItems, "")
+    },
+    quoteRef: quote?.quote_ref || meta?.quoteRef || "",
+    customerName: quote?.customer_name || meta?.customerName || "",
+    quoteDate: quote?.quote_date || meta?.quoteDate || "",
+    validUntil: quote?.valid_until || meta?.validUntil || ""
+  };
+}
+
+function QuotePrintPreview({ quote, meta, items, preview, loading, exporting, onClose, onPrint, onExportPdf }) {
+  const data = buildQuotePrintPreviewData(quote, meta, items, preview);
+
+  return (
+    <div className="quote-print-preview-backdrop" role="presentation" onClick={onClose}>
+      <div className="quote-print-preview-shell" role="dialog" aria-modal="true" aria-labelledby="quote-print-preview-title" onClick={(e) => e.stopPropagation()}>
+        <div className="quote-print-preview-head">
+          <div>
+            <p className="eyebrow">Print Preview</p>
+            <h3 id="quote-print-preview-title">Customer Quotation</h3>
+          </div>
+          <div className="quote-print-actions">
+            <button className="btn btn-ghost" type="button" onClick={onClose}>Close</button>
+            <button className="btn btn-secondary" type="button" onClick={onExportPdf} disabled={exporting || !meta?.id}>
+              {exporting ? "Exporting..." : "Export PDF"}
+            </button>
+            <button className="btn btn-primary" type="button" onClick={onPrint} disabled={loading || !quote}>
+              Print
+            </button>
+          </div>
+        </div>
+
+        {loading && <div className="quote-print-loading">Loading quotation preview...</div>}
+        {!loading && !quote && <div className="quote-print-loading">No quote selected.</div>}
+
+        {!loading && quote && (
+          <div className="quote-print-document">
+            <div className="quote-print-header">
+              <img src="/SOLARES.png" alt="SOLARES" className="quote-print-logo" />
+              <div className="quote-print-company">
+                <h2>SOLARES Energy Solutions</h2>
+                <p>Sumacab Norte, Cabanatuan City</p>
+                <p>Nueva Ecija, 3100</p>
+                <div className="quote-print-contact"><strong>Email Address:</strong> <span>solares.energysolutions@gmail.com</span></div>
+                <div className="quote-print-contact"><strong>Cellphone No.:</strong> 0967-886-7909</div>
+              </div>
+              <div className="quote-print-setup">
+                <strong>Suggested Solar SET-UP:</strong>
+                <span>{data.suggestedSetup || "-"}</span>
+              </div>
+            </div>
+
+            <table className="quote-print-table quote-print-info-table">
+              <tbody>
+                <tr><th colSpan={5}>Quotation</th></tr>
+                <tr>
+                  <td colSpan={2}><strong>Customer Name:</strong> {data.customerName}</td>
+                  <td><strong>Quotation Ref:</strong></td>
+                  <td colSpan={2}>{data.quoteRef}</td>
+                </tr>
+                <tr>
+                  <td colSpan={2}></td>
+                  <td><strong>Date</strong></td>
+                  <td colSpan={2}>{formatDateLabel(data.quoteDate)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={2}></td>
+                  <td><strong>Valid Until</strong></td>
+                  <td colSpan={2}>{formatDateLabel(data.validUntil)}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <table className="quote-print-table quote-print-items-table">
+              <colgroup>
+                <col className="quote-print-col-no" />
+                <col className="quote-print-col-item" />
+                <col className="quote-print-col-qty" />
+                <col className="quote-print-col-money" />
+                <col className="quote-print-col-money" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>ITEM</th>
+                  <th>ITEM</th>
+                  <th>QTY</th>
+                  <th>U.P.<br />PESO</th>
+                  <th>T.P<br />PESO</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.lines.map((line) => (
+                  <tr key={line.itemNo}>
+                    <td className="quote-print-center">{line.itemNo}</td>
+                    <td>{line.description}</td>
+                    <td className="quote-print-center">{line.qtyDisplay}</td>
+                    <td className="quote-print-money">{formatPlainMoney(line.unitPrice)}</td>
+                    <td className="quote-print-money">{formatPlainMoney(line.lineTotal)}</td>
+                  </tr>
+                ))}
+                <tr className="quote-print-total-row">
+                  <td colSpan={4}>TOTAL PRICE IN PHILIPPINE PESO</td>
+                  <td className="quote-print-money">{formatPlainMoney(data.subtotal)}</td>
+                </tr>
+                {data.discountTotal > 0 && (
+                  <>
+                    <tr className="quote-print-total-row quote-print-discount-row">
+                      <td colSpan={4}>PROMOTIONAL DISCOUNT</td>
+                      <td className="quote-print-money">-{formatPlainMoney(data.discountTotal)}</td>
+                    </tr>
+                    <tr className="quote-print-total-row">
+                      <td colSpan={4}>TOTAL PRICE (Php) after DISCOUNT</td>
+                      <td className="quote-print-money">{formatPlainMoney(data.total)}</td>
+                    </tr>
+                  </>
+                )}
+              </tbody>
+            </table>
+
+            <table className="quote-print-table quote-print-spec-table">
+              <tbody>
+                <tr><td><strong>Solar Panel Type</strong></td><td>{data.specs.panel}</td></tr>
+                <tr><td><strong>Inverter Type</strong></td><td>{data.specs.inverter}</td></tr>
+                <tr><td><strong>Battery Type</strong></td><td>{data.specs.battery}</td></tr>
+                <tr><td><strong>Warranty on Panels</strong></td><td>12 years</td></tr>
+                <tr><td><strong>Warranty on Inverter</strong></td><td>5 years</td></tr>
+                <tr><td><strong>Workmanship Warranty</strong></td><td>1 year</td></tr>
+                <tr className="quote-print-note-row"><td colSpan={2}>Note: Prices above are VAT exclusive</td></tr>
+              </tbody>
+            </table>
+
+            <table className="quote-print-table quote-print-footer-table">
+              <tbody>
+                <tr><th colSpan={2}>Delivery &amp; Installation Timeline</th></tr>
+                <tr><td><strong>Material Delivery</strong></td><td>: Day after the delivery of Materials (or depends on availability of stocks)</td></tr>
+                <tr><td><strong>Installation Completion</strong></td><td>: 3-5 days from delivery</td></tr>
+                <tr className="quote-print-gap"><td colSpan={2}></td></tr>
+                <tr><th colSpan={2}>Payment Terms</th></tr>
+                <tr><td colSpan={2}>: 40% Advance along with Work Order</td></tr>
+                <tr><td colSpan={2}>: 40% After Material Delivery</td></tr>
+                <tr><td colSpan={2}>: 20% After Installation &amp; Commissioning</td></tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function QuotesTab() {
   const [quoteView, setQuoteView] = useState("create");
   const [templates, setTemplates] = useState([]);
@@ -674,14 +1035,16 @@ export default function QuotesTab() {
   const [recentQuoteError, setRecentQuoteError] = useState("");
   const [confirmState, setConfirmState] = useState(null);
   const [deletingQuoteId, setDeletingQuoteId] = useState(null);
+  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
   const [pricingConfig, setPricingConfig] = useState({
     materialMarkupRate: 0.1165,
     installationMarkupRate: 0.112,
     installationRatePerWatt: 9
   });
   const [installationMarginRate, setInstallationMarginRate] = useState(0.112);
+  const [installationMultiplier, setInstallationMultiplier] = useState("9");
 
-  useBodyScrollLock(Boolean(confirmState));
+  useBodyScrollLock(Boolean(confirmState) || printPreviewOpen);
   const manualIdRef = useRef(-1);
 
   const selectedTemplate = useMemo(
@@ -732,6 +1095,7 @@ export default function QuotesTab() {
         installationRatePerWatt: Number(res?.data?.installationRatePerWatt || 9) || 9
       });
       setInstallationMarginRate(normalizeRate(res?.data?.installationMarkupRate, 0.112));
+      setInstallationMultiplier(String(Number(res?.data?.installationRatePerWatt || 9) || 9));
     } catch {
       setPricingConfig({
         materialMarkupRate: 0.1165,
@@ -739,6 +1103,7 @@ export default function QuotesTab() {
         installationRatePerWatt: 9
       });
       setInstallationMarginRate(0.112);
+      setInstallationMultiplier("9");
     }
   };
 
@@ -1141,10 +1506,20 @@ export default function QuotesTab() {
   }, [quoteView, selectedRecentQuoteId]);
 
   const steps = useMemo(() => {
-    return CATEGORY_DEFS.map((def) => {
+    const packageSteps = CATEGORY_DEFS.map((def) => {
       const items = templateItems.filter((item) => item.section === def.key);
       return { ...def, items };
     });
+    return [
+      ...packageSteps,
+      {
+        key: "others",
+        label: "Others",
+        items: templateItems.length
+          ? [{ templateItemId: "others-complete-installation" }]
+          : []
+      }
+    ];
   }, [templateItems]);
 
   const prevStepIndex = useMemo(() => {
@@ -1179,6 +1554,7 @@ export default function QuotesTab() {
   }, [steps, currentStep]);
 
   const activeStep = steps[currentStep] || null;
+  const isOthersStep = activeStep?.key === "others";
 
   const createQuote = async () => {
     setCreating(true);
@@ -1210,6 +1586,7 @@ export default function QuotesTab() {
         packagePriceId: packagePriceId ? Number(packagePriceId) : null,
         discountItems: discountRows.filter((d) => Number(d.amount) > 0).map((d) => ({ label: d.label || "Discount", amount: Number(d.amount) })),
         installationMarginRate,
+        installationMultiplier: installationMultiplierValue,
         quoteVatMode
       });
       setCreated(res.data);
@@ -1257,6 +1634,26 @@ export default function QuotesTab() {
     }
   };
 
+  const printSelectedQuote = () => {
+    if (!selectedRecentQuote?.quote) return;
+
+    const cleanup = () => document.body.classList.remove("quote-print-mode");
+    document.body.classList.add("quote-print-mode");
+    window.addEventListener("afterprint", cleanup, { once: true });
+    window.print();
+    window.setTimeout(cleanup, 800);
+  };
+
+  const openRecentQuotePreview = (quoteId) => {
+    const nextQuoteId = Number(quoteId);
+    if (Number(selectedRecentQuoteId || 0) !== nextQuoteId) {
+      setSelectedRecentQuote(null);
+      setLoadingSelectedRecentQuote(true);
+    }
+    setSelectedRecentQuoteId(nextQuoteId);
+    setPrintPreviewOpen(true);
+  };
+
   const deleteQuote = (quote) => {
     if (!quote?.id) return;
 
@@ -1292,6 +1689,22 @@ export default function QuotesTab() {
     () => templateItems.filter((item) => item.included),
     [templateItems]
   );
+  const selectedPanelItems = useMemo(
+    () => includedItems.filter((item) => item.isPanel || isPanelDescription(item.description)),
+    [includedItems]
+  );
+  const selectedPanelQty = useMemo(
+    () => selectedPanelItems.reduce((sum, item) => sum + Number(item.qty || 0), 0),
+    [selectedPanelItems]
+  );
+  const selectedPanelWatt = useMemo(() => {
+    const panelWithWatt = selectedPanelItems.find((item) => parsePanelWatt(item.description) > 0);
+    return parsePanelWatt(panelWithWatt?.description, 620) || 620;
+  }, [selectedPanelItems]);
+  const installationMultiplierValue = Math.max(
+    0,
+    Number(installationMultiplier || pricingConfig.installationRatePerWatt || 9) || 0
+  );
   const estimatedMaterialSubtotal = useMemo(
     () =>
       includedItems.reduce(
@@ -1303,22 +1716,19 @@ export default function QuotesTab() {
       ),
     [includedItems, pricingConfig.materialMarkupRate]
   );
+  const estimatedInstallationBaseTotal = useMemo(
+    () => roundPeso(selectedPanelQty * selectedPanelWatt * installationMultiplierValue),
+    [installationMultiplierValue, selectedPanelQty, selectedPanelWatt]
+  );
   const estimatedInstallationTotal = useMemo(() => {
     if (selectedPackagePrice) {
       return Math.max(0, roundPeso(Number(selectedPackagePrice.package_price || 0) - estimatedMaterialSubtotal));
     }
 
-    const panelItem = includedItems.find((item) => item.isPanel);
-    if (!panelItem) return 0;
-
-    const panelQty = Number(panelItem.qty || 0);
-    const panelWatt = parsePanelWatt(panelItem.description);
-    const baseInstallation = roundPeso(panelQty * panelWatt * Number(pricingConfig.installationRatePerWatt || 9));
-    return applyMarkup(baseInstallation, installationMarginRate);
+    return applyMarkup(estimatedInstallationBaseTotal, installationMarginRate);
   }, [
-    includedItems,
+    estimatedInstallationBaseTotal,
     estimatedMaterialSubtotal,
-    pricingConfig.installationRatePerWatt,
     installationMarginRate,
     selectedPackagePrice
   ]);
@@ -1349,6 +1759,7 @@ export default function QuotesTab() {
   );
   const reviewedQuote = selectedRecentQuote?.quote || null;
   const reviewedQuoteItems = Array.isArray(selectedRecentQuote?.items) ? selectedRecentQuote.items : [];
+  const reviewedQuotePreview = selectedRecentQuote?.preview || null;
 
   return (
     <div className={`quotes-page ${quoteView === "recent" ? "quotes-page-recent" : ""}`}>
@@ -1587,173 +1998,209 @@ export default function QuotesTab() {
                 {activeStep && (
                   <>
                     <div className="items-editor-note">
-                      {activeStep.label} ({activeStep.items.length} items)
+                      {activeStep.label} ({isOthersStep ? 1 : activeStep.items.length} {isOthersStep || activeStep.items.length === 1 ? "item" : "items"})
                     </div>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => addManualItemToSection(activeStep.key)}
-                    >
-                      Add Item
-                    </button>
-
-                    <div className="items-grid items-grid-head">
-                      <div>Use</div>
-                      <div>No.</div>
-                      <div>Description</div>
-                      <div>Qty</div>
-                      <div>Unit</div>
-                      <div>{normalizeVatMode(quoteVatMode) === "incl" ? "Base Cost (VAT Incl.)" : "Base Cost"}</div>
-                      <div>Margin %</div>
-                      <div>Quote Price</div>
-                    </div>
-
-                    {!activeStep.items.length && (
-                      <p className="section-note">No items assigned to this section.</p>
+                    {!isOthersStep && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => addManualItemToSection(activeStep.key)}
+                      >
+                        Add Item
+                      </button>
                     )}
 
-                    {activeStep.items.map((item) => (
-                      <div className="items-grid items-grid-row" key={item.templateItemId}>
-                        <div>
-                          <input
-                            type="checkbox"
-                            checked={item.included}
-                            onChange={(e) =>
-                              updateItemById(item.templateItemId, { included: e.target.checked })
-                            }
-                          />
+                    {isOthersStep ? (
+                      <>
+                        <div className="others-grid others-grid-head">
+                          <div>Description Item</div>
+                          <div>Qty</div>
+                          <div>kW</div>
+                          <div>Qty of Panels</div>
+                          <div>Multiplier</div>
+                          <div>Total</div>
                         </div>
-                        <div className="item-no-col">
-                          <span>{item.itemNo}</span>
-                          {item.isManual && (
-                            <button
-                              type="button"
-                              className="link-mini"
-                              onClick={() => removeManualItem(item.templateItemId)}
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                        <div>
-                          <select
-                            className="select material-pick-select"
-                            value={item.catalogMaterialId || ""}
-                            onChange={(e) =>
-                              applyMaterialSelection(item.templateItemId, e.target.value)
-                            }
-                          >
-                            <option value="">Pick from price list</option>
-                            {getMaterialOptionGroupsForItem(item).map((group) => (
-                              <optgroup label={group.label} key={group.label}>
-                                {group.options.map((mat) => (
-                                  <option value={mat.id} key={mat.id}>
-                                    {`${mat.material_name} | Base ${formatCurrency(mat.base_price)} -> VAT Incl. ${formatCurrency(
-                                      toVatInclusivePrice(mat.base_price)
-                                    )} | Used ${formatCurrency(resolveCatalogDisplayPrice(mat.base_price, quoteVatMode))}${mat.unit ? ` / ${mat.unit}` : ""
-                                      }${mat.source_section ? ` | ${mat.source_section}` : ""}`}
-                                  </option>
-                                ))}
-                              </optgroup>
-                            ))}
-                          </select>
-                          <input
-                            className="input"
-                            value={item.description}
-                            onChange={(e) =>
-                              updateItemById(item.templateItemId, (() => {
-                                const nextDescription = e.target.value;
-                                const nextCategory = detectCategory(nextDescription);
-                                const nextSubgroup = detectItemSubgroup(nextDescription);
-                                return {
-                                  description: nextDescription,
-                                  category: nextCategory,
-                                  subgroup: nextSubgroup,
-                                  marginRate: getMarginRateForBucket(
-                                    resolveMarginBucket({
-                                      description: nextDescription,
-                                      subgroup: nextSubgroup,
-                                      section: item.section,
-                                      category: nextCategory
-                                    }),
-                                    selectedMarginTemplate,
-                                    pricingConfig.materialMarkupRate
-                                  ),
-                                  formulaKey: detectMountingFormulaKey(nextDescription),
-                                  catalogMaterialId: null,
-                                  isPanel: isPanelDescription(nextDescription)
-                                };
-                              })())
-                            }
-                          />
-                        </div>
-                        <div>
-                          <div className="qty-wrap">
-                            <input
-                              className="input"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={item.qty}
-                              disabled={item.autoFromPanel}
-                              onChange={(e) =>
-                                updateItemById(item.templateItemId, {
-                                  qty: Number(e.target.value || 0)
-                                })
-                              }
-                            />
-                            {item.autoFromPanel && <span className="auto-chip">Auto</span>}
-                          </div>
-                        </div>
-                        <div>
-                          <input
-                            className="input"
-                            value={item.unit}
-                            onChange={(e) =>
-                              updateItemById(item.templateItemId, { unit: e.target.value })
-                            }
-                          />
-                        </div>
-                        <div>
+                        <div className="others-grid others-grid-row">
+                          <input className="input" value="Complete Installation" readOnly />
+                          <input className="input" value="1 Job" readOnly />
+                          <input className="input" value={`${selectedPanelWatt || 620}W`} readOnly />
+                          <input className="input" value={selectedPanelQty} readOnly />
                           <input
                             className="input"
                             type="number"
                             min="0"
                             step="0.01"
-                            value={item.basePrice}
-                            onChange={(e) =>
-                              updateItemById(item.templateItemId, {
-                                basePrice: Number(e.target.value || 0)
-                              })
-                            }
+                            value={installationMultiplier}
+                            onChange={(e) => setInstallationMultiplier(e.target.value)}
                           />
-                        </div>
-                        <div>
                           <input
                             className="input"
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={(Number(item.marginRate || 0) * 100).toFixed(2)}
-                            onChange={(e) =>
-                              updateItemById(item.templateItemId, {
-                                marginRate: Math.max(0, Number(e.target.value || 0) / 100)
-                              })
-                            }
-                          />
-                        </div>
-                        <div>
-                          <input
-                            className="input"
-                            value={applyMarkup(
-                              Number(item.basePrice || 0),
-                              normalizeRate(item.marginRate, pricingConfig.materialMarkupRate)
-                            )}
+                            value={formatCurrency(estimatedInstallationTotal)}
                             readOnly
                           />
                         </div>
-                      </div>
-                    ))}
+                      </>
+                    ) : (
+                      <>
+                        <div className="items-grid items-grid-head">
+                          <div>Use</div>
+                          <div>No.</div>
+                          <div>Description</div>
+                          <div>Qty</div>
+                          <div>Unit</div>
+                          <div>{normalizeVatMode(quoteVatMode) === "incl" ? "Base Cost (VAT Incl.)" : "Base Cost"}</div>
+                          <div>Margin %</div>
+                          <div>Quote Price</div>
+                        </div>
+
+                        {!activeStep.items.length && (
+                          <p className="section-note">No items assigned to this section.</p>
+                        )}
+
+                        {activeStep.items.map((item) => (
+                          <div className="items-grid items-grid-row" key={item.templateItemId}>
+                            <div>
+                              <input
+                                type="checkbox"
+                                checked={item.included}
+                                onChange={(e) =>
+                                  updateItemById(item.templateItemId, { included: e.target.checked })
+                                }
+                              />
+                            </div>
+                            <div className="item-no-col">
+                              <span>{item.itemNo}</span>
+                              {item.isManual && (
+                                <button
+                                  type="button"
+                                  className="link-mini"
+                                  onClick={() => removeManualItem(item.templateItemId)}
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                            <div>
+                              <select
+                                className="select material-pick-select"
+                                value={item.catalogMaterialId || ""}
+                                onChange={(e) =>
+                                  applyMaterialSelection(item.templateItemId, e.target.value)
+                                }
+                              >
+                                <option value="">Pick from price list</option>
+                                {getMaterialOptionGroupsForItem(item).map((group) => (
+                                  <optgroup label={group.label} key={group.label}>
+                                    {group.options.map((mat) => (
+                                      <option value={mat.id} key={mat.id}>
+                                        {`${mat.material_name} | Base ${formatCurrency(mat.base_price)} -> VAT Incl. ${formatCurrency(
+                                          toVatInclusivePrice(mat.base_price)
+                                        )} | Used ${formatCurrency(resolveCatalogDisplayPrice(mat.base_price, quoteVatMode))}${mat.unit ? ` / ${mat.unit}` : ""
+                                          }${mat.source_section ? ` | ${mat.source_section}` : ""}`}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                ))}
+                              </select>
+                              <input
+                                className="input"
+                                value={item.description}
+                                onChange={(e) =>
+                                  updateItemById(item.templateItemId, (() => {
+                                    const nextDescription = e.target.value;
+                                    const nextCategory = detectCategory(nextDescription);
+                                    const nextSubgroup = detectItemSubgroup(nextDescription);
+                                    return {
+                                      description: nextDescription,
+                                      category: nextCategory,
+                                      subgroup: nextSubgroup,
+                                      marginRate: getMarginRateForBucket(
+                                        resolveMarginBucket({
+                                          description: nextDescription,
+                                          subgroup: nextSubgroup,
+                                          section: item.section,
+                                          category: nextCategory
+                                        }),
+                                        selectedMarginTemplate,
+                                        pricingConfig.materialMarkupRate
+                                      ),
+                                      formulaKey: detectMountingFormulaKey(nextDescription),
+                                      catalogMaterialId: null,
+                                      isPanel: isPanelDescription(nextDescription)
+                                    };
+                                  })())
+                                }
+                              />
+                            </div>
+                            <div>
+                              <div className="qty-wrap">
+                                <input
+                                  className="input"
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={item.qty}
+                                  disabled={item.autoFromPanel}
+                                  onChange={(e) =>
+                                    updateItemById(item.templateItemId, {
+                                      qty: Number(e.target.value || 0)
+                                    })
+                                  }
+                                />
+                                {item.autoFromPanel && <span className="auto-chip">Auto</span>}
+                              </div>
+                            </div>
+                            <div>
+                              <input
+                                className="input"
+                                value={item.unit}
+                                onChange={(e) =>
+                                  updateItemById(item.templateItemId, { unit: e.target.value })
+                                }
+                              />
+                            </div>
+                            <div>
+                              <input
+                                className="input"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={item.basePrice}
+                                onChange={(e) =>
+                                  updateItemById(item.templateItemId, {
+                                    basePrice: Number(e.target.value || 0)
+                                  })
+                                }
+                              />
+                            </div>
+                            <div>
+                              <input
+                                className="input"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={(Number(item.marginRate || 0) * 100).toFixed(2)}
+                                onChange={(e) =>
+                                  updateItemById(item.templateItemId, {
+                                    marginRate: Math.max(0, Number(e.target.value || 0) / 100)
+                                  })
+                                }
+                              />
+                            </div>
+                            <div>
+                              <input
+                                className="input"
+                                value={applyMarkup(
+                                  Number(item.basePrice || 0),
+                                  normalizeRate(item.marginRate, pricingConfig.materialMarkupRate)
+                                )}
+                                readOnly
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
 
                     <div className="step-nav">
                       <button
@@ -1952,7 +2399,7 @@ export default function QuotesTab() {
                             className="btn btn-ghost"
                             type="button"
                             disabled={deletingQuoteId === Number(quote.id)}
-                            onClick={() => setSelectedRecentQuoteId(Number(quote.id))}
+                            onClick={() => openRecentQuotePreview(quote.id)}
                           >
                             Review
                           </button>
@@ -2057,6 +2504,14 @@ export default function QuotesTab() {
 
                 <button
                   className="btn btn-secondary"
+                  type="button"
+                  onClick={() => setPrintPreviewOpen(true)}
+                  disabled={loadingSelectedRecentQuote}
+                >
+                  Print Preview
+                </button>
+                <button
+                  className="btn btn-secondary"
                   onClick={() =>
                     exportQuote({
                       endpoint: "customer-excel",
@@ -2132,6 +2587,28 @@ export default function QuotesTab() {
             )}
           </aside>
         </div>
+      )}
+
+      {printPreviewOpen && (
+        <QuotePrintPreview
+          quote={reviewedQuote}
+          meta={selectedRecentQuoteMeta}
+          items={reviewedQuoteItems}
+          preview={reviewedQuotePreview}
+          loading={loadingSelectedRecentQuote}
+          exporting={exporting}
+          onClose={() => setPrintPreviewOpen(false)}
+          onPrint={printSelectedQuote}
+          onExportPdf={() => {
+            if (!selectedRecentQuoteMeta?.id) return;
+            exportQuote({
+              endpoint: "customer-pdf",
+              fallbackExt: "pdf",
+              quoteId: selectedRecentQuoteMeta.id,
+              quoteRef: selectedRecentQuoteMeta.quoteRef
+            });
+          }}
+        />
       )}
 
       {confirmState && (

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../api/client";
 import CalendarTab from "./CalendarTab";
-import QuotesTab from "./QuotesTab";
+import CRMTab from "./CRMTab";
 import MaterialsTab from "./MaterialsTab";
 import InventoryTab from "./InventoryTab";
 import PayrollTab from "./PayrollTab";
@@ -11,22 +11,24 @@ import TemplatesTab from "./TemplatesTab";
 import UsersTab from "./UsersTab";
 import RolesTab from "./RolesTab";
 import AuditTab from "./AuditTab";
-import BudgetTab from "./BudgetTab";
+import FinancialManagementTab from "./FinancialManagementTab";
+import AccountingManagementTab from "./AccountingManagementTab";
 import solaresLogo from "../components/assets/SOLARES.png";
 import { clearAuthToken } from "../auth/tokenStorage";
-import { normalizeModules, roleLabel } from "../constants/access";
+import { isAdminRole, normalizeModules, roleLabel } from "../constants/access";
 import useBodyScrollLock from "../hooks/useBodyScrollLock";
 
 const TAB_CONFIG = [
   { key: "calendar", label: "Calendar Dashboard", group: "Workspace", icon: "calendar" },
-  { key: "quotes", label: "Quotes", group: "Workspace", icon: "quotes" },
+  { key: "crm", label: "Customer Relationship Management", group: "Workspace", icon: "crm", accessKeys: ["crm", "quotes"] },
   { key: "payroll", label: "Payroll", group: "Workspace", icon: "payroll" },
   { key: "templates", label: "Template Manager", group: "Catalog", icon: "templates" },
   { key: "materials", label: "Material Cost", group: "Catalog", icon: "materials" },
   { key: "inventory", label: "Inventory", group: "Catalog", icon: "inventory" },
   { key: "packages", label: "Package Prices", group: "Catalog", icon: "packages" },
   { key: "margins", label: "Margin Setup", group: "Catalog", icon: "margins" },
-  { key: "budget", label: "Financial & Accounting Management", group: "Workspace", icon: "budget" },
+  { key: "finance", label: "Financial Management", group: "Workspace", icon: "finance" },
+  { key: "accounting", label: "Accounting Management", group: "Workspace", icon: "accounting" },
   { key: "users", label: "Users", group: "System Admin", icon: "users" },
   { key: "roles", label: "Roles", group: "System Admin", icon: "roles" },
   { key: "audit", label: "Audit", group: "System Admin", icon: "audit" }
@@ -68,6 +70,17 @@ function SidebarIcon({ icon }) {
           <path d="M8.5 11h7" />
           <path d="M8.5 14.5h7" />
           <path d="M8.5 18h4" />
+        </svg>
+      );
+    case "crm":
+      return (
+        <svg {...common}>
+          <path d="M16.5 20v-1.2a3.8 3.8 0 0 0-3.8-3.8H7.8A3.8 3.8 0 0 0 4 18.8V20" />
+          <circle cx="10.2" cy="8" r="3.2" />
+          <path d="M19.5 20v-1a3 3 0 0 0-2.2-2.9" />
+          <path d="M15.7 5.1a3.1 3.1 0 0 1 0 5.9" />
+          <path d="M3.5 5.5h4" />
+          <path d="M5.5 3.5v4" />
         </svg>
       );
     case "payroll":
@@ -154,17 +167,25 @@ function SidebarIcon({ icon }) {
           <path d="M21.5 12h-2" />
         </svg>
       );
-    case "budget":
+    case "finance":
       return (
         <svg {...common}>
           <rect x="3.5" y="6" width="17" height="13" rx="2" />
           <path d="M3.5 10h17" />
-          <path d="M7.5 14h2" />
-          <path d="M11.5 14h2" />
-          <path d="M15.5 14h1" />
-          <path d="M12 3.5v2.5" />
-          <path d="M8 3.5v2.5" />
-          <path d="M16 3.5v2.5" />
+          <path d="M7.2 15.5h2.4" />
+          <path d="M12 15.5h1.8" />
+          <path d="M16.4 15.5h.6" />
+          <path d="M7.5 3.5v2.5" />
+          <path d="M16.5 3.5v2.5" />
+        </svg>
+      );
+    case "accounting":
+      return (
+        <svg {...common}>
+          <path d="M6 3.8h12a1.5 1.5 0 0 1 1.5 1.5v15l-2.3-1.2-2.3 1.2-2.3-1.2-2.3 1.2-2.3-1.2L4.5 20.3V5.3A1.5 1.5 0 0 1 6 3.8Z" />
+          <path d="M8 8.5h8" />
+          <path d="M8 12h8" />
+          <path d="M8 15.5h4.5" />
         </svg>
       );
     default:
@@ -183,7 +204,8 @@ export default function Dashboard({ theme = "light", onToggleTheme }) {
     inventory: 0,
     payroll: 0,
     packages: 0,
-    margins: 0
+    margins: 0,
+    crmProjects: 0
   });
   const [user, setUser] = useState({
     id: null,
@@ -219,8 +241,9 @@ export default function Dashboard({ theme = "light", onToggleTheme }) {
 
   const visibleTabs = useMemo(() => {
     const allowedKeys = normalizeModules(user.permissions, ["calendar"]);
-    return TAB_CONFIG.filter((item) => allowedKeys.includes(item.key));
-  }, [user.permissions]);
+    if (isAdminRole(user.role)) return TAB_CONFIG;
+    return TAB_CONFIG.filter((item) => (item.accessKeys || [item.key]).some((key) => allowedKeys.includes(key)));
+  }, [user.permissions, user.role]);
 
   const activeTab = useMemo(
     () => visibleTabs.find((item) => item.key === tab) || visibleTabs[0] || TAB_CONFIG[0],
@@ -244,6 +267,7 @@ export default function Dashboard({ theme = "light", onToggleTheme }) {
     const nextUser = meRes?.data || {};
     const nextRole = String(nextUser.role || "field_work");
     const nextPermissions = normalizeModules(nextUser.permissions, ["calendar"]);
+    const canAccessModule = (key) => isAdminRole(nextRole) || nextPermissions.includes(key);
 
     setUser({
       id: nextUser.id || null,
@@ -255,14 +279,15 @@ export default function Dashboard({ theme = "light", onToggleTheme }) {
       permissions: nextPermissions.length ? nextPermissions : ["calendar"]
     });
 
-    const [eventsRes, templatesRes, materialsRes, inventoryRes, payrollRes, packagesRes, marginsRes] = await Promise.allSettled([
-      nextPermissions.includes("calendar") ? api.get("/events") : Promise.resolve({ data: [] }),
-      nextPermissions.includes("templates") ? api.get("/templates?includeAll=1") : Promise.resolve({ data: [] }),
-      nextPermissions.includes("materials") ? api.get("/materials") : Promise.resolve({ data: [] }),
-      nextPermissions.includes("inventory") ? api.get("/inventory") : Promise.resolve({ data: [] }),
-      nextPermissions.includes("payroll") ? api.get("/payroll/employees") : Promise.resolve({ data: [] }),
-      nextPermissions.includes("packages") ? api.get("/package-prices?activeOnly=1") : Promise.resolve({ data: [] }),
-      nextPermissions.includes("margins") ? api.get("/margin-templates?activeOnly=1") : Promise.resolve({ data: [] })
+    const [eventsRes, templatesRes, materialsRes, inventoryRes, payrollRes, packagesRes, marginsRes, crmRes] = await Promise.allSettled([
+      canAccessModule("calendar") ? api.get("/events") : Promise.resolve({ data: [] }),
+      canAccessModule("templates") ? api.get("/templates?includeAll=1") : Promise.resolve({ data: [] }),
+      canAccessModule("materials") ? api.get("/materials") : Promise.resolve({ data: [] }),
+      canAccessModule("inventory") ? api.get("/inventory") : Promise.resolve({ data: [] }),
+      canAccessModule("payroll") ? api.get("/payroll/employees") : Promise.resolve({ data: [] }),
+      canAccessModule("packages") ? api.get("/package-prices?activeOnly=1") : Promise.resolve({ data: [] }),
+      canAccessModule("margins") ? api.get("/margin-templates?activeOnly=1") : Promise.resolve({ data: [] }),
+      canAccessModule("crm") ? api.get("/customers/summary") : Promise.resolve({ data: {} })
     ]);
 
     setSummary({
@@ -272,7 +297,8 @@ export default function Dashboard({ theme = "light", onToggleTheme }) {
       inventory: inventoryRes?.status === "fulfilled" ? toCount(inventoryRes.value.data) : 0,
       payroll: payrollRes?.status === "fulfilled" ? toCount(payrollRes.value.data) : 0,
       packages: packagesRes?.status === "fulfilled" ? toCount(packagesRes.value.data) : 0,
-      margins: marginsRes?.status === "fulfilled" ? toCount(marginsRes.value.data) : 0
+      margins: marginsRes?.status === "fulfilled" ? toCount(marginsRes.value.data) : 0,
+      crmProjects: crmRes?.status === "fulfilled" ? Number(crmRes.value.data?.totalProjects || 0) : 0
     });
   };
 
@@ -296,29 +322,33 @@ export default function Dashboard({ theme = "light", onToggleTheme }) {
 
   const stats = useMemo(() => {
     const items = [];
-    if (user.permissions.includes("calendar")) {
+    const canAccessModule = (key) => isAdminRole(user.role) || user.permissions.includes(key);
+    if (canAccessModule("calendar")) {
       items.push({ label: "Scheduled Events", value: summary.events });
     }
-    if (user.permissions.includes("templates")) {
+    if (canAccessModule("templates")) {
       items.push({ label: "Quote Templates", value: summary.templates });
     }
-    if (user.permissions.includes("materials")) {
+    if (canAccessModule("materials")) {
       items.push({ label: "Materials", value: summary.materials });
     }
-    if (user.permissions.includes("inventory")) {
+    if (canAccessModule("inventory")) {
       items.push({ label: "Inventory Items", value: summary.inventory });
     }
-    if (user.permissions.includes("payroll")) {
+    if (canAccessModule("payroll")) {
       items.push({ label: "Payroll Employees", value: summary.payroll });
     }
-    if (user.permissions.includes("packages")) {
+    if (canAccessModule("crm")) {
+      items.push({ label: "CRM Projects", value: summary.crmProjects });
+    }
+    if (canAccessModule("packages")) {
       items.push({ label: "Active Packages", value: summary.packages });
     }
-    if (user.permissions.includes("margins")) {
+    if (canAccessModule("margins")) {
       items.push({ label: "Margin Templates", value: summary.margins });
     }
     return items;
-  }, [summary, user.permissions]);
+  }, [summary, user.permissions, user.role]);
 
   return (
     <div className={`workspace-shell page-animate${sidebarOpen ? " sidebar-active" : ""}`}>
@@ -427,19 +457,20 @@ export default function Dashboard({ theme = "light", onToggleTheme }) {
           </div>
         )}
 
-        <section className={`panel workspace-panel ${tab === "quotes" ? "workspace-panel-fill" : ""}`}>
+        <section className={`panel workspace-panel ${tab === "crm" ? "workspace-panel-fill" : ""}`}>
           {tab === "calendar" && <CalendarTab currentUser={user} onActivityChange={loadSummary} />}
-          {tab === "quotes" && <QuotesTab />}
+          {tab === "crm" && <CRMTab currentUser={user} />}
           {tab === "payroll" && <PayrollTab />}
           {tab === "templates" && <TemplatesTab />}
           {tab === "materials" && <MaterialsTab />}
           {tab === "inventory" && <InventoryTab />}
           {tab === "packages" && <PackagePricesTab />}
           {tab === "margins" && <MarginTemplatesTab />}
+          {tab === "finance" && <FinancialManagementTab />}
+          {tab === "accounting" && <AccountingManagementTab />}
           {tab === "users" && <UsersTab currentUser={user} />}
           {tab === "roles" && <RolesTab />}
           {tab === "audit" && <AuditTab />}
-          {tab === "budget" && <BudgetTab />}
         </section>
       </main>
     </div>

@@ -159,6 +159,26 @@ const EMPTY_BOOKKEEPING_ROWS = {
   accounts_payable: []
 };
 
+const FINANCIAL_PAGE_OPTIONS = [
+  { key: "sales_transactions", label: "All Transactions", view: "transactions", scopeMode: "overall", filterType: "all" },
+  { key: "collections", label: "Collections", view: "transactions", scopeMode: "overall", filterType: "income" },
+  { key: "payments", label: "Payments", view: "transactions", scopeMode: "overall", filterType: "withdrawal" },
+  { key: "expenses", label: "Expenses", view: "transactions", scopeMode: "overall", filterType: "expense" },
+  { key: "project_costing", label: "Project Costing", view: "transactions", scopeMode: "project", filterType: "all" },
+  { key: "cash_flow", label: "Cash Flow", view: "financial_reports" },
+  { key: "financial_reports", label: "Financial Reports", view: "financial_reports" }
+];
+
+const ACCOUNTING_PAGE_OPTIONS = [
+  { key: "chart_of_accounts", label: "Chart of Accounts", view: "accounts" },
+  { key: "journal_entries", label: "Journal Entries", view: "bookkeeping", bookkeepingView: "sales" },
+  { key: "general_ledger", label: "General Ledger", view: "bookkeeping", bookkeepingView: "sales" },
+  { key: "trial_balance", label: "Trial Balance", view: "accounting_reports" },
+  { key: "accounts_receivable", label: "Accounts Receivable", view: "bookkeeping", bookkeepingView: "accounts_receivable" },
+  { key: "accounts_payable", label: "Accounts Payable", view: "bookkeeping", bookkeepingView: "accounts_payable" },
+  { key: "financial_statements", label: "Financial Statements", view: "accounting_reports" }
+];
+
 function createBookkeepingForm(section) {
   if (section === "accounts_receivable" || section === "accounts_payable") {
     return {
@@ -366,6 +386,18 @@ function createMaterialDetail(overrides = {}) {
   return { item: "", qty: "", unitCost: "", total: "", ...overrides };
 }
 
+function projectPackageDisplayName(pkg) {
+  const templateName = String(pkg?.template_name || "").trim();
+  const scenarioLabel = String(pkg?.scenario_label || "").trim();
+  if (templateName && scenarioLabel) return `${templateName} - ${scenarioLabel}`;
+  return scenarioLabel || templateName || "System Package";
+}
+
+function projectPackageOptionLabel(pkg) {
+  const scenarioLabel = String(pkg?.scenario_label || "").trim() || projectPackageDisplayName(pkg);
+  return `${scenarioLabel} | ${formatPhpCurrency(pkg?.package_price)}`;
+}
+
 function createLaborDetail(overrides = {}) {
   return { description: "", amount: "", ...overrides };
 }
@@ -495,6 +527,148 @@ function ProjectDetailsSummary({ project }) {
   );
 }
 
+function FinancialReportsPanel({ page, summary, transactions, projects, accounts }) {
+  const isCashFlow = page === "cash_flow";
+  const totalSales = projects.reduce((sum, project) => sum + toNumber(project.sale_amount, 0), 0);
+  const totalCosting = projects.reduce((sum, project) => sum + projectDetailsTotalCost(project), 0);
+  const accountRows = accounts.map((account) => ({
+    ...account,
+    inflow: toNumber(account.total_in, 0),
+    outflow: toNumber(account.total_out, 0),
+    net: toNumber(account.balance, 0)
+  }));
+  const recentCashRows = transactions.slice(0, 10);
+
+  return (
+    <div className="bgt-report-shell">
+      <div className="sl-kpi-row">
+        <div className="sl-kpi sl-kpi--sales">
+          <span className="sl-kpi-label">Collections</span>
+          <strong className="sl-kpi-value">₱{formatMoney(summary.totalIn)}</strong>
+          <span className="sl-kpi-sub">cash inflows</span>
+        </div>
+        <div className="sl-kpi sl-kpi--expenses">
+          <span className="sl-kpi-label">Payments / Expenses</span>
+          <strong className="sl-kpi-value">₱{formatMoney(summary.totalOut)}</strong>
+          <span className="sl-kpi-sub">cash outflows</span>
+        </div>
+        <div className={`sl-kpi ${toNumber(summary.netBalance, 0) >= 0 ? "sl-kpi--pos" : "sl-kpi--neg"}`}>
+          <span className="sl-kpi-label">Cash Flow</span>
+          <strong className="sl-kpi-value">₱{formatMoney(summary.netBalance)}</strong>
+          <span className={`sl-kpi-badge ${toNumber(summary.netBalance, 0) >= 0 ? "sl-kpi-badge--pos" : "sl-kpi-badge--neg"}`}>{toNumber(summary.netBalance, 0) >= 0 ? "Positive" : "Negative"}</span>
+        </div>
+        <div className="sl-kpi">
+          <span className="sl-kpi-label">Project Margin</span>
+          <strong className="sl-kpi-value">₱{formatMoney(totalSales - totalCosting)}</strong>
+          <span className="sl-kpi-sub">contract value less costing</span>
+        </div>
+      </div>
+
+      <div className="bgt-table-wrap">
+        <table className="bgt-table">
+          <thead>
+            <tr><th>{isCashFlow ? "Cash Flow Category" : "Financial Report Line"}</th><th className="bgt-col-amt">Inflow</th><th className="bgt-col-amt">Outflow</th><th className="bgt-col-amt">Net</th><th>Entries</th></tr>
+          </thead>
+          <tbody>
+            {accountRows.map((row) => (
+              <tr key={row.id} className="bgt-table-row">
+                <td><span className="bgt-account-chip">{row.name}</span> <span className="bgt-muted">{accountTypeLabel(row.type)}</span></td>
+                <td className="bgt-col-amt bgt-amount--in">₱{formatMoney(row.inflow)}</td>
+                <td className="bgt-col-amt bgt-amount--out">₱{formatMoney(row.outflow)}</td>
+                <td className={`bgt-col-amt ${row.net >= 0 ? "bgt-amount--in" : "bgt-amount--out"}`}>₱{formatMoney(row.net)}</td>
+                <td>{row.transaction_count || 0}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {isCashFlow && (
+        <div className="bgt-table-wrap">
+          <table className="bgt-table bgt-table--compact">
+            <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Type</th><th className="bgt-col-amt">Amount</th></tr></thead>
+            <tbody>
+              {recentCashRows.map((tx) => {
+                const txAccountType = accountTypeFromTransactionRecord(tx);
+                const txDirection = transactionDirectionFromAccountType(txAccountType);
+                return (
+                  <tr key={tx.id}>
+                    <td className="bgt-cell-date">{formatDate(tx.transaction_date)}</td>
+                    <td><span className="bgt-account-chip">{tx.account_name || "-"}</span></td>
+                    <td>{tx.description || <span className="bgt-muted">-</span>}</td>
+                    <td>{transactionTypeShortLabel(txAccountType)}</td>
+                    <td className={`bgt-col-amt bgt-amount--${txDirection}`}>₱{formatMoney(tx.amount)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AccountingReportsPanel({ page, accounts, bookkeepingRows }) {
+  const debitTotal = accounts.reduce((sum, account) => sum + Math.max(0, toNumber(account.balance, 0)), 0);
+  const creditTotal = accounts.reduce((sum, account) => sum + Math.max(0, -toNumber(account.balance, 0)), 0);
+  const receivableTotal = (bookkeepingRows.accounts_receivable || []).reduce((sum, row) => sum + toNumber(row.amount ?? row.total, 0), 0);
+  const payableTotal = (bookkeepingRows.accounts_payable || []).reduce((sum, row) => sum + toNumber(row.amount ?? row.total ?? row.amount_due, 0), 0);
+  const isStatements = page === "financial_statements";
+
+  return (
+    <div className="bgt-report-shell">
+      <div className="sl-kpi-row">
+        <div className="sl-kpi">
+          <span className="sl-kpi-label">Trial Balance Debit</span>
+          <strong className="sl-kpi-value">₱{formatMoney(debitTotal)}</strong>
+          <span className="sl-kpi-sub">positive account balances</span>
+        </div>
+        <div className="sl-kpi">
+          <span className="sl-kpi-label">Trial Balance Credit</span>
+          <strong className="sl-kpi-value">₱{formatMoney(creditTotal)}</strong>
+          <span className="sl-kpi-sub">negative account balances</span>
+        </div>
+        <div className="sl-kpi sl-kpi--sales">
+          <span className="sl-kpi-label">Accounts Receivable</span>
+          <strong className="sl-kpi-value">₱{formatMoney(receivableTotal)}</strong>
+          <span className="sl-kpi-sub">receipt journal</span>
+        </div>
+        <div className="sl-kpi sl-kpi--expenses">
+          <span className="sl-kpi-label">Accounts Payable</span>
+          <strong className="sl-kpi-value">₱{formatMoney(payableTotal)}</strong>
+          <span className="sl-kpi-sub">disbursement journal</span>
+        </div>
+      </div>
+
+      <div className="bgt-table-wrap">
+        <table className="bgt-table">
+          <thead>
+            <tr><th>{isStatements ? "Financial Statement Line" : "Account"}</th><th>Type</th><th className="bgt-col-amt">Debit</th><th className="bgt-col-amt">Credit</th><th>Entries</th></tr>
+          </thead>
+          <tbody>
+            {accounts.map((account) => {
+              const balance = toNumber(account.balance, 0);
+              return (
+                <tr key={account.id} className="bgt-table-row">
+                  <td><strong>{account.name}</strong></td>
+                  <td><span className={`bgt-pill bgt-pill--${account.type}`}>{accountTypeLabel(account.type)}</span></td>
+                  <td className="bgt-col-amt">{balance >= 0 ? formatPhpCurrency(balance) : "-"}</td>
+                  <td className="bgt-col-amt">{balance < 0 ? formatPhpCurrency(Math.abs(balance)) : "-"}</td>
+                  <td>{account.transaction_count || 0}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <div className="bgt-table-footer">
+          {accounts.length} account{accounts.length !== 1 ? "s" : ""} • Debit ₱{formatMoney(debitTotal)} • Credit ₱{formatMoney(creditTotal)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const EMPTY_ACCOUNT_FORM = { name: "", type: "expense", description: "" };
 
 function IconArrowDown() {
@@ -554,7 +728,9 @@ function IconRefresh() {
   );
 }
 
-export default function BudgetTab() {
+export default function BudgetTab({ moduleMode = "combined" }) {
+  const isFinanceMode = moduleMode === "finance";
+  const isAccountingMode = moduleMode === "accounting";
   const [transactions, setTransactions] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [summary, setSummary] = useState({ totalIn: 0, totalOut: 0, netBalance: 0, transactionCount: 0, activeAccounts: 0 });
@@ -571,7 +747,9 @@ export default function BudgetTab() {
   const [searchRaw, setSearchRaw] = useState("");
   const search = useDeferredValue(searchRaw);
 
-  const [view, setView] = useState("transactions"); // "transactions" | "accounts" | "sales" | "bookkeeping"
+  const [view, setView] = useState(isAccountingMode ? "accounts" : "transactions"); // "transactions" | "accounts" | "bookkeeping" | reports
+  const [financialPage, setFinancialPage] = useState("sales_transactions");
+  const [accountingPage, setAccountingPage] = useState("chart_of_accounts");
 
   const [txForm, setTxForm] = useState(EMPTY_TX_FORM);
   const [txLines, setTxLines] = useState(() => [createTxLine()]);
@@ -609,6 +787,9 @@ export default function BudgetTab() {
   const [importBatchDeleting, setImportBatchDeleting] = useState(false);
   const [exportingRawLogs, setExportingRawLogs] = useState(false);
   const [projects, setProjects] = useState([]);
+  const [projectPackages, setProjectPackages] = useState([]);
+  const [projectPackagesLoading, setProjectPackagesLoading] = useState(false);
+  const [projectPackageApplying, setProjectPackageApplying] = useState(false);
 
   // ── Sales / Customers state ─────────────────────────────────────────────────
   const [customers, setCustomers] = useState([]);
@@ -707,10 +888,31 @@ export default function BudgetTab() {
     }
   };
 
+  const loadProjectPackages = async (quiet = false) => {
+    if (!quiet) setProjectPackagesLoading(true);
+    try {
+      const res = await api.get("/package-prices", {
+        params: {
+          activeOnly: 1
+        }
+      });
+      setProjectPackages(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setProjectPackages([]);
+    } finally {
+      if (!quiet) setProjectPackagesLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterType, filterAccount, filterDateFrom, filterDateTo, search, scopeMode, scopeProjectId]);
+
+  useEffect(() => {
+    loadProjectPackages(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (scopeMode === "transaction") {
@@ -724,10 +926,43 @@ export default function BudgetTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (isAccountingMode) {
+      selectAccountingPage(accountingPage);
+    } else if (isFinanceMode) {
+      selectFinancialPage(financialPage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moduleMode]);
+
   function flash(msg, type = "success") {
     if (type === "success") { setSuccess(msg); setError(""); }
     else { setError(msg); setSuccess(""); }
     setTimeout(() => { setSuccess(""); setError(""); }, 3500);
+  }
+
+  function selectFinancialPage(pageKey) {
+    const page = FINANCIAL_PAGE_OPTIONS.find((item) => item.key === pageKey) || FINANCIAL_PAGE_OPTIONS[0];
+    setFinancialPage(page.key);
+    setView(page.view);
+    setScopeMode(page.scopeMode || "overall");
+    setScopeProjectId("");
+    if (page.filterType) setFilterType(page.filterType);
+    if (page.view !== "transactions") {
+      setFilterType("all");
+      setFilterAccount("all");
+    }
+  }
+
+  function selectAccountingPage(pageKey) {
+    const page = ACCOUNTING_PAGE_OPTIONS.find((item) => item.key === pageKey) || ACCOUNTING_PAGE_OPTIONS[0];
+    setAccountingPage(page.key);
+    setView(page.view);
+    if (page.bookkeepingView) {
+      setBookkeepingView(page.bookkeepingView);
+      setBookkeepingFormOpen(false);
+      setEditingBookkeeping(null);
+    }
   }
 
   function updateBookkeepingField(section, field, value) {
@@ -938,6 +1173,36 @@ export default function BudgetTab() {
     () => projects.filter((project) => projForm.customerId && String(project.customer_id || "") === String(projForm.customerId)),
     [projects, projForm.customerId]
   );
+  const projectPackageGroups = useMemo(() => {
+    const groups = new Map();
+    for (const pkg of [...projectPackages].sort((a, b) => {
+      const templateDiff = String(a.template_name || "").localeCompare(String(b.template_name || ""));
+      if (templateDiff !== 0) return templateDiff;
+      return String(a.scenario_label || "").localeCompare(String(b.scenario_label || ""));
+    })) {
+      const label = String(pkg.template_name || "").trim() || "Packages";
+      if (!groups.has(label)) groups.set(label, []);
+      groups.get(label).push(pkg);
+    }
+    return Array.from(groups.entries()).map(([label, rows]) => ({ label, rows }));
+  }, [projectPackages]);
+  const selectedProjectPackageId = useMemo(() => {
+    const savedPackage = String(projForm.systemPackage || "").trim();
+    if (!savedPackage) return "";
+
+    const existingProjectPackage = String(editingProj?.system_package || "").trim();
+    if (editingProj && existingProjectPackage && savedPackage === existingProjectPackage) {
+      return "__current";
+    }
+
+    const match = projectPackages.find((pkg) => {
+      const displayName = projectPackageDisplayName(pkg);
+      const scenarioLabel = String(pkg.scenario_label || "").trim();
+      return displayName === savedPackage || scenarioLabel === savedPackage;
+    });
+
+    return match ? String(match.id) : "__current";
+  }, [editingProj, projectPackages, projForm.systemPackage]);
   const salesCollected = useMemo(
     () => projects.reduce((sum, project) => sum + toNumber(project.total_income, 0), 0),
     [projects]
@@ -1153,6 +1418,55 @@ export default function BudgetTab() {
     setEditingProj(selectedProject);
     setProjForm(projectFormFromProject(selectedProject));
   }
+  async function handleProjectPackageChange(packageId) {
+    if (!packageId) {
+      setProjForm((form) => ({ ...form, systemPackage: "" }));
+      return;
+    }
+    if (packageId === "__current") return;
+
+    const selectedPackage = projectPackages.find((pkg) => String(pkg.id) === String(packageId));
+    if (!selectedPackage) return;
+
+    const packageName = projectPackageDisplayName(selectedPackage);
+    setProjForm((form) => ({
+      ...form,
+      systemPackage: packageName,
+      saleAmount: formatFixedFormNumber(selectedPackage.package_price, 2)
+    }));
+
+    setProjectPackageApplying(true);
+    try {
+      const res = await api.get("/package-prices/costing", {
+        params: {
+          templateId: Number(selectedPackage.template_id),
+          activeOnly: 0,
+          vatMode: "incl"
+        }
+      });
+      const materialRows = (Array.isArray(res.data?.items) ? res.data.items : [])
+        .map((item) => {
+          const qty = Math.max(0, toNumber(item.qty, 0));
+          const unitCost = Math.max(0, toNumber(item.unit_cost, 0));
+          return createMaterialDetail({
+            item: String(item.description || item.catalog_material_name || "").trim(),
+            qty: formatFormNumber(qty),
+            unitCost: formatFormNumber(unitCost),
+            total: formatFormNumber(qty * unitCost)
+          });
+        })
+        .filter((row) => row.item);
+
+      setProjForm((form) => ({
+        ...form,
+        materialsDetails: materialRows.length ? materialRows : [createMaterialDetail()]
+      }));
+    } catch (err) {
+      flash(err?.response?.data?.message || "Failed to load materials for the selected package.", "error");
+    } finally {
+      setProjectPackageApplying(false);
+    }
+  }
   function updateProjectDetail(section, index, field, value) {
     setProjForm((form) => {
       const rows = [...(form[section] || [])];
@@ -1182,7 +1496,7 @@ export default function BudgetTab() {
     const selectedProject = isProjectCostingForm && projForm.projectId ? projects.find((project) => String(project.id) === String(projForm.projectId)) : null;
     const targetProject = editingProj || selectedProject;
     if (isProjectCostingForm && !targetProject) {
-      flash("Select an existing Sales project for project costing.", "error");
+      flash("Select an existing CRM project for project costing.", "error");
       return;
     }
     setProjSaving(true);
@@ -1646,30 +1960,38 @@ export default function BudgetTab() {
       {/* ── Toolbar ────────────────────────────────────────────────────────── */}
       <div className="bgt-toolbar">
         <div className="bgt-seg">
-          <button className={`bgt-seg-btn${view === "transactions" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("transactions")}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12h6M9 16h4" /></svg>
-            Transactions
-          </button>
-          <button className={`bgt-seg-btn${view === "accounts" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("accounts")}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /><path d="M7 15h2M12 15h2" /></svg>
-            Category
-          </button>
-          <button className={`bgt-seg-btn${view === "sales" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("sales")}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-            Sales
-          </button>
-          <button className={`bgt-seg-btn${view === "bookkeeping" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("bookkeeping")}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3.5h12a1.5 1.5 0 0 1 1.5 1.5v15.5l-2.2-1.2-2.2 1.2-2.2-1.2-2.2 1.2-2.2-1.2-2.2 1.2V5A1.5 1.5 0 0 1 6 3.5Z" /><path d="M8.5 8h7" /><path d="M8.5 11.5h7" /><path d="M8.5 15h4.5" /></svg>
-            Bookkeeping
-          </button>
+          {isFinanceMode && FINANCIAL_PAGE_OPTIONS.map((page) => (
+            <button key={page.key} className={`bgt-seg-btn${financialPage === page.key ? " bgt-seg-btn--on" : ""}`} onClick={() => selectFinancialPage(page.key)} type="button">
+              {page.label}
+            </button>
+          ))}
+          {isAccountingMode && ACCOUNTING_PAGE_OPTIONS.map((page) => (
+            <button key={page.key} className={`bgt-seg-btn${accountingPage === page.key ? " bgt-seg-btn--on" : ""}`} onClick={() => selectAccountingPage(page.key)} type="button">
+              {page.label}
+            </button>
+          ))}
+          {!isFinanceMode && !isAccountingMode && (
+            <>
+              <button className={`bgt-seg-btn${view === "transactions" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("transactions")}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12h6M9 16h4" /></svg>
+                Transactions
+              </button>
+              <button className={`bgt-seg-btn${view === "accounts" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("accounts")}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /><path d="M7 15h2M12 15h2" /></svg>
+                Category
+              </button>
+              <button className={`bgt-seg-btn${view === "bookkeeping" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("bookkeeping")}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3.5h12a1.5 1.5 0 0 1 1.5 1.5v15.5l-2.2-1.2-2.2 1.2-2.2-1.2-2.2 1.2-2.2-1.2-2.2 1.2V5A1.5 1.5 0 0 1 6 3.5Z" /><path d="M8.5 8h7" /><path d="M8.5 11.5h7" /><path d="M8.5 15h4.5" /></svg>
+                Bookkeeping
+              </button>
+            </>
+          )}
         </div>
 
         <div className="bgt-toolbar-actions">
           {view === "transactions" && (
             scopeMode === "project" ? (
-              <button className="btn btn-primary" onClick={() => openNewProj()}>
-                <IconPlus /> Add Project
-              </button>
+              null
             ) : (
               <>
                 <button className="btn btn-ghost bgt-btn-import" onClick={openAssignProject} disabled={!selectedTxCount || projects.length === 0}>
@@ -1698,19 +2020,26 @@ export default function BudgetTab() {
               <IconPlus /> New Category
             </button>
           )}
-          {view === "sales" && (
-            <div className="bgt-toolbar-actions">
-              <button className="btn btn-ghost bgt-btn-import" onClick={openImport}>
-                <IconUpload /> Import Expenses
-              </button>
-              <button className="btn btn-ghost" onClick={() => openNewPayment(detailProj)} disabled={!defaultIncomeAccountId}><IconArrowDown /> Add Payment</button>
-              <button className="btn btn-ghost bgt-btn-import" onClick={openNewCust}><IconPlus /> Add Client</button>
-              <button className="btn btn-primary" onClick={() => openNewProj()}><IconPlus /> Add Project / Sale</button>
-            </div>
-          )}
           {view === "bookkeeping" && (
             <button className="btn btn-ghost bgt-btn-import" onClick={() => loadBookkeeping()} disabled={bookkeepingLoading}>
               <IconRefresh /> {bookkeepingLoading ? "Refreshing..." : "Refresh"}
+            </button>
+          )}
+          {view === "financial_reports" && (
+            <button className="btn btn-ghost bgt-btn-import" onClick={() => loadAll(true)} disabled={loading}>
+              <IconRefresh /> {loading ? "Refreshing..." : "Refresh"}
+            </button>
+          )}
+          {view === "accounting_reports" && (
+            <button
+              className="btn btn-ghost bgt-btn-import"
+              onClick={() => {
+                loadAll(true);
+                loadBookkeeping(true);
+              }}
+              disabled={loading || bookkeepingLoading}
+            >
+              <IconRefresh /> {loading || bookkeepingLoading ? "Refreshing..." : "Refresh"}
             </button>
           )}
         </div>
@@ -1720,14 +2049,16 @@ export default function BudgetTab() {
       {view === "transactions" && (
         <>
           <div className="bgt-filters">
-            <div className="bgt-seg" style={{ flexShrink: 0 }}>
-              <button className={`bgt-seg-btn${scopeMode === "overall" ? " bgt-seg-btn--on" : ""}`} onClick={() => { setScopeMode("overall"); setScopeProjectId(""); }}>
-                Raw Logs
-              </button>
-              <button className={`bgt-seg-btn${scopeMode === "project" ? " bgt-seg-btn--on" : ""}`} onClick={() => { setScopeMode("project"); setScopeProjectId(""); setFilterType("all"); setFilterAccount("all"); }}>
-                Project Costing
-              </button>
-            </div>
+            {!isFinanceMode && (
+              <div className="bgt-seg" style={{ flexShrink: 0 }}>
+                <button className={`bgt-seg-btn${scopeMode === "overall" ? " bgt-seg-btn--on" : ""}`} onClick={() => { setScopeMode("overall"); setScopeProjectId(""); }}>
+                  Raw Logs
+                </button>
+                <button className={`bgt-seg-btn${scopeMode === "project" ? " bgt-seg-btn--on" : ""}`} onClick={() => { setScopeMode("project"); setScopeProjectId(""); setFilterType("all"); setFilterAccount("all"); }}>
+                  Project Costing
+                </button>
+              </div>
+            )}
             <div className="bgt-search-wrap">
               <span className="bgt-search-icon"><IconSearch /></span>
               <input className="input bgt-search-input" placeholder={scopeMode === "project" ? "Search customer, project, package, location..." : "Search description, reference, category…"} value={searchRaw} onChange={(e) => setSearchRaw(e.target.value)} />
@@ -1768,7 +2099,6 @@ export default function BudgetTab() {
               <div className="bgt-empty">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="bgt-empty-icon"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
                 <p>{projectCostingHasFilters ? "No projects match your filters." : "No project costing records yet."}</p>
-                {!projectCostingHasFilters && <button className="btn btn-primary" onClick={() => openNewProj()}><IconPlus /> Add Project</button>}
               </div>
             ) : (
               <div className="bgt-table-wrap">
@@ -1805,14 +2135,6 @@ export default function BudgetTab() {
                           <button className="bgt-row-btn" onClick={() => setViewingProjDetails(project)} title="View Details">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M1.5 12s4-7 10.5-7 10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z" /><circle cx="12" cy="12" r="3" /></svg>
                             View Details
-                          </button>
-                          <button className="bgt-row-btn" onClick={() => openEditProj(project)} title="Edit">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                            Edit
-                          </button>
-                          <button className="bgt-row-btn bgt-row-btn--del" onClick={() => setDeletingProj(project)} title="Delete">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" /></svg>
-                            Delete
                           </button>
                         </td>
                       </tr>
@@ -1924,6 +2246,16 @@ export default function BudgetTab() {
       )}
 
       {/* ── Accounts view ──────────────────────────────────────────────────── */}
+      {view === "financial_reports" && (
+        <FinancialReportsPanel
+          page={financialPage}
+          summary={summary}
+          transactions={transactions}
+          projects={projects}
+          accounts={accounts}
+        />
+      )}
+
       {assignOpen && (
         <div className="bgt-backdrop" onClick={(e) => { if (e.target === e.currentTarget) closeAssignProject(); }}>
           <div className="bgt-modal bgt-modal--sm">
@@ -2025,6 +2357,14 @@ export default function BudgetTab() {
       )}
 
       {/* ── Sales view ─────────────────────────────────────────────────────── */}
+      {view === "accounting_reports" && (
+        <AccountingReportsPanel
+          page={accountingPage}
+          accounts={accounts}
+          bookkeepingRows={bookkeepingRows}
+        />
+      )}
+
       {view === "bookkeeping" && (() => {
         const activeSection = BOOKKEEPING_SECTIONS.find((section) => section.key === bookkeepingView) || BOOKKEEPING_SECTIONS[0];
         const form = bookkeepingForms[activeSection.key] || createBookkeepingForm(activeSection.key);
@@ -2505,14 +2845,41 @@ export default function BudgetTab() {
                     <div className="bgt-form-grid">
                       <div className="bgt-field bgt-field--wide"><label className="bgt-label">Customer <span className="bgt-req">*</span></label><select className="input" required value={projForm.customerId} onChange={(e) => setProjForm((f) => ({ ...f, customerId: e.target.value }))}><option value="">— Select customer —</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                       <div className="bgt-field bgt-field--wide"><label className="bgt-label">Project <span className="bgt-req">*</span></label><input className="input" required placeholder="e.g. Solar Installation – Phase 1" value={projForm.projectName} onChange={(e) => setProjForm((f) => ({ ...f, projectName: e.target.value }))} /></div>
-                      <div className="bgt-field"><label className="bgt-label">System Package</label><input className="input" placeholder="e.g. 5kW Hybrid" value={projForm.systemPackage} onChange={(e) => setProjForm((f) => ({ ...f, systemPackage: e.target.value }))} /></div>
+                      <div className="bgt-field">
+                        <label className="bgt-label">System Package</label>
+                        <select
+                          className="input select"
+                          value={selectedProjectPackageId}
+                          disabled={projectPackagesLoading || projectPackageApplying}
+                          onChange={(e) => handleProjectPackageChange(e.target.value)}
+                        >
+                          <option value="">
+                            {projectPackages.length ? "Select package" : "No active packages available"}
+                          </option>
+                          {selectedProjectPackageId === "__current" && (
+                            <option value="__current">{projForm.systemPackage}</option>
+                          )}
+                          {projectPackageGroups.map((group) => (
+                            <optgroup key={group.label} label={group.label}>
+                              {group.rows.map((pkg) => (
+                                <option key={pkg.id} value={pkg.id}>
+                                  {projectPackageOptionLabel(pkg)}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ))}
+                        </select>
+                        {projectPackageApplying && (
+                          <p className="bgt-field-note">Creating project costing snapshot...</p>
+                        )}
+                      </div>
                       <div className="bgt-field"><label className="bgt-label">Location</label><input className="input" placeholder="Project location" value={projForm.location} onChange={(e) => setProjForm((f) => ({ ...f, location: e.target.value }))} /></div>
                       <div className="bgt-field"><label className="bgt-label">Selling Price (₱) <span className="bgt-req">*</span></label><input className="input" type="number" min="0" step="0.01" required placeholder="0.00" value={projForm.saleAmount} onChange={(e) => setProjForm((f) => ({ ...f, saleAmount: e.target.value }))} /></div>
                       <div className="bgt-field"><label className="bgt-label">Date</label><input className="input" type="date" value={projForm.projectDate} onChange={(e) => setProjForm((f) => ({ ...f, projectDate: e.target.value }))} /></div>
                       <div className="bgt-field"><label className="bgt-label">Status</label><select className="input" value={projForm.status} onChange={(e) => setProjForm((f) => ({ ...f, status: e.target.value }))}><option value="active">Active</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></div>
                       <div className="bgt-field"><label className="bgt-label">Category</label><select className="input" value={projForm.projectCategory} onChange={(e) => setProjForm((f) => ({ ...f, projectCategory: e.target.value }))}>{PROJECT_CATEGORY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
                     </div>
-                    <div className="bgt-modal-foot"><button type="button" className="btn btn-ghost" onClick={closeProj} disabled={projSaving}>Cancel</button><button type="submit" className="btn btn-primary" disabled={projSaving}>{projSaving ? "Saving…" : editingProj ? "Save Changes" : "Create Project"}</button></div>
+                    <div className="bgt-modal-foot"><button type="button" className="btn btn-ghost" onClick={closeProj} disabled={projSaving || projectPackageApplying}>Cancel</button><button type="submit" className="btn btn-primary" disabled={projSaving || projectPackageApplying}>{projSaving ? "Saving…" : editingProj ? "Save Changes" : "Create Project"}</button></div>
                   </form>
                 </div>
               </div>
@@ -2592,7 +2959,31 @@ export default function BudgetTab() {
                 </div>
                 <div className="bgt-field">
                   <label className="bgt-label">System Package</label>
-                  <input className="input" placeholder="e.g. 5kW Hybrid" value={projForm.systemPackage} onChange={(e) => setProjForm((f) => ({ ...f, systemPackage: e.target.value }))} />
+                  <select
+                    className="input select"
+                    value={selectedProjectPackageId}
+                    disabled={projectPackagesLoading || projectPackageApplying}
+                    onChange={(e) => handleProjectPackageChange(e.target.value)}
+                  >
+                    <option value="">
+                      {projectPackages.length ? "Select package" : "No active packages available"}
+                    </option>
+                    {selectedProjectPackageId === "__current" && (
+                      <option value="__current">{projForm.systemPackage}</option>
+                    )}
+                    {projectPackageGroups.map((group) => (
+                      <optgroup key={group.label} label={group.label}>
+                        {group.rows.map((pkg) => (
+                          <option key={pkg.id} value={pkg.id}>
+                            {projectPackageOptionLabel(pkg)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  {projectPackageApplying && (
+                    <p className="bgt-field-note">Loading package materials...</p>
+                  )}
                 </div>
                 <div className="bgt-field">
                   <label className="bgt-label">Location</label>
@@ -2679,8 +3070,8 @@ export default function BudgetTab() {
                   <strong>₱{formatMoney(projectFormTotalCost(projForm))}</strong>
                 </div>
                 <div className="bgt-modal-actions">
-                  <button type="button" className="btn btn-ghost" onClick={closeProj} disabled={projSaving}>Cancel</button>
-                  <button type="submit" className="btn btn-primary" disabled={projSaving}>{projSaving ? "Saving..." : editingProj ? "Save Changes" : "Create Project"}</button>
+                  <button type="button" className="btn btn-ghost" onClick={closeProj} disabled={projSaving || projectPackageApplying}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" disabled={projSaving || projectPackageApplying}>{projSaving ? "Saving..." : editingProj ? "Save Changes" : "Create Project"}</button>
                 </div>
               </div>
             </form>

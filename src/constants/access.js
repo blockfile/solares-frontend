@@ -5,6 +5,11 @@ export const MODULE_DEFINITIONS = [
     description: "View and manage calendar events."
   },
   {
+    key: "crm",
+    label: "Customer Relationship Management",
+    description: "Manage clients, projects, sales records, package selection, and quotations."
+  },
+  {
     key: "quotes",
     label: "Quotes",
     description: "Create and export customer quotations."
@@ -40,6 +45,16 @@ export const MODULE_DEFINITIONS = [
     description: "Manage reusable pricing margin templates."
   },
   {
+    key: "finance",
+    label: "Financial Management",
+    description: "Manage sales transactions, collections, payments, expenses, project costing, cash flow, and financial reports."
+  },
+  {
+    key: "accounting",
+    label: "Accounting Management",
+    description: "Manage chart of accounts, journal entries, general ledger, trial balance, receivables, payables, and financial statements."
+  },
+  {
     key: "users",
     label: "Users",
     description: "Create users and assign roles."
@@ -53,11 +68,6 @@ export const MODULE_DEFINITIONS = [
     key: "audit",
     label: "Audit",
     description: "Review activity logs and history."
-  },
-  {
-    key: "budget",
-    label: "Financial & Accounting Management",
-    description: "Track income and expenses, manage accounts, and monitor cash flow."
   }
 ];
 
@@ -67,6 +77,9 @@ export const SYSTEM_ROLE_KEYS = {
 };
 
 const MODULE_KEY_SET = new Set(MODULE_DEFINITIONS.map((definition) => definition.key));
+const MODULE_ALIASES = {
+  budget: ["finance", "accounting"]
+};
 
 export function normalizeRoleKey(value) {
   const normalized = String(value || "")
@@ -98,9 +111,12 @@ export function normalizeModules(value, fallback = []) {
   const modules = [];
   for (const item of source) {
     const key = String(item || "").trim().toLowerCase();
-    if (!MODULE_KEY_SET.has(key) || seen.has(key)) continue;
-    seen.add(key);
-    modules.push(key);
+    const keys = MODULE_ALIASES[key] || [key];
+    for (const moduleKey of keys) {
+      if (!MODULE_KEY_SET.has(moduleKey) || seen.has(moduleKey)) continue;
+      seen.add(moduleKey);
+      modules.push(moduleKey);
+    }
   }
   return modules;
 }

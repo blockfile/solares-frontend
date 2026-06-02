@@ -13,6 +13,21 @@ function formatMoney(value, fractionDigits = 2) {
   return toNumber(value, 0).toLocaleString("en-PH", { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits });
 }
 
+function formatPhpCurrency(value, fractionDigits = 2) {
+  if (value == null || value === "") return "₱-";
+  return `₱${formatMoney(value, fractionDigits)}`;
+}
+
+function formatFormNumber(value) {
+  if (value == null || value === "") return "";
+  return String(value);
+}
+
+function formatFixedFormNumber(value, fractionDigits) {
+  if (value == null || value === "") return "";
+  return toNumber(value, 0).toFixed(fractionDigits);
+}
+
 function formatQuantity(value) {
   if (value == null || value === "") return "—";
   return toNumber(value, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: PRICE_DECIMAL_PLACES });
@@ -38,9 +53,104 @@ function localDate(value = new Date()) {
 
 const STATUS_LABELS = { active: "Active", completed: "Completed", cancelled: "Cancelled" };
 const STATUS_COLORS = { active: "sl-pill--active", completed: "sl-pill--done", cancelled: "sl-pill--cancelled" };
+const PROJECT_CATEGORY_OPTIONS = [
+  { value: "materials", label: "Materials" },
+  { value: "labor", label: "Labor" },
+  { value: "others", label: "Others" }
+];
 
-const EMPTY_CUST = { name: "", contact: "", address: "", notes: "" };
-const EMPTY_PROJ = { customerId: "", projectName: "", saleAmount: "", projectDate: localDate(), status: "active", notes: "" };
+function projectPackageDisplayName(pkg) {
+  const templateName = String(pkg?.template_name || "").trim();
+  const scenarioLabel = String(pkg?.scenario_label || "").trim();
+  if (templateName && scenarioLabel) return `${templateName} - ${scenarioLabel}`;
+  return scenarioLabel || templateName || "System Package";
+}
+
+function projectPackageOptionLabel(pkg) {
+  const scenarioLabel = String(pkg?.scenario_label || "").trim() || projectPackageDisplayName(pkg);
+  return `${scenarioLabel} | ${formatPhpCurrency(pkg?.package_price)}`;
+}
+
+function createMaterialDetail(overrides = {}) {
+  return { item: "", qty: "", unitCost: "", total: "", ...overrides };
+}
+
+function createLaborDetail(overrides = {}) {
+  return { description: "", amount: "", ...overrides };
+}
+
+function createOtherExpenseDetail(overrides = {}) {
+  return { expenses: "", amount: "", ...overrides };
+}
+
+function materialDetailTotal(row) {
+  const explicit = Number(row?.total);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  const qty = Number(row?.qty);
+  const unitCost = Number(row?.unitCost);
+  if (!Number.isFinite(qty) || !Number.isFinite(unitCost)) return 0;
+  return qty * unitCost;
+}
+
+function normalizeMaterialDetails(value, includeBlank = false) {
+  const rows = Array.isArray(value) ? value : [];
+  const normalized = rows.map((row) => createMaterialDetail({
+    item: row?.item || "",
+    qty: formatFormNumber(row?.qty),
+    unitCost: formatFormNumber(row?.unitCost ?? row?.unit_cost),
+    total: formatFormNumber(row?.total)
+  })).filter((row) => row.item || row.qty || row.unitCost || row.total);
+  return normalized.length || !includeBlank ? normalized : [createMaterialDetail()];
+}
+
+function normalizeAmountDetails(value, labelField, createRow, includeBlank = false) {
+  const rows = Array.isArray(value) ? value : [];
+  const normalized = rows.map((row) => createRow({
+    [labelField]: row?.[labelField] || "",
+    amount: formatFormNumber(row?.amount)
+  })).filter((row) => row[labelField] || row.amount);
+  return normalized.length || !includeBlank ? normalized : [createRow()];
+}
+
+function projectDetailsForForm(project, includeBlank = true) {
+  return {
+    materialsDetails: normalizeMaterialDetails(project?.materials_details, includeBlank),
+    laborDetails: normalizeAmountDetails(project?.labor_details, "description", createLaborDetail, includeBlank),
+    otherExpensesDetails: normalizeAmountDetails(project?.other_expenses_details, "expenses", createOtherExpenseDetail, includeBlank)
+  };
+}
+
+function projectDetailsTotalCost(project) {
+  const materials = normalizeMaterialDetails(project?.materials_details);
+  const labor = normalizeAmountDetails(project?.labor_details, "description", createLaborDetail);
+  const others = normalizeAmountDetails(project?.other_expenses_details, "expenses", createOtherExpenseDetail);
+  return (
+    materials.reduce((sum, row) => sum + materialDetailTotal(row), 0) +
+    labor.reduce((sum, row) => sum + toNumber(row.amount, 0), 0) +
+    others.reduce((sum, row) => sum + toNumber(row.amount, 0), 0)
+  );
+}
+
+function projectCostAmount(project) {
+  const snapshotCost = projectDetailsTotalCost(project);
+  return snapshotCost > 0 ? snapshotCost : toNumber(project?.total_expenses, 0);
+}
+
+const EMPTY_CUST = { name: "", contact: "", tinNo: "", address: "", notes: "" };
+const EMPTY_PROJ = {
+  customerId: "",
+  projectName: "",
+  systemPackage: "",
+  location: "",
+  saleAmount: "",
+  projectDate: localDate(),
+  startDate: localDate(),
+  endDate: "",
+  status: "active",
+  projectCategory: "materials",
+  notes: "",
+  ...projectDetailsForForm(null, true)
+};
 
 export default function SalesTab() {
   const [customers, setCustomers] = useState([]);
@@ -66,6 +176,9 @@ export default function SalesTab() {
   const [projOpen, setProjOpen] = useState(false);
   const [projSaving, setProjSaving] = useState(false);
   const [deletingProj, setDeletingProj] = useState(null);
+  const [projectPackages, setProjectPackages] = useState([]);
+  const [projectPackagesLoading, setProjectPackagesLoading] = useState(false);
+  const [projectPackageApplying, setProjectPackageApplying] = useState(false);
 
   // Project detail drawer
   const [detailProj, setDetailProj] = useState(null);
@@ -90,7 +203,22 @@ export default function SalesTab() {
     }
   };
 
+  const loadProjectPackages = async (quiet = false) => {
+    if (!quiet) setProjectPackagesLoading(true);
+    try {
+      const res = await api.get("/package-prices", {
+        params: { activeOnly: 1 }
+      });
+      setProjectPackages(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setProjectPackages([]);
+    } finally {
+      if (!quiet) setProjectPackagesLoading(false);
+    }
+  };
+
   useEffect(() => { loadAll(); }, []);
+  useEffect(() => { loadProjectPackages(true); }, []);
 
   function flash(msg, type = "success") {
     if (type === "success") { setSuccess(msg); setError(""); }
@@ -100,13 +228,13 @@ export default function SalesTab() {
 
   // ── Customer CRUD ──────────────────────────────────────────────────────────
   function openNewCust() { setEditingCust(null); setCustForm(EMPTY_CUST); setCustOpen(true); }
-  function openEditCust(c) { setEditingCust(c); setCustForm({ name: c.name || "", contact: c.contact || "", address: c.address || "", notes: c.notes || "" }); setCustOpen(true); }
+  function openEditCust(c) { setEditingCust(c); setCustForm({ name: c.name || "", contact: c.contact || "", tinNo: c.tin_no || c.tinNo || "", address: c.address || "", notes: c.notes || "" }); setCustOpen(true); }
   function closeCust() { setCustOpen(false); setEditingCust(null); setCustForm(EMPTY_CUST); }
 
   async function saveCust(e) {
     e.preventDefault(); setCustSaving(true);
     try {
-      const payload = { name: custForm.name, contact: custForm.contact, address: custForm.address, notes: custForm.notes };
+      const payload = { name: custForm.name, contact: custForm.contact, tinNo: custForm.tinNo, address: custForm.address, notes: custForm.notes };
       if (editingCust) { await api.put(`/customers/${editingCust.id}`, payload); flash("Customer updated."); }
       else { await api.post("/customers", payload); flash("Customer created."); }
       closeCust(); await loadAll(true);
@@ -123,18 +251,108 @@ export default function SalesTab() {
   }
 
   // ── Project CRUD ───────────────────────────────────────────────────────────
-  function openNewProj(custId = "") { setEditingProj(null); setProjForm({ ...EMPTY_PROJ, customerId: custId ? String(custId) : "", projectDate: localDate() }); setProjOpen(true); }
+  function openNewProj(custId = "") {
+    setEditingProj(null);
+    setProjForm({
+      ...EMPTY_PROJ,
+      ...projectDetailsForForm(null, true),
+      customerId: custId ? String(custId) : "",
+      projectDate: localDate(),
+      startDate: localDate(),
+      endDate: "",
+      projectCategory: "materials"
+    });
+    setProjOpen(true);
+  }
   function openEditProj(p) {
     setEditingProj(p);
-    setProjForm({ customerId: String(p.customer_id), projectName: p.project_name || "", saleAmount: String(p.sale_amount), projectDate: p.project_date ? localDate(p.project_date) : localDate(), status: p.status || "active", notes: p.notes || "" });
+    setProjForm({
+      customerId: String(p.customer_id || ""),
+      projectName: p.project_name || "",
+      systemPackage: p.system_package || "",
+      location: p.location || "",
+      saleAmount: String(p.sale_amount ?? ""),
+      projectDate: p.project_date ? localDate(p.project_date) : localDate(p.start_date || new Date()),
+      startDate: p.start_date ? localDate(p.start_date) : p.project_date ? localDate(p.project_date) : "",
+      endDate: p.end_date ? localDate(p.end_date) : "",
+      status: p.status || "active",
+      projectCategory: p.project_category || "materials",
+      notes: p.notes || "",
+      ...projectDetailsForForm(p, true)
+    });
     setProjOpen(true);
   }
   function closeProj() { setProjOpen(false); setEditingProj(null); setProjForm(EMPTY_PROJ); }
 
+  async function handleProjectPackageChange(packageId) {
+    if (!packageId) {
+      setProjForm((form) => ({ ...form, systemPackage: "" }));
+      return;
+    }
+    if (packageId === "__current") return;
+
+    const selectedPackage = projectPackages.find((pkg) => String(pkg.id) === String(packageId));
+    if (!selectedPackage) return;
+
+    const packageName = projectPackageDisplayName(selectedPackage);
+    setProjForm((form) => ({
+      ...form,
+      systemPackage: packageName,
+      saleAmount: formatFixedFormNumber(selectedPackage.package_price, 2)
+    }));
+
+    setProjectPackageApplying(true);
+    try {
+      const res = await api.get("/package-prices/costing", {
+        params: {
+          templateId: Number(selectedPackage.template_id),
+          activeOnly: 0,
+          vatMode: "incl"
+        }
+      });
+      const materialRows = (Array.isArray(res.data?.items) ? res.data.items : [])
+        .map((item) => {
+          const qty = Math.max(0, toNumber(item.qty, 0));
+          const unitCost = Math.max(0, toNumber(item.unit_cost, 0));
+          return createMaterialDetail({
+            item: String(item.description || item.catalog_material_name || "").trim(),
+            qty: formatFormNumber(qty),
+            unitCost: formatFormNumber(unitCost),
+            total: formatFormNumber(qty * unitCost)
+          });
+        })
+        .filter((row) => row.item);
+
+      setProjForm((form) => ({
+        ...form,
+        materialsDetails: materialRows.length ? materialRows : [createMaterialDetail()]
+      }));
+    } catch (err) {
+      flash(err?.response?.data?.message || "Failed to load materials for the selected package.", "error");
+    } finally {
+      setProjectPackageApplying(false);
+    }
+  }
+
   async function saveProj(e) {
     e.preventDefault(); setProjSaving(true);
     try {
-      const payload = { customerId: Number(projForm.customerId), projectName: projForm.projectName, saleAmount: Number(projForm.saleAmount), projectDate: projForm.projectDate, status: projForm.status, notes: projForm.notes };
+      const payload = {
+        customerId: Number(projForm.customerId),
+        projectName: projForm.projectName,
+        systemPackage: projForm.systemPackage,
+        location: projForm.location,
+        saleAmount: Number(projForm.saleAmount),
+        projectDate: projForm.projectDate,
+        startDate: projForm.startDate || projForm.projectDate,
+        endDate: projForm.endDate,
+        status: projForm.status,
+        projectCategory: projForm.projectCategory,
+        notes: projForm.notes,
+        materialsDetails: projForm.materialsDetails,
+        laborDetails: projForm.laborDetails,
+        otherExpensesDetails: projForm.otherExpensesDetails
+      };
       if (editingProj) { await api.put(`/customers/projects/${editingProj.id}`, payload); flash("Project updated."); }
       else { await api.post("/customers/projects", payload); flash("Project created."); }
       closeProj(); await loadAll(true);
@@ -160,14 +378,53 @@ export default function SalesTab() {
   }
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  const customerMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
-
   const filteredProjects = useMemo(() =>
     selectedCustomer ? projects.filter((p) => p.customer_id === selectedCustomer) : projects,
     [projects, selectedCustomer]
   );
 
-  const netPositive = toNumber(summary.totalMargin, 0) >= 0;
+  const projectPackageGroups = useMemo(() => {
+    const groups = new Map();
+    for (const pkg of [...projectPackages].sort((a, b) => {
+      const templateDiff = String(a.template_name || "").localeCompare(String(b.template_name || ""));
+      if (templateDiff !== 0) return templateDiff;
+      return String(a.scenario_label || "").localeCompare(String(b.scenario_label || ""));
+    })) {
+      const label = String(pkg.template_name || "").trim() || "Packages";
+      if (!groups.has(label)) groups.set(label, []);
+      groups.get(label).push(pkg);
+    }
+    return Array.from(groups.entries()).map(([label, rows]) => ({ label, rows }));
+  }, [projectPackages]);
+
+  const selectedProjectPackageId = useMemo(() => {
+    const savedPackage = String(projForm.systemPackage || "").trim();
+    if (!savedPackage) return "";
+
+    const existingProjectPackage = String(editingProj?.system_package || "").trim();
+    if (editingProj && existingProjectPackage && savedPackage === existingProjectPackage) {
+      return "__current";
+    }
+
+    const match = projectPackages.find((pkg) => {
+      const displayName = projectPackageDisplayName(pkg);
+      const scenarioLabel = String(pkg.scenario_label || "").trim();
+      return displayName === savedPackage || scenarioLabel === savedPackage;
+    });
+
+    return match ? String(match.id) : "__current";
+  }, [editingProj, projectPackages, projForm.systemPackage]);
+
+  const crmContractValue = useMemo(
+    () => projects.reduce((sum, project) => sum + toNumber(project.sale_amount, 0), 0),
+    [projects]
+  );
+  const crmCostingExpenses = useMemo(
+    () => projects.reduce((sum, project) => sum + projectCostAmount(project), 0),
+    [projects]
+  );
+  const crmMargin = crmContractValue - crmCostingExpenses;
+  const netPositive = crmMargin >= 0;
 
   return (
     <div className="sl">
@@ -180,17 +437,17 @@ export default function SalesTab() {
         </div>
         <div className="sl-kpi sl-kpi--sales">
           <span className="sl-kpi-label">Total Sales</span>
-          <strong className="sl-kpi-value">₱{formatMoney(summary.totalSales)}</strong>
+          <strong className="sl-kpi-value">₱{formatMoney(crmContractValue)}</strong>
           <span className="sl-kpi-sub">contract value</span>
         </div>
         <div className="sl-kpi sl-kpi--expenses">
           <span className="sl-kpi-label">Total Expenses</span>
-          <strong className="sl-kpi-value">₱{formatMoney(summary.totalExpenses)}</strong>
-          <span className="sl-kpi-sub">linked costs</span>
+          <strong className="sl-kpi-value">₱{formatMoney(crmCostingExpenses)}</strong>
+          <span className="sl-kpi-sub">project costing</span>
         </div>
         <div className={`sl-kpi sl-kpi--margin ${netPositive ? "sl-kpi--pos" : "sl-kpi--neg"}`}>
           <span className="sl-kpi-label">Net Margin</span>
-          <strong className="sl-kpi-value">₱{formatMoney(summary.totalMargin)}</strong>
+          <strong className="sl-kpi-value">₱{formatMoney(crmMargin)}</strong>
           <span className={`sl-kpi-badge ${netPositive ? "sl-kpi-badge--pos" : "sl-kpi-badge--neg"}`}>{netPositive ? "Profit" : "Loss"}</span>
         </div>
       </div>
@@ -217,7 +474,7 @@ export default function SalesTab() {
         </div>
         <div className="bgt-toolbar-actions">
           {view === "customers" && <button className="btn btn-primary" onClick={openNewCust}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Customer</button>}
-          {(view === "projects" || view === "overview") && <button className="btn btn-primary" onClick={() => openNewProj()}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Project</button>}
+          {view === "projects" && <button className="btn btn-primary" onClick={() => openNewProj()}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Project</button>}
         </div>
       </div>
 
@@ -236,7 +493,7 @@ export default function SalesTab() {
             {customers.map((cust) => {
               const custProjects = projects.filter((p) => p.customer_id === cust.id);
               const totalSales = custProjects.reduce((s, p) => s + toNumber(p.sale_amount, 0), 0);
-              const totalExp   = custProjects.reduce((s, p) => s + toNumber(p.total_expenses, 0), 0);
+              const totalExp   = custProjects.reduce((s, p) => s + projectCostAmount(p), 0);
               const margin     = totalSales - totalExp;
               const marginPos  = margin >= 0;
               return (
@@ -263,20 +520,27 @@ export default function SalesTab() {
 
                   {custProjects.length > 0 && (
                     <div className="sl-cust-projects">
-                      {custProjects.map((p) => (
-                        <button key={p.id} className="sl-proj-row" onClick={() => openDetail(p)}>
-                          <div className="sl-proj-row-left">
-                            <span className={`sl-pill ${STATUS_COLORS[p.status] || ""}`}>{STATUS_LABELS[p.status] || p.status}</span>
-                            <span className="sl-proj-name">{p.project_name}</span>
-                          </div>
-                          <div className="sl-proj-row-right">
-                            <span className="sl-proj-margin" style={{ color: toNumber(p.margin, 0) >= 0 ? "#147845" : "#b83a3a" }}>
-                              ₱{formatMoney(p.margin)}
-                            </span>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                          </div>
-                        </button>
-                      ))}
+                      {custProjects.map((p) => {
+                        const projectCost = projectCostAmount(p);
+                        const projectMargin = toNumber(p.sale_amount, 0) - projectCost;
+                        return (
+                          <button key={p.id} className="sl-proj-row" onClick={() => openDetail(p)}>
+                            <div className="sl-proj-row-left">
+                              <span className={`sl-pill ${STATUS_COLORS[p.status] || ""}`}>{STATUS_LABELS[p.status] || p.status}</span>
+                              <div className="sl-proj-copy">
+                                <span className="sl-proj-name">{p.project_name}</span>
+                                <span className="sl-proj-sub">{p.system_package || "No package selected"} • Cost ₱{formatMoney(projectCost)}</span>
+                              </div>
+                            </div>
+                            <div className="sl-proj-row-right">
+                              <span className="sl-proj-margin" style={{ color: projectMargin >= 0 ? "#147845" : "#b83a3a" }}>
+                                ₱{formatMoney(projectMargin)}
+                              </span>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -301,17 +565,20 @@ export default function SalesTab() {
         ) : (
           <div className="bgt-table-wrap">
             <table className="bgt-table">
-              <thead><tr><th>Customer</th><th>Contact</th><th>Projects</th><th className="bgt-col-amt">Sales</th><th className="bgt-col-amt">Expenses</th><th className="bgt-col-amt">Margin</th><th /></tr></thead>
+              <thead><tr><th>Full Name</th><th>Contact No.</th><th>Projects</th><th className="bgt-col-amt">Sales</th><th className="bgt-col-amt">Expenses</th><th className="bgt-col-amt">Margin</th><th /></tr></thead>
               <tbody>
                 {customers.map((c) => {
-                  const margin = toNumber(c.margin, 0);
+                  const customerProjects = projects.filter((p) => p.customer_id === c.id);
+                  const customerSales = customerProjects.reduce((sum, project) => sum + toNumber(project.sale_amount, 0), 0);
+                  const customerCost = customerProjects.reduce((sum, project) => sum + projectCostAmount(project), 0);
+                  const margin = customerSales - customerCost;
                   return (
                     <tr key={c.id} className="bgt-table-row">
                       <td><strong>{c.name}</strong></td>
                       <td className="bgt-muted">{c.contact || "—"}</td>
                       <td>{c.project_count}</td>
-                      <td className="bgt-col-amt" style={{ color: "#147845", fontWeight: 700 }}>₱{formatMoney(c.total_sales)}</td>
-                      <td className="bgt-col-amt" style={{ color: "#b83a3a", fontWeight: 700 }}>₱{formatMoney(c.total_expenses)}</td>
+                      <td className="bgt-col-amt" style={{ color: "#147845", fontWeight: 700 }}>₱{formatMoney(customerSales)}</td>
+                      <td className="bgt-col-amt" style={{ color: "#b83a3a", fontWeight: 700 }}>₱{formatMoney(customerCost)}</td>
                       <td className="bgt-col-amt" style={{ color: margin >= 0 ? "#147845" : "#b83a3a", fontWeight: 700 }}>₱{formatMoney(margin)}</td>
                       <td className="bgt-col-actions">
                         <button className="bgt-row-btn" onClick={() => openEditCust(c)}>Edit</button>
@@ -340,18 +607,20 @@ export default function SalesTab() {
           ) : (
             <div className="bgt-table-wrap">
               <table className="bgt-table">
-                <thead><tr><th>Customer</th><th>Project</th><th>Date</th><th>Status</th><th className="bgt-col-amt">Sale Amount</th><th className="bgt-col-amt">Expenses</th><th className="bgt-col-amt">Margin</th><th /></tr></thead>
+                <thead><tr><th>Customer</th><th>Project</th><th>System Package</th><th>Date</th><th>Status</th><th className="bgt-col-amt">Sale Amount</th><th className="bgt-col-amt">Expenses</th><th className="bgt-col-amt">Margin</th><th /></tr></thead>
                 <tbody>
                   {filteredProjects.map((p) => {
-                    const margin = toNumber(p.margin, 0);
+                    const projectCost = projectCostAmount(p);
+                    const margin = toNumber(p.sale_amount, 0) - projectCost;
                     return (
                       <tr key={p.id} className="bgt-table-row" style={{ cursor: "pointer" }} onClick={() => openDetail(p)}>
                         <td><span className="bgt-account-chip">{p.customer_name}</span></td>
                         <td><strong>{p.project_name}</strong></td>
+                        <td>{p.system_package || <span className="bgt-muted">—</span>}</td>
                         <td className="bgt-cell-date">{formatDate(p.project_date)}</td>
                         <td><span className={`sl-pill ${STATUS_COLORS[p.status] || ""}`}>{STATUS_LABELS[p.status] || p.status}</span></td>
                         <td className="bgt-col-amt" style={{ color: "#147845", fontWeight: 700 }}>₱{formatMoney(p.sale_amount)}</td>
-                        <td className="bgt-col-amt" style={{ color: "#b83a3a", fontWeight: 700 }}>₱{formatMoney(p.total_expenses)}</td>
+                        <td className="bgt-col-amt" style={{ color: "#b83a3a", fontWeight: 700 }}>₱{formatMoney(projectCost)}</td>
                         <td className="bgt-col-amt" style={{ color: margin >= 0 ? "#147845" : "#b83a3a", fontWeight: 700 }}>₱{formatMoney(margin)}</td>
                         <td className="bgt-col-actions" onClick={(e) => e.stopPropagation()}>
                           <button className="bgt-row-btn" onClick={() => openEditProj(p)}>Edit</button>
@@ -377,8 +646,9 @@ export default function SalesTab() {
             </div>
             <form className="bgt-modal-body" onSubmit={saveCust}>
               <div className="bgt-form-grid">
-                <div className="bgt-field bgt-field--wide"><label className="bgt-label">Name <span className="bgt-req">*</span></label><input className="input" required placeholder="e.g. Allan Santos" value={custForm.name} onChange={(e) => setCustForm((f) => ({ ...f, name: e.target.value }))} /></div>
-                <div className="bgt-field bgt-field--wide"><label className="bgt-label">Contact / Phone</label><input className="input" placeholder="Phone or email" value={custForm.contact} onChange={(e) => setCustForm((f) => ({ ...f, contact: e.target.value }))} /></div>
+                <div className="bgt-field bgt-field--wide"><label className="bgt-label">Full Name <span className="bgt-req">*</span></label><input className="input" required placeholder="e.g. Allan Santos" value={custForm.name} onChange={(e) => setCustForm((f) => ({ ...f, name: e.target.value }))} /></div>
+                <div className="bgt-field bgt-field--wide"><label className="bgt-label">Contact No.</label><input className="input" placeholder="Phone number" value={custForm.contact} onChange={(e) => setCustForm((f) => ({ ...f, contact: e.target.value }))} /></div>
+                <div className="bgt-field bgt-field--wide"><label className="bgt-label">TIN No.</label><input className="input" placeholder="TIN No. (optional)" value={custForm.tinNo} onChange={(e) => setCustForm((f) => ({ ...f, tinNo: e.target.value }))} /></div>
                 <div className="bgt-field bgt-field--wide"><label className="bgt-label">Address</label><input className="input" placeholder="Address (optional)" value={custForm.address} onChange={(e) => setCustForm((f) => ({ ...f, address: e.target.value }))} /></div>
                 <div className="bgt-field bgt-field--wide"><label className="bgt-label">Notes</label><textarea className="input" rows={2} value={custForm.notes} onChange={(e) => setCustForm((f) => ({ ...f, notes: e.target.value }))} /></div>
               </div>
@@ -405,18 +675,48 @@ export default function SalesTab() {
                   </select>
                 </div>
                 <div className="bgt-field bgt-field--wide"><label className="bgt-label">Project Name <span className="bgt-req">*</span></label><input className="input" required placeholder="e.g. Solar Installation – Phase 1" value={projForm.projectName} onChange={(e) => setProjForm((f) => ({ ...f, projectName: e.target.value }))} /></div>
+                <div className="bgt-field">
+                  <label className="bgt-label">System Package</label>
+                  <select
+                    className="input select"
+                    value={selectedProjectPackageId}
+                    disabled={projectPackagesLoading || projectPackageApplying}
+                    onChange={(e) => handleProjectPackageChange(e.target.value)}
+                  >
+                    <option value="">
+                      {projectPackages.length ? "Select package" : "No active packages available"}
+                    </option>
+                    {selectedProjectPackageId === "__current" && (
+                      <option value="__current">{projForm.systemPackage}</option>
+                    )}
+                    {projectPackageGroups.map((group) => (
+                      <optgroup key={group.label} label={group.label}>
+                        {group.rows.map((pkg) => (
+                          <option key={pkg.id} value={pkg.id}>
+                            {projectPackageOptionLabel(pkg)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  {projectPackageApplying && (
+                    <p className="bgt-field-note">Creating project costing snapshot...</p>
+                  )}
+                </div>
+                <div className="bgt-field"><label className="bgt-label">Location</label><input className="input" placeholder="Project location" value={projForm.location} onChange={(e) => setProjForm((f) => ({ ...f, location: e.target.value }))} /></div>
                 <div className="bgt-field"><label className="bgt-label">Sale Amount (₱) <span className="bgt-req">*</span></label><input className="input" type="number" min="0" step="0.01" required placeholder="0.00" value={projForm.saleAmount} onChange={(e) => setProjForm((f) => ({ ...f, saleAmount: e.target.value }))} /></div>
                 <div className="bgt-field"><label className="bgt-label">Date</label><input className="input" type="date" value={projForm.projectDate} onChange={(e) => setProjForm((f) => ({ ...f, projectDate: e.target.value }))} /></div>
-                <div className="bgt-field bgt-field--wide"><label className="bgt-label">Status</label>
+                <div className="bgt-field"><label className="bgt-label">Status</label>
                   <select className="input" value={projForm.status} onChange={(e) => setProjForm((f) => ({ ...f, status: e.target.value }))}>
                     <option value="active">Active</option>
                     <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
+                <div className="bgt-field"><label className="bgt-label">Category</label><select className="input" value={projForm.projectCategory} onChange={(e) => setProjForm((f) => ({ ...f, projectCategory: e.target.value }))}>{PROJECT_CATEGORY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
                 <div className="bgt-field bgt-field--wide"><label className="bgt-label">Notes</label><textarea className="input" rows={2} value={projForm.notes} onChange={(e) => setProjForm((f) => ({ ...f, notes: e.target.value }))} /></div>
               </div>
-              <div className="bgt-modal-foot"><button type="button" className="btn btn-ghost" onClick={closeProj} disabled={projSaving}>Cancel</button><button type="submit" className="btn btn-primary" disabled={projSaving}>{projSaving ? "Saving…" : editingProj ? "Save Changes" : "Create Project"}</button></div>
+              <div className="bgt-modal-foot"><button type="button" className="btn btn-ghost" onClick={closeProj} disabled={projSaving || projectPackageApplying}>Cancel</button><button type="submit" className="btn btn-primary" disabled={projSaving || projectPackageApplying}>{projSaving ? "Saving…" : editingProj ? "Save Changes" : "Create Project"}</button></div>
             </form>
           </div>
         </div>
@@ -434,18 +734,32 @@ export default function SalesTab() {
               <button className="bgt-modal-x" onClick={() => setDetailProj(null)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
             <div className="bgt-modal-body">
+              {(() => {
+                const detailCost = projectCostAmount(detailProj);
+                const detailMargin = toNumber(detailProj.sale_amount, 0) - detailCost;
+                return (
+                  <>
+                    <dl className="bgt-delete-fields bgt-delete-fields--wide">
+                      <div><dt>System Package</dt><dd>{detailProj.system_package || "-"}</dd></div>
+                      <div><dt>Location</dt><dd>{detailProj.location || "-"}</dd></div>
+                      <div><dt>Start Date</dt><dd>{formatDate(detailProj.start_date || detailProj.project_date)}</dd></div>
+                      <div><dt>End Date</dt><dd>{formatDate(detailProj.end_date)}</dd></div>
+                    </dl>
               <div className="sl-drawer-stats">
                 <div className="sl-dstat"><span className="sl-dstat-label">Sale Amount</span><strong className="sl-dstat-val sl-dstat-val--sales">₱{formatMoney(detailProj.sale_amount)}</strong></div>
-                <div className="sl-dstat"><span className="sl-dstat-label">Total Expenses</span><strong className="sl-dstat-val sl-dstat-val--exp">₱{formatMoney(detailProj.total_expenses)}</strong></div>
-                <div className="sl-dstat"><span className="sl-dstat-label">Margin</span><strong className={`sl-dstat-val ${toNumber(detailProj.margin, 0) >= 0 ? "sl-dstat-val--sales" : "sl-dstat-val--exp"}`}>₱{formatMoney(detailProj.margin)}</strong></div>
+                <div className="sl-dstat"><span className="sl-dstat-label">Project Cost</span><strong className="sl-dstat-val sl-dstat-val--exp">₱{formatMoney(detailCost)}</strong></div>
+                <div className="sl-dstat"><span className="sl-dstat-label">Margin</span><strong className={`sl-dstat-val ${detailMargin >= 0 ? "sl-dstat-val--sales" : "sl-dstat-val--exp"}`}>₱{formatMoney(detailMargin)}</strong></div>
               </div>
+                  </>
+                );
+              })()}
 
               <div className="sl-drawer-section">
                 <p className="sl-drawer-section-title">Linked Expenses ({detailTx.length})</p>
                 {detailLoading ? (
                   <div className="bgt-empty" style={{ padding: 24 }}><div className="bgt-spinner" /></div>
                 ) : detailTx.length === 0 ? (
-                  <p className="bgt-muted" style={{ padding: "12px 0", fontSize: 13 }}>No expenses linked to this project yet. Assign transactions via Financial & Accounting Management.</p>
+                  <p className="bgt-muted" style={{ padding: "12px 0", fontSize: 13 }}>No expenses linked to this project yet. Assign transactions via Financial Management.</p>
                 ) : (
                   <div className="bgt-import-preview">
                     <table className="bgt-table bgt-table--compact">
