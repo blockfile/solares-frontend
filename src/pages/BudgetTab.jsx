@@ -162,7 +162,6 @@ const EMPTY_BOOKKEEPING_ROWS = {
 const FINANCIAL_PAGE_OPTIONS = [
   { key: "sales_transactions", label: "All Transactions", view: "transactions", scopeMode: "overall", filterType: "all" },
   { key: "collections", label: "Collections", view: "transactions", scopeMode: "overall", filterType: "income" },
-  { key: "payments", label: "Payments", view: "transactions", scopeMode: "overall", filterType: "withdrawal" },
   { key: "expenses", label: "Expenses", view: "transactions", scopeMode: "overall", filterType: "expense" },
   { key: "project_costing", label: "Project Costing", view: "transactions", scopeMode: "project", filterType: "all" },
   { key: "cash_flow", label: "Cash Flow", view: "financial_reports" },
