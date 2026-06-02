@@ -23,7 +23,8 @@ function isPanelDescription(description) {
   return (
     text.includes("solar panel") ||
     (text.includes("panel") && text.includes("mono")) ||
-    (text.includes("mono") && /\d{3,4}\s*w/.test(text))
+    (text.includes("mono") && /\d{3,4}\s*w/.test(text)) ||
+    /\b\d{3,4}\s*w\b/.test(text)
   );
 }
 
@@ -446,6 +447,12 @@ function applyMarkup(basePrice, markupRate) {
 function parsePanelWatt(text) {
   const match = String(text || "").match(/(\d{3,4})\s*w\b/i);
   return match ? Number(match[1]) : 0;
+}
+
+function isPanelItemLike(item) {
+  const description = String(item?.description || item?.material_name || "");
+  const subgroup = String(item?.subgroup || item?.catalog_subgroup || "").trim().toLowerCase();
+  return item?.isPanel === true || subgroup === "panel" || isPanelDescription(description) || parsePanelWatt(description) > 0;
 }
 
 const QUOTE_VAT_RATE = 0.12;
@@ -1152,7 +1159,7 @@ export default function QuotesTab() {
             catalogBasePrice,
             marginRate: pricingConfig.materialMarkupRate,
             catalogMaterialId: Number(it.catalog_material_id || 0) || null,
-            isPanel: isPanelDescription(description),
+            isPanel: isPanelItemLike({ description, subgroup }),
             isManual: false,
             autoFromPanel: false,
             panelRatio: null,
@@ -1162,7 +1169,7 @@ export default function QuotesTab() {
         })
         .sort((a, b) => a.itemNo - b.itemNo);
 
-      const panel = mapped.find((it) => it.isPanel);
+      const panel = mapped.find((it) => isPanelItemLike(it));
       if (panel && Number(panel.qty) > 0) {
         mapped = mapped.map((it) => {
           if (it.templateItemId === panel.templateItemId) return it;
@@ -1404,7 +1411,7 @@ export default function QuotesTab() {
         selectedMarginTemplate,
         pricingConfig.materialMarkupRate
       ),
-      isPanel: isPanelDescription(String(hit.material_name || "")),
+      isPanel: isPanelItemLike({ description: String(hit.material_name || ""), subgroup: hit.subgroup }),
       formulaKey: detectMountingFormulaKey(String(hit.material_name || "")),
       catalogMaterialId: Number(hit.id)
     });
@@ -1690,7 +1697,7 @@ export default function QuotesTab() {
     [templateItems]
   );
   const selectedPanelItems = useMemo(
-    () => includedItems.filter((item) => item.isPanel || isPanelDescription(item.description)),
+    () => includedItems.filter((item) => isPanelItemLike(item)),
     [includedItems]
   );
   const selectedPanelQty = useMemo(
@@ -2126,7 +2133,7 @@ export default function QuotesTab() {
                                       ),
                                       formulaKey: detectMountingFormulaKey(nextDescription),
                                       catalogMaterialId: null,
-                                      isPanel: isPanelDescription(nextDescription)
+                                      isPanel: isPanelItemLike({ description: nextDescription, subgroup: nextSubgroup })
                                     };
                                   })())
                                 }
