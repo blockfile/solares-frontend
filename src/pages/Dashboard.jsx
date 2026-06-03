@@ -22,16 +22,16 @@ const TAB_CONFIG = [
   { key: "calendar", label: "Calendar Dashboard", group: "Workspace", icon: "calendar" },
   { key: "crm", label: "Customer Relationship Management", group: "Workspace", icon: "crm", accessKeys: ["crm", "quotes"] },
   { key: "payroll", label: "Payroll", group: "Workspace", icon: "payroll" },
-  { key: "templates", label: "Template Manager", group: "Catalog", icon: "templates" },
-  { key: "materials", label: "Material Cost", group: "Catalog", icon: "materials" },
-  { key: "inventory", label: "Inventory", group: "Catalog", icon: "inventory" },
-  { key: "packages", label: "Package Prices", group: "Catalog", icon: "packages" },
-  { key: "margins", label: "Margin Setup", group: "Catalog", icon: "margins" },
+  { key: "templates", label: "Template Manager", group: "System Configuration", icon: "templates" },
+  { key: "materials", label: "Material Cost", group: "System Configuration", icon: "materials" },
+  { key: "inventory", label: "Inventory", group: "System Configuration", icon: "inventory" },
+  { key: "packages", label: "Package Prices", group: "System Configuration", icon: "packages" },
+  { key: "margins", label: "Margin Setup", group: "System Configuration", icon: "margins" },
   { key: "finance", label: "Financial Management", group: "Workspace", icon: "finance" },
   { key: "accounting", label: "Accounting Management", group: "Workspace", icon: "accounting" },
-  { key: "users", label: "Users", group: "System Admin", icon: "users" },
-  { key: "roles", label: "Roles", group: "System Admin", icon: "roles" },
-  { key: "audit", label: "Audit", group: "System Admin", icon: "audit" }
+  { key: "users", label: "Users", group: "System Administration", icon: "users" },
+  { key: "roles", label: "Roles", group: "System Administration", icon: "roles" },
+  { key: "audit", label: "Audit", group: "System Administration", icon: "audit" }
 ];
 
 function toCount(data) {

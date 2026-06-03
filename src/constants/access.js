@@ -6,6 +6,7 @@ export const MODULE_DEFINITIONS = [
   },
   {
     key: "crm",
+    code: "CRM",
     label: "Customer Relationship Management",
     description: "Manage clients, projects, sales records, package selection, and quotations."
   },
@@ -46,11 +47,13 @@ export const MODULE_DEFINITIONS = [
   },
   {
     key: "finance",
+    code: "FM",
     label: "Financial Management",
     description: "Manage sales transactions, collections, payments, expenses, project costing, cash flow, and financial reports."
   },
   {
     key: "accounting",
+    code: "AM",
     label: "Accounting Management",
     description: "Manage chart of accounts, journal entries, general ledger, trial balance, receivables, payables, and financial statements."
   },
@@ -78,7 +81,11 @@ export const SYSTEM_ROLE_KEYS = {
 
 const MODULE_KEY_SET = new Set(MODULE_DEFINITIONS.map((definition) => definition.key));
 const MODULE_ALIASES = {
-  budget: ["finance", "accounting"]
+  budget: ["finance", "accounting"],
+  fm: ["finance"],
+  am: ["accounting"],
+  sc: ["templates", "materials", "inventory", "packages", "margins"],
+  sa: ["users", "roles", "audit"]
 };
 
 export function normalizeRoleKey(value) {
