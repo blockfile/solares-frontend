@@ -5811,6 +5811,36 @@ button {
   min-width: 1040px;
 }
 
+.bgt-table--category-list {
+  min-width: 1040px;
+}
+
+.bgt-table-row--inactive {
+  opacity: 0.66;
+}
+
+.bgt-category-list-name {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.bgt-category-list-name strong {
+  display: block;
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.25;
+}
+
+.bgt-category-list-name p {
+  margin-top: 3px;
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.35;
+  max-width: 360px;
+}
+
 .bgt-cell-date {
   white-space: nowrap;
   color: var(--text-soft);

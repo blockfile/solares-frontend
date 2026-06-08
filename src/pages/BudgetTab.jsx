@@ -169,7 +169,7 @@ const FINANCIAL_PAGE_OPTIONS = [
 ];
 
 const ACCOUNTING_PAGE_OPTIONS = [
-  { key: "chart_of_accounts", label: "PR Codes", view: "pr_codes" },
+  { key: "chart_of_accounts", label: "Chart of Accounts", view: "pr_codes" },
   { key: "journal_entries", label: "Journal Entries", view: "bookkeeping", bookkeepingView: "sales" },
   { key: "general_ledger", label: "General Ledger", view: "bookkeeping", bookkeepingView: "sales" },
   { key: "trial_balance", label: "Trial Balance", view: "accounting_reports" },
@@ -753,59 +753,55 @@ function CategoryList({ accounts, onCreate, onEdit, onDelete, showEmptyAction = 
   }
 
   return (
-    <div className="bgt-accounts-grid">
-      {accounts.map((acc) => {
-        const inactive = Number(acc.is_active) !== 1;
-        const bal = toNumber(acc.balance, 0);
-        return (
-          <div key={acc.id} className={`bgt-acc-card${inactive ? " bgt-acc-card--inactive" : ""}`}>
-            <div className="bgt-acc-head">
-              <div className="bgt-acc-info">
-                <span className={`bgt-acc-type-dot bgt-acc-type-dot--${acc.type}`} />
-                <div>
-                  <strong className="bgt-acc-name">{acc.name}</strong>
-                  {acc.description && <p className="bgt-acc-desc">{acc.description}</p>}
-                </div>
-              </div>
-              <div className="bgt-acc-badges">
-                <span className={`bgt-pill bgt-pill--${acc.type}`}>{accountTypeLabel(acc.type)}</span>
-                {inactive && <span className="bgt-pill bgt-pill--inactive">Inactive</span>}
-              </div>
-            </div>
-
-            <div className="bgt-acc-stats">
-              <div className="bgt-acc-stat">
-                <span className="bgt-acc-stat-label">In</span>
-                <span className="bgt-acc-stat-val bgt-acc-stat-val--in">+₱{formatMoney(acc.total_in)}</span>
-              </div>
-              <div className="bgt-acc-divider" />
-              <div className="bgt-acc-stat">
-                <span className="bgt-acc-stat-label">Out</span>
-                <span className="bgt-acc-stat-val bgt-acc-stat-val--out">−₱{formatMoney(acc.total_out)}</span>
-              </div>
-              <div className="bgt-acc-divider" />
-              <div className="bgt-acc-stat">
-                <span className="bgt-acc-stat-label">Balance</span>
-                <span className={`bgt-acc-stat-val ${bal >= 0 ? "bgt-acc-stat-val--in" : "bgt-acc-stat-val--out"}`}>
-                  ₱{formatMoney(acc.balance)}
-                </span>
-              </div>
-              <div className="bgt-acc-divider" />
-              <div className="bgt-acc-stat">
-                <span className="bgt-acc-stat-label">Entries</span>
-                <span className="bgt-acc-stat-val">{acc.transaction_count}</span>
-              </div>
-            </div>
-
-            <div className="bgt-acc-actions">
-              <button className="btn btn-ghost bgt-acc-btn" onClick={() => onEdit(acc)}>Edit</button>
-              <button className="btn btn-ghost bgt-acc-btn bgt-acc-btn--del" onClick={() => onDelete(acc)}>
-                {Number(acc.is_active) === 1 && acc.transaction_count > 0 ? "Deactivate" : "Delete"}
-              </button>
-            </div>
-          </div>
-        );
-      })}
+    <div className="bgt-table-wrap">
+      <table className="bgt-table bgt-table--category-list">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th className="bgt-col-amt">In</th>
+            <th className="bgt-col-amt">Out</th>
+            <th className="bgt-col-amt">Balance</th>
+            <th>Entries</th>
+            <th className="bgt-col-actions" />
+          </tr>
+        </thead>
+        <tbody>
+          {accounts.map((acc) => {
+            const inactive = Number(acc.is_active) !== 1;
+            const bal = toNumber(acc.balance, 0);
+            return (
+              <tr key={acc.id} className={`bgt-table-row${inactive ? " bgt-table-row--inactive" : ""}`}>
+                <td>
+                  <div className="bgt-category-list-name">
+                    <span className={`bgt-acc-type-dot bgt-acc-type-dot--${acc.type}`} />
+                    <div>
+                      <strong>{acc.name}</strong>
+                      {acc.description && <p>{acc.description}</p>}
+                    </div>
+                  </div>
+                </td>
+                <td><span className={`bgt-pill bgt-pill--${acc.type}`}>{accountTypeLabel(acc.type)}</span></td>
+                <td>{inactive ? <span className="bgt-pill bgt-pill--inactive">Inactive</span> : <span className="sl-pill sl-pill--active">Active</span>}</td>
+                <td className="bgt-col-amt bgt-amount--in">+{formatPhpCurrency(acc.total_in)}</td>
+                <td className="bgt-col-amt bgt-amount--out">-{formatPhpCurrency(acc.total_out)}</td>
+                <td className={`bgt-col-amt ${bal >= 0 ? "bgt-amount--in" : "bgt-amount--out"}`}>{formatPhpCurrency(acc.balance)}</td>
+                <td>{acc.transaction_count || 0}</td>
+                <td className="bgt-col-actions">
+                  <button className="bgt-row-btn" type="button" onClick={() => onEdit(acc)}>Edit</button>
+                  <button className="bgt-row-btn bgt-row-btn--del" type="button" onClick={() => onDelete(acc)}>
+                    {Number(acc.is_active) === 1 && acc.transaction_count > 0 ? "Deactivate" : "Delete"}
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div className="bgt-table-footer">
+        {accounts.length} categor{accounts.length === 1 ? "y" : "ies"}
+      </div>
     </div>
   );
 }
@@ -2088,7 +2084,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
       <div className="bgt-toolbar">
         <div className="bgt-seg">
           {isFinanceMode && FINANCIAL_PAGE_OPTIONS.map((page) => (
-            <button key={page.key} className={`bgt-seg-btn${financialPage === page.key ? " bgt-seg-btn--on" : ""}`} onClick={() => selectFinancialPage(page.key)} type="button">
+            <button key={page.key} className={`bgt-seg-btn${view !== "finance_settings" && financialPage === page.key ? " bgt-seg-btn--on" : ""}`} onClick={() => selectFinancialPage(page.key)} type="button">
               {page.label}
             </button>
           ))}
