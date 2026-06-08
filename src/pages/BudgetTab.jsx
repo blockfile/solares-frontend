@@ -179,6 +179,14 @@ const ACCOUNTING_PAGE_OPTIONS = [
   { key: "financial_statements", label: "Financial Statements", view: "accounting_reports" }
 ];
 
+const EMPTY_ACCOUNTING_PAGE_KEYS = new Set([
+  "general_ledger",
+  "trial_balance",
+  "accounts_receivable",
+  "accounts_payable",
+  "financial_statements"
+]);
+
 function createBookkeepingForm(section) {
   if (section === "accounts_receivable" || section === "accounts_payable") {
     return {
@@ -1300,6 +1308,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
   const visibleTxIds = useMemo(() => transactions.map((tx) => tx.id), [transactions]);
   const selectedTxCount = selectedTxIds.size;
   const allVisibleTxSelected = visibleTxIds.length > 0 && visibleTxIds.every((id) => selectedTxIds.has(id));
+  const accountingPageHasNoContent = isAccountingMode && EMPTY_ACCOUNTING_PAGE_KEYS.has(accountingPage);
   const projectScoped = scopeMode === "project" && !!scopeProjectId;
   const selectedScopeProject = useMemo(
     () => projects.find((p) => String(p.id) === String(scopeProjectId)) || null,
@@ -2157,7 +2166,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
               <IconPlus /> New Category
             </button>
           )}
-          {view === "bookkeeping" && (
+          {view === "bookkeeping" && !accountingPageHasNoContent && (
             <button className="btn btn-ghost bgt-btn-import" onClick={() => loadBookkeeping()} disabled={bookkeepingLoading}>
               <IconRefresh /> {bookkeepingLoading ? "Refreshing..." : "Refresh"}
             </button>
@@ -2167,7 +2176,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
               <IconRefresh /> {loading ? "Refreshing..." : "Refresh"}
             </button>
           )}
-          {view === "accounting_reports" && (
+          {view === "accounting_reports" && !accountingPageHasNoContent && (
             <button
               className="btn btn-ghost bgt-btn-import"
               onClick={() => {
@@ -2517,7 +2526,13 @@ export default function BudgetTab({ moduleMode = "combined" }) {
       )}
 
       {/* ── Sales view ─────────────────────────────────────────────────────── */}
-      {view === "accounting_reports" && (
+      {accountingPageHasNoContent && (
+        <div className="bgt-empty">
+          <p>No data to display.</p>
+        </div>
+      )}
+
+      {view === "accounting_reports" && !accountingPageHasNoContent && (
         <AccountingReportsPanel
           page={accountingPage}
           accounts={accounts}
@@ -2525,7 +2540,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
         />
       )}
 
-      {view === "bookkeeping" && (() => {
+      {view === "bookkeeping" && !accountingPageHasNoContent && (() => {
         const activeSection = BOOKKEEPING_SECTIONS.find((section) => section.key === bookkeepingView) || BOOKKEEPING_SECTIONS[0];
         const form = bookkeepingForms[activeSection.key] || createBookkeepingForm(activeSection.key);
         const rows = bookkeepingRows[activeSection.key] || [];
