@@ -169,7 +169,7 @@ const FINANCIAL_PAGE_OPTIONS = [
 ];
 
 const ACCOUNTING_PAGE_OPTIONS = [
-  { key: "chart_of_accounts", label: "Chart of Accounts", view: "accounts" },
+  { key: "chart_of_accounts", label: "PR Codes", view: "pr_codes" },
   { key: "journal_entries", label: "Journal Entries", view: "bookkeeping", bookkeepingView: "sales" },
   { key: "general_ledger", label: "General Ledger", view: "bookkeeping", bookkeepingView: "sales" },
   { key: "trial_balance", label: "Trial Balance", view: "accounting_reports" },
@@ -733,6 +733,126 @@ function IconRefresh() {
     </svg>
   );
 }
+function IconSettings() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.6 1h.1a2 2 0 1 1 0 4H21a1.7 1.7 0 0 0-1.6 1Z" />
+    </svg>
+  );
+}
+
+function CategoryList({ accounts, onCreate, onEdit, onDelete, showEmptyAction = true }) {
+  if (accounts.length === 0) {
+    return (
+      <div className="bgt-empty">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="bgt-empty-icon"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18M7 15h2M12 15h2" /></svg>
+        <p>No categories yet.</p>
+        {showEmptyAction && <button className="btn btn-primary" onClick={onCreate}><IconPlus /> Create First Category</button>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bgt-accounts-grid">
+      {accounts.map((acc) => {
+        const inactive = Number(acc.is_active) !== 1;
+        const bal = toNumber(acc.balance, 0);
+        return (
+          <div key={acc.id} className={`bgt-acc-card${inactive ? " bgt-acc-card--inactive" : ""}`}>
+            <div className="bgt-acc-head">
+              <div className="bgt-acc-info">
+                <span className={`bgt-acc-type-dot bgt-acc-type-dot--${acc.type}`} />
+                <div>
+                  <strong className="bgt-acc-name">{acc.name}</strong>
+                  {acc.description && <p className="bgt-acc-desc">{acc.description}</p>}
+                </div>
+              </div>
+              <div className="bgt-acc-badges">
+                <span className={`bgt-pill bgt-pill--${acc.type}`}>{accountTypeLabel(acc.type)}</span>
+                {inactive && <span className="bgt-pill bgt-pill--inactive">Inactive</span>}
+              </div>
+            </div>
+
+            <div className="bgt-acc-stats">
+              <div className="bgt-acc-stat">
+                <span className="bgt-acc-stat-label">In</span>
+                <span className="bgt-acc-stat-val bgt-acc-stat-val--in">+₱{formatMoney(acc.total_in)}</span>
+              </div>
+              <div className="bgt-acc-divider" />
+              <div className="bgt-acc-stat">
+                <span className="bgt-acc-stat-label">Out</span>
+                <span className="bgt-acc-stat-val bgt-acc-stat-val--out">−₱{formatMoney(acc.total_out)}</span>
+              </div>
+              <div className="bgt-acc-divider" />
+              <div className="bgt-acc-stat">
+                <span className="bgt-acc-stat-label">Balance</span>
+                <span className={`bgt-acc-stat-val ${bal >= 0 ? "bgt-acc-stat-val--in" : "bgt-acc-stat-val--out"}`}>
+                  ₱{formatMoney(acc.balance)}
+                </span>
+              </div>
+              <div className="bgt-acc-divider" />
+              <div className="bgt-acc-stat">
+                <span className="bgt-acc-stat-label">Entries</span>
+                <span className="bgt-acc-stat-val">{acc.transaction_count}</span>
+              </div>
+            </div>
+
+            <div className="bgt-acc-actions">
+              <button className="btn btn-ghost bgt-acc-btn" onClick={() => onEdit(acc)}>Edit</button>
+              <button className="btn btn-ghost bgt-acc-btn bgt-acc-btn--del" onClick={() => onDelete(acc)}>
+                {Number(acc.is_active) === 1 && acc.transaction_count > 0 ? "Deactivate" : "Delete"}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const PR_CODE_CLASS_LABELS = {
+  1: "Assets",
+  2: "Liabilities",
+  3: "Owner's Capital",
+  4: "Revenue",
+  5: "Expenses"
+};
+
+function PrCodeCatalog() {
+  return (
+    <div className="bgt-pr-code-shell">
+      <div className="bgt-section-head">
+        <div>
+          <p className="bgt-section-eyebrow">Accounting</p>
+          <h3 className="bgt-section-title">PR Code Data</h3>
+        </div>
+      </div>
+      <div className="bgt-table-wrap">
+        <table className="bgt-table bgt-table--compact bgt-table--pr-codes">
+          <thead>
+            <tr><th>PR Code</th><th>Account Name</th><th>Class</th></tr>
+          </thead>
+          <tbody>
+            {BOOKKEEPING_PR_CODE_OPTIONS.map((option) => {
+              const [, nameFromLabel] = option.label.split(/\s+-\s+/, 2);
+              const classLabel = PR_CODE_CLASS_LABELS[String(option.value).charAt(0)] || "-";
+              return (
+                <tr key={option.value} className="bgt-table-row">
+                  <td className="bgt-cell-ref"><code className="bgt-ref-code">{option.value}</code></td>
+                  <td><strong>{nameFromLabel || option.label}</strong></td>
+                  <td><span className="bgt-account-chip">{classLabel}</span></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <div className="bgt-table-footer">
+          {BOOKKEEPING_PR_CODE_OPTIONS.length} PR code{BOOKKEEPING_PR_CODE_OPTIONS.length !== 1 ? "s" : ""}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function BudgetTab({ moduleMode = "combined" }) {
   const isFinanceMode = moduleMode === "finance";
@@ -753,7 +873,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
   const [searchRaw, setSearchRaw] = useState("");
   const search = useDeferredValue(searchRaw);
 
-  const [view, setView] = useState(isAccountingMode ? "accounts" : "transactions"); // "transactions" | "accounts" | "bookkeeping" | reports
+  const [view, setView] = useState(isAccountingMode ? "pr_codes" : "transactions"); // "transactions" | "accounts" | "bookkeeping" | "finance_settings" | "pr_codes" | reports
   const [financialPage, setFinancialPage] = useState("sales_transactions");
   const [accountingPage, setAccountingPage] = useState("chart_of_accounts");
 
@@ -2049,6 +2169,17 @@ export default function BudgetTab({ moduleMode = "combined" }) {
               <IconRefresh /> {loading || bookkeepingLoading ? "Refreshing..." : "Refresh"}
             </button>
           )}
+          {isFinanceMode && (
+            <button
+              className={`bgt-settings-btn${view === "finance_settings" ? " bgt-settings-btn--on" : ""}`}
+              type="button"
+              onClick={() => setView("finance_settings")}
+              title="Settings"
+              aria-label="Financial Management settings"
+            >
+              <IconSettings />
+            </button>
+          )}
         </div>
       </div>
 
@@ -2297,6 +2428,29 @@ export default function BudgetTab({ moduleMode = "combined" }) {
           </div>
         </div>
       )}
+
+      {view === "finance_settings" && (
+        <div className="bgt-settings-section">
+          <div className="bgt-section-head">
+            <div>
+              <p className="bgt-section-eyebrow">Settings</p>
+              <h3 className="bgt-section-title">Category</h3>
+            </div>
+            <button className="btn btn-primary" type="button" onClick={openNewAcc}>
+              <IconPlus /> Add Category
+            </button>
+          </div>
+          <CategoryList
+            accounts={accounts}
+            onCreate={openNewAcc}
+            onEdit={openEditAcc}
+            onDelete={setDeletingAcc}
+            showEmptyAction={false}
+          />
+        </div>
+      )}
+
+      {view === "pr_codes" && <PrCodeCatalog />}
 
       {view === "accounts" && (
         accounts.length === 0 ? (
