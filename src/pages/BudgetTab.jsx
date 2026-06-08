@@ -829,7 +829,7 @@ function PrCodeCatalog({ generalJournalRows = [] }) {
       <div className="bgt-section-head">
         <div>
           <p className="bgt-section-eyebrow">Accounting</p>
-          <h3 className="bgt-section-title">PR Code Data</h3>
+          <h3 className="bgt-section-title">Chart of Accounts</h3>
         </div>
       </div>
       <div className="bgt-table-wrap">
@@ -883,8 +883,8 @@ export default function BudgetTab({ moduleMode = "combined" }) {
   const [searchRaw, setSearchRaw] = useState("");
   const search = useDeferredValue(searchRaw);
 
-  const [view, setView] = useState(isAccountingMode ? "pr_codes" : "transactions"); // "transactions" | "accounts" | "bookkeeping" | "finance_settings" | "pr_codes" | reports
-  const [financialPage, setFinancialPage] = useState("sales_transactions");
+  const [view, setView] = useState(isAccountingMode ? "pr_codes" : isFinanceMode ? "finance_settings" : "transactions"); // "transactions" | "accounts" | "bookkeeping" | "finance_settings" | "pr_codes" | reports
+  const [financialPage, setFinancialPage] = useState(isFinanceMode ? "category" : "sales_transactions");
   const [accountingPage, setAccountingPage] = useState("chart_of_accounts");
 
   const [txForm, setTxForm] = useState(EMPTY_TX_FORM);
@@ -1066,7 +1066,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
     if (isAccountingMode) {
       selectAccountingPage(accountingPage);
     } else if (isFinanceMode) {
-      selectFinancialPage(financialPage);
+      selectFinancialPage("category");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moduleMode]);
