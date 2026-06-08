@@ -358,6 +358,10 @@ export default function Dashboard({ theme = "light", onToggleTheme }) {
       <aside className={`workspace-sidebar${sidebarOpen ? " sidebar-open" : ""}`}>
         <div className="sidebar-brand">
           <img src={solaresLogo} alt="Solares" className="sidebar-brand-logo" />
+          <div className="sidebar-brand-text" aria-label="Solares Energy Solution">
+            <strong>Solares</strong>
+            <span>Energy Solution</span>
+          </div>
         </div>
 
         <div className="sidebar-groups">

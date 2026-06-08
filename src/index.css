@@ -509,18 +509,24 @@ textarea.input::placeholder {
 
 .sidebar-brand-text {
   display: grid;
-  gap: 2px;
+  gap: 1px;
   justify-items: center;
+  line-height: 1.08;
 }
 
 .sidebar-brand-text strong {
+  color: #17243a;
+  font-family: var(--font-title);
   font-size: 15px;
-  color: #0f5fa8;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 .sidebar-brand-text span {
-  font-size: 12px;
-  color: var(--text-soft);
+  color: #526175;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 .sidebar-groups {
@@ -7631,6 +7637,14 @@ button {
 
 :root[data-theme="dark"] .workspace-sidebar {
   background: linear-gradient(180deg, #101b2b 0%, #0b1728 100%);
+}
+
+:root[data-theme="dark"] .sidebar-brand-text strong {
+  color: #f8fbff;
+}
+
+:root[data-theme="dark"] .sidebar-brand-text span {
+  color: #c9d7ea;
 }
 
 :root[data-theme="dark"] .workspace-main {
