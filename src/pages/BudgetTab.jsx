@@ -814,7 +814,65 @@ const PR_CODE_CLASS_LABELS = {
   5: "Expenses"
 };
 
-function PrCodeCatalog() {
+const CATEGORY_TYPE_PR_CLASS = {
+  income: "Revenue",
+  expense: "Expenses",
+  investment: "Owner's Capital",
+  withdrawal: "Owner's Capital"
+};
+
+const CATEGORY_PR_CODE_MATCHES = {
+  "sales revenue": ["401"],
+  equipment: ["104"],
+  "general expenses": ["500"],
+  labor: ["501"],
+  marketing: ["508"],
+  materials: ["503"],
+  "permits and fees": ["510"],
+  transportation: ["103"],
+  capital: ["301"],
+  "pull out": ["302"],
+  pullout: ["302"]
+};
+
+function normalizePrCodeMatchText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function prCodeAccountName(option) {
+  const [, nameFromLabel] = String(option?.label || "").split(/\s+-\s+/, 2);
+  return nameFromLabel || option?.label || "";
+}
+
+function accountMatchesPrCode(account, option, prName, classLabel) {
+  const accountName = normalizePrCodeMatchText(account?.name);
+  const mappedCodes = CATEGORY_PR_CODE_MATCHES[accountName];
+  if (mappedCodes) return mappedCodes.includes(String(option.value));
+
+  const accountClass = CATEGORY_TYPE_PR_CLASS[String(account?.type || "").toLowerCase()];
+  if (accountClass && accountClass !== classLabel) return false;
+
+  const normalizedPrName = normalizePrCodeMatchText(prName);
+  return accountName === normalizedPrName || accountName.includes(normalizedPrName) || normalizedPrName.includes(accountName);
+}
+
+function summarizePrCodeAccounts(option, classLabel, accounts = []) {
+  const prName = prCodeAccountName(option);
+  const matchedAccounts = accounts.filter((account) => accountMatchesPrCode(account, option, prName, classLabel));
+  return matchedAccounts.reduce((summary, account) => ({
+    totalIn: summary.totalIn + toNumber(account.total_in, 0),
+    totalOut: summary.totalOut + toNumber(account.total_out, 0),
+    balance: summary.balance + toNumber(account.balance, 0),
+    entries: summary.entries + toNumber(account.transaction_count, 0)
+  }), { totalIn: 0, totalOut: 0, balance: 0, entries: 0 });
+}
+
+function PrCodeCatalog({ accounts = [] }) {
   return (
     <div className="bgt-pr-code-shell">
       <div className="bgt-section-head">
@@ -826,17 +884,22 @@ function PrCodeCatalog() {
       <div className="bgt-table-wrap">
         <table className="bgt-table bgt-table--compact bgt-table--pr-codes">
           <thead>
-            <tr><th>PR Code</th><th>Account Name</th><th>Class</th></tr>
+            <tr><th>PR Code</th><th>Account Name</th><th>Class</th><th className="bgt-col-amt">In</th><th className="bgt-col-amt">Out</th><th className="bgt-col-amt">Balance</th><th>Entries</th></tr>
           </thead>
           <tbody>
             {BOOKKEEPING_PR_CODE_OPTIONS.map((option) => {
-              const [, nameFromLabel] = option.label.split(/\s+-\s+/, 2);
+              const nameFromLabel = prCodeAccountName(option);
               const classLabel = PR_CODE_CLASS_LABELS[String(option.value).charAt(0)] || "-";
+              const totals = summarizePrCodeAccounts(option, classLabel, accounts);
               return (
                 <tr key={option.value} className="bgt-table-row">
                   <td className="bgt-cell-ref"><code className="bgt-ref-code">{option.value}</code></td>
-                  <td><strong>{nameFromLabel || option.label}</strong></td>
+                  <td><strong>{nameFromLabel}</strong></td>
                   <td><span className="bgt-account-chip">{classLabel}</span></td>
+                  <td className="bgt-col-amt bgt-amount--in">+{formatPhpCurrency(totals.totalIn)}</td>
+                  <td className="bgt-col-amt bgt-amount--out">-{formatPhpCurrency(totals.totalOut)}</td>
+                  <td className={`bgt-col-amt ${totals.balance >= 0 ? "bgt-amount--in" : "bgt-amount--out"}`}>{formatPhpCurrency(totals.balance)}</td>
+                  <td>{totals.entries}</td>
                 </tr>
               );
             })}
@@ -2446,7 +2509,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
         </div>
       )}
 
-      {view === "pr_codes" && <PrCodeCatalog />}
+      {view === "pr_codes" && <PrCodeCatalog accounts={accounts} />}
 
       {view === "accounts" && (
         accounts.length === 0 ? (
