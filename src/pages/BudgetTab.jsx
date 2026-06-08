@@ -2532,28 +2532,31 @@ export default function BudgetTab({ moduleMode = "combined" }) {
         const isLedgerSection = activeSection.key === "sales" || activeSection.key === "expense";
         const isReceivableSection = activeSection.key === "accounts_receivable";
         const isPayableSection = activeSection.key === "accounts_payable";
+        const showBookkeepingTabs = accountingPage !== "general_ledger";
         const formClassName = `bgt-bookkeeping-form bgt-bookkeeping-form--${
           isLedgerSection ? "ledger" : isReceivableSection ? "receivable" : "payable"
         }`;
 
         return (
           <div className="bgt-bookkeeping-shell">
-            <div className="bgt-seg bgt-bookkeeping-tabs">
-              {BOOKKEEPING_SECTIONS.map((section) => (
-                <button
-                  key={section.key}
-                  className={`bgt-seg-btn${bookkeepingView === section.key ? " bgt-seg-btn--on" : ""}`}
-                  onClick={() => {
-                    setBookkeepingView(section.key);
-                    setBookkeepingFormOpen(false);
-                    setEditingBookkeeping(null);
-                  }}
-                  type="button"
-                >
-                  {section.label}
-                </button>
-              ))}
-            </div>
+            {showBookkeepingTabs && (
+              <div className="bgt-seg bgt-bookkeeping-tabs">
+                {BOOKKEEPING_SECTIONS.map((section) => (
+                  <button
+                    key={section.key}
+                    className={`bgt-seg-btn${bookkeepingView === section.key ? " bgt-seg-btn--on" : ""}`}
+                    onClick={() => {
+                      setBookkeepingView(section.key);
+                      setBookkeepingFormOpen(false);
+                      setEditingBookkeeping(null);
+                    }}
+                    type="button"
+                  >
+                    {section.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="bgt-bookkeeping-actions">
               <button className="btn btn-primary" type="button" onClick={openNewBookkeepingEntry}>
