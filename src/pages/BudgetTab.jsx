@@ -160,6 +160,7 @@ const EMPTY_BOOKKEEPING_ROWS = {
 };
 
 const FINANCIAL_PAGE_OPTIONS = [
+  { key: "category", label: "Category", view: "finance_settings" },
   { key: "sales_transactions", label: "All Transactions", view: "transactions", scopeMode: "overall", filterType: "all" },
   { key: "collections", label: "Collections", view: "transactions", scopeMode: "overall", filterType: "income" },
   { key: "expenses", label: "Expenses", view: "transactions", scopeMode: "overall", filterType: "expense" },
@@ -733,14 +734,6 @@ function IconRefresh() {
     </svg>
   );
 }
-function IconSettings() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.6 1h.1a2 2 0 1 1 0 4H21a1.7 1.7 0 0 0-1.6 1Z" />
-    </svg>
-  );
-}
-
 function CategoryList({ accounts, onCreate, onEdit, onDelete, showEmptyAction = true }) {
   if (accounts.length === 0) {
     return (
@@ -2105,7 +2098,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
       <div className="bgt-toolbar">
         <div className="bgt-seg">
           {isFinanceMode && FINANCIAL_PAGE_OPTIONS.map((page) => (
-            <button key={page.key} className={`bgt-seg-btn${view !== "finance_settings" && financialPage === page.key ? " bgt-seg-btn--on" : ""}`} onClick={() => selectFinancialPage(page.key)} type="button">
+            <button key={page.key} className={`bgt-seg-btn${financialPage === page.key ? " bgt-seg-btn--on" : ""}`} onClick={() => selectFinancialPage(page.key)} type="button">
               {page.label}
             </button>
           ))}
@@ -2184,17 +2177,6 @@ export default function BudgetTab({ moduleMode = "combined" }) {
               disabled={loading || bookkeepingLoading}
             >
               <IconRefresh /> {loading || bookkeepingLoading ? "Refreshing..." : "Refresh"}
-            </button>
-          )}
-          {isFinanceMode && (
-            <button
-              className={`bgt-settings-btn${view === "finance_settings" ? " bgt-settings-btn--on" : ""}`}
-              type="button"
-              onClick={() => setView("finance_settings")}
-              title="Settings"
-              aria-label="Financial Management settings"
-            >
-              <IconSettings />
             </button>
           )}
         </div>
@@ -2450,7 +2432,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
         <div className="bgt-settings-section">
           <div className="bgt-section-head">
             <div>
-              <p className="bgt-section-eyebrow">Settings</p>
+              <p className="bgt-section-eyebrow">Financial Management</p>
               <h3 className="bgt-section-title">Category</h3>
             </div>
             <button className="btn btn-primary" type="button" onClick={openNewAcc}>
