@@ -6538,6 +6538,10 @@ button {
   grid-column: span 2;
 }
 
+.bgt-form-grid--tx-header .bgt-field--tx-description {
+  grid-column: 1 / -1;
+}
+
 .bgt-field {
   display: flex;
   flex-direction: column;
@@ -6705,6 +6709,81 @@ button {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.bgt-modal--transaction-details {
+  max-width: 920px;
+}
+
+.bgt-tx-item-count {
+  margin-top: 5px;
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.bgt-tx-detail-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 10px;
+}
+
+.bgt-tx-detail-summary > div {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f7f8fb;
+}
+
+.bgt-tx-detail-summary span:first-child {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bgt-tx-detail-summary strong {
+  display: block;
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.bgt-tx-detail-summary .bgt-type-pill {
+  width: fit-content;
+  margin-top: 2px;
+}
+
+.bgt-tx-detail-loading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bgt-tx-detail-loading .bgt-spinner {
+  width: 18px;
+  height: 18px;
+}
+
+.bgt-tx-detail-table-wrap {
+  max-height: 360px;
+  overflow: auto;
+}
+
+.bgt-tx-detail-notes {
+  max-width: 220px;
+  white-space: normal;
 }
 
 .bgt-label {
@@ -7879,6 +7958,13 @@ button {
 }
 
 :root[data-theme="dark"] :is(.stat-row, .quote-list-bar, .quote-review-item-meta span, .step-pill, .auto-chip, .materials-file-pill, .inventory-stock-cell, .bgt-account-chip, .bgt-type-btn, .bgt-tx-lines-head, .bgt-tx-line-head, .bgt-tx-total-row, .bgt-tx-line, .bgt-import-col-chip, .sl-pill--done) {
+  background: rgba(126, 182, 255, 0.1);
+  border-color: var(--border);
+  color: var(--text-soft);
+}
+
+:root[data-theme="dark"] .bgt-tx-detail-summary > div,
+:root[data-theme="dark"] .bgt-tx-detail-loading {
   background: rgba(126, 182, 255, 0.1);
   border-color: var(--border);
   color: var(--text-soft);

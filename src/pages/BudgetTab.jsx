@@ -86,10 +86,108 @@ function hasTxLineInput(line) {
   });
 }
 
+function normalizeTransactionGroupPart(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function transactionGroupCategoryKey(tx) {
+  const accountId = tx?.account_id;
+  if (accountId != null && String(accountId).trim() !== "") return `account:${accountId}`;
+  return `category:${normalizeTransactionGroupPart(tx?.account_name)}`;
+}
+
+function transactionGroupKey(tx) {
+  return [
+    normalizeTransactionGroupPart(tx?.reference_no),
+    String(tx?.transaction_date || ""),
+    transactionGroupCategoryKey(tx)
+  ].join("||");
+}
+
+function transactionItems(tx) {
+  if (!tx) return [];
+  return Array.isArray(tx.items) && tx.items.length ? tx.items : [tx];
+}
+
+function transactionItemIds(tx) {
+  return transactionItems(tx)
+    .map((item) => item?.id)
+    .filter((id) => id != null);
+}
+
+function sumTransactionField(items, field) {
+  const hasAny = items.some((item) => item?.[field] != null && item?.[field] !== "");
+  if (!hasAny) return null;
+  return items.reduce((sum, item) => sum + toNumber(item?.[field], 0), 0);
+}
+
+function buildTransactionGroup(items = []) {
+  const rows = (Array.isArray(items) ? items : []).filter(Boolean);
+  const first = rows[0] || {};
+  const multipleItems = rows.length > 1;
+  const transactionDescriptions = uniqueTransactionText(rows, (row) => row.transaction_description);
+
+  return {
+    ...first,
+    group_key: transactionGroupKey(first),
+    items: rows,
+    item_ids: rows.map((row) => row.id).filter((id) => id != null),
+    item_count: rows.length,
+    amount: sumTransactionField(rows, "amount") ?? 0,
+    price: multipleItems ? null : first.price,
+    quantity: multipleItems ? sumTransactionField(rows, "quantity") : first.quantity,
+    discount: multipleItems ? sumTransactionField(rows, "discount") : first.discount,
+    transaction_description: transactionDescriptions[0] || ""
+  };
+}
+
+function groupTransactionsByReferenceDateCategory(rows = []) {
+  const groups = new Map();
+  for (const row of rows) {
+    const key = transactionGroupKey(row);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+  return Array.from(groups.values()).map(buildTransactionGroup);
+}
+
+function uniqueTransactionText(items, selector) {
+  const values = [];
+  const seen = new Set();
+  for (const item of items) {
+    const text = String(selector(item) || "").trim();
+    const key = text.toLowerCase();
+    if (!text || seen.has(key)) continue;
+    seen.add(key);
+    values.push(text);
+  }
+  return values;
+}
+
+function transactionGroupDescription(tx) {
+  return String(tx?.transaction_description || "").trim();
+}
+
+function transactionGroupProjectLabel(tx) {
+  const labels = uniqueTransactionText(transactionItems(tx), (item) => {
+    if (!item?.project_id) return "";
+    return item.customer_name ? `${item.customer_name} - ${item.project_name}` : item.project_name;
+  });
+  if (!labels.length) return "";
+  return labels.length === 1 ? labels[0] : `${labels.length} projects`;
+}
+
+function transactionGroupTitle(tx) {
+  const category = tx?.account_name || "Transaction";
+  const reference = String(tx?.reference_no || "").trim();
+  return reference ? `${category} - ${reference}` : category;
+}
+
 const EMPTY_TX_FORM = {
   accountId: "",
   projectId: "",
   type: "",
+  description: "",
   referenceNo: "",
   transactionDate: localDateInput()
 };
@@ -728,6 +826,13 @@ function IconEdit() {
     </svg>
   );
 }
+function IconEye() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M1.5 12s4-7 10.5-7 10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z" /><circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
 function IconSearch() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -901,6 +1006,8 @@ export default function BudgetTab({ moduleMode = "combined" }) {
   const [editingTx, setEditingTx] = useState(null);
   const [txFormOpen, setTxFormOpen] = useState(false);
   const [txSaving, setTxSaving] = useState(false);
+  const [viewingTxDetails, setViewingTxDetails] = useState(null);
+  const [txDetailsLoading, setTxDetailsLoading] = useState(false);
 
   const [accForm, setAccForm] = useState(EMPTY_ACCOUNT_FORM);
   const [editingAcc, setEditingAcc] = useState(null);
@@ -1307,8 +1414,13 @@ export default function BudgetTab({ moduleMode = "combined" }) {
   const hasFilters = filterType !== "all" || filterAccount !== "all" || filterDateFrom || filterDateTo || searchRaw || scopeMode !== "overall";
   const projectCostingHasFilters = filterDateFrom || filterDateTo || searchRaw;
   const netPositive = toNumber(summary.netBalance, 0) >= 0;
-  const visibleTxIds = useMemo(() => transactions.map((tx) => tx.id), [transactions]);
+  const groupedTransactions = useMemo(() => groupTransactionsByReferenceDateCategory(transactions), [transactions]);
+  const visibleTxIds = useMemo(() => groupedTransactions.flatMap((tx) => transactionItemIds(tx)), [groupedTransactions]);
   const selectedTxCount = selectedTxIds.size;
+  const selectedTxRecordCount = useMemo(
+    () => groupedTransactions.filter((tx) => transactionItemIds(tx).some((id) => selectedTxIds.has(id))).length,
+    [groupedTransactions, selectedTxIds]
+  );
   const allVisibleTxSelected = visibleTxIds.length > 0 && visibleTxIds.every((id) => selectedTxIds.has(id));
   const accountingPageHasNoContent = isAccountingMode && EMPTY_ACCOUNTING_PAGE_KEYS.has(accountingPage);
   const projectScoped = scopeMode === "project" && !!scopeProjectId;
@@ -1685,11 +1797,16 @@ export default function BudgetTab({ moduleMode = "combined" }) {
   }
 
   // ── Transaction form ────────────────────────────────────────────────────────
-  function toggleTxSelection(id) {
+  function toggleTxSelection(tx) {
+    const ids = transactionItemIds(tx);
+    if (!ids.length) return;
     setSelectedTxIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      const allSelected = ids.every((id) => next.has(id));
+      ids.forEach((id) => {
+        if (allSelected) next.delete(id);
+        else next.add(id);
+      });
       return next;
     });
   }
@@ -1739,7 +1856,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
 
   function openNewTx(overrides = {}) {
     const safeOverrides = overrides && overrides.currentTarget ? {} : overrides;
-    const { description, price, quantity, discount, amount, notes, ...headerOverrides } = safeOverrides;
+    const { description: itemDescription, price, quantity, discount, amount, notes, transactionDescription, ...headerOverrides } = safeOverrides;
     const accountId = headerOverrides.accountId || "";
     setEditingTx(null);
     setError("");
@@ -1750,10 +1867,11 @@ export default function BudgetTab({ moduleMode = "combined" }) {
       projectId: projectScoped && selectedScopeProject ? String(selectedScopeProject.id) : "",
       ...headerOverrides,
       accountId,
+      description: transactionDescription || headerOverrides.description || "",
       type: headerOverrides.type ? normalizeAccountType(headerOverrides.type) : accountTypeForAccountId(accountId, EMPTY_TX_FORM.type)
     });
     setTxLines([createTxLine({
-      description: description || "",
+      description: itemDescription || "",
       price: price || "",
       quantity: quantity || "",
       discount: discount || "",
@@ -1771,24 +1889,29 @@ export default function BudgetTab({ moduleMode = "combined" }) {
     });
   }
   function openEditTx(tx) {
-    setEditingTx(tx);
+    const items = transactionItems(tx);
+    const first = items[0] || tx;
+    if (!first) return;
+    setEditingTx(buildTransactionGroup(items));
     setError("");
     setSuccess("");
     setTxForm({
-      accountId: String(tx.account_id),
-      projectId: tx.project_id ? String(tx.project_id) : "",
-      type: accountTypeFromTransactionRecord(tx),
-      referenceNo: tx.reference_no || "",
-      transactionDate: tx.transaction_date ? localDateInput(tx.transaction_date) : localDateInput()
+      accountId: String(first.account_id),
+      projectId: first.project_id ? String(first.project_id) : "",
+      type: accountTypeFromTransactionRecord(first),
+      description: first.transaction_description || "",
+      referenceNo: first.reference_no || "",
+      transactionDate: first.transaction_date ? localDateInput(first.transaction_date) : localDateInput()
     });
-    setTxLines([createTxLine({
-      price: formatFormNumber(tx.price),
-      quantity: formatFormNumber(tx.quantity),
-      discount: formatFormNumber(tx.discount),
-      amount: formatFixedFormNumber(tx.amount, AMOUNT_DECIMAL_PLACES),
-      description: tx.description || "",
-      notes: tx.notes || ""
-    })]);
+    setTxLines(items.map((item) => createTxLine({
+      id: item.id,
+      price: formatFormNumber(item.price),
+      quantity: formatFormNumber(item.quantity),
+      discount: formatFormNumber(item.discount),
+      amount: formatFixedFormNumber(item.amount, AMOUNT_DECIMAL_PLACES),
+      description: item.description || "",
+      notes: item.notes || ""
+    })));
     setTxFormOpen(true);
   }
   function closeTxForm() {
@@ -1852,9 +1975,8 @@ export default function BudgetTab({ moduleMode = "combined" }) {
   async function saveTx(e) {
     e.preventDefault(); setTxSaving(true);
     try {
-      const payloadLines = txLines
-        .filter(hasTxLineInput)
-        .map((line, index) => normalizeTxLineForPayload(line, index));
+      const inputLines = editingTx ? txLines : txLines.filter(hasTxLineInput);
+      const payloadLines = inputLines.map((line, index) => normalizeTxLineForPayload(line, index));
       const invalidLine = payloadLines.find((line) => line.error);
       if (invalidLine) { flash(invalidLine.error, "error"); return; }
       const items = payloadLines.map((line) => line.value);
@@ -1864,30 +1986,42 @@ export default function BudgetTab({ moduleMode = "combined" }) {
         accountId: Number(txForm.accountId),
         projectId: txForm.projectId ? Number(txForm.projectId) : null,
         type: transactionDirectionFromAccountType(accountTypeForAccountId(txForm.accountId, txForm.type)),
+        transactionDescription: txForm.description,
         referenceNo: txForm.referenceNo,
         transactionDate: txForm.transactionDate
       };
       if (editingTx) {
-        await api.put(`/budget/${editingTx.id}`, { ...sharedPayload, ...items[0] });
-        flash("Transaction updated.");
+        const existingItems = transactionItems(editingTx);
+        await Promise.all(items.map((item, index) => {
+          const lineId = inputLines[index]?.id || existingItems[index]?.id;
+          if (!lineId) throw new Error("Missing transaction item id.");
+          return api.put(`/budget/${lineId}`, { ...sharedPayload, ...item });
+        }));
+        flash(items.length > 1 ? "Transaction record updated." : "Transaction updated.");
       }
       else {
         const res = await api.post("/budget", { ...sharedPayload, items });
         const createdCount = res.data?.created || items.length;
         flash(`${createdCount} transaction${createdCount !== 1 ? "s" : ""} recorded.`);
       }
-      closeTxForm(); await loadAll(true);
+      closeTxForm(); setViewingTxDetails(null); await loadAll(true);
     } catch (err) { flash(err?.response?.data?.message || "Failed to save transaction.", "error"); }
     finally { setTxSaving(false); }
   }
   async function confirmDeleteTx(tx) {
+    const ids = transactionItemIds(tx);
     try {
-      await api.delete(`/budget/${tx.id}`);
-      flash("Transaction deleted.");
+      if (ids.length > 1) {
+        await api.delete("/budget/bulk", { data: { transactionIds: ids } });
+      } else {
+        await api.delete(`/budget/${ids[0] || tx.id}`);
+      }
+      flash(ids.length > 1 ? "Transaction record deleted." : "Transaction deleted.");
       setDeletingTx(null);
+      setViewingTxDetails(null);
       setSelectedTxIds((prev) => {
         const next = new Set(prev);
-        next.delete(tx.id);
+        ids.forEach((id) => next.delete(id));
         return next;
       });
       await loadAll(true);
@@ -1895,6 +2029,34 @@ export default function BudgetTab({ moduleMode = "combined" }) {
       flash(err?.response?.data?.message || "Failed to delete.", "error");
       setDeletingTx(null);
     }
+  }
+
+  async function openTxDetails(tx) {
+    const initialGroup = buildTransactionGroup(transactionItems(tx));
+    setViewingTxDetails(initialGroup);
+    setTxDetailsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (initialGroup.account_id) params.set("accountId", String(initialGroup.account_id));
+      if (initialGroup.transaction_date) {
+        params.set("dateFrom", initialGroup.transaction_date);
+        params.set("dateTo", initialGroup.transaction_date);
+      }
+      params.set("dateSort", "asc");
+      params.set("limit", "500");
+      const res = await api.get(`/budget?${params}`);
+      const rows = (res.data || []).filter((row) => transactionGroupKey(row) === initialGroup.group_key);
+      setViewingTxDetails(buildTransactionGroup(rows.length ? rows : initialGroup.items));
+    } catch (err) {
+      flash(err?.response?.data?.message || "Failed to load transaction details.", "error");
+    } finally {
+      setTxDetailsLoading(false);
+    }
+  }
+
+  function closeTxDetails() {
+    setViewingTxDetails(null);
+    setTxDetailsLoading(false);
   }
 
   async function confirmBulkDeleteTx() {
@@ -2144,10 +2306,10 @@ export default function BudgetTab({ moduleMode = "combined" }) {
             ) : (
               <>
                 <button className="btn btn-ghost bgt-btn-import" onClick={openAssignProject} disabled={!selectedTxCount || projects.length === 0}>
-                  <IconPlus /> Assign to Project{selectedTxCount ? ` (${selectedTxCount})` : ""}
+                  <IconPlus /> Assign to Project{selectedTxRecordCount ? ` (${selectedTxRecordCount})` : ""}
                 </button>
                 <button className="btn btn-danger" onClick={() => setBulkDeleteOpen(true)} disabled={!selectedTxCount}>
-                  Delete Selected{selectedTxCount ? ` (${selectedTxCount})` : ""}
+                  Delete Selected{selectedTxRecordCount ? ` (${selectedTxRecordCount})` : ""}
                 </button>
                 <button className="btn btn-ghost bgt-btn-import" onClick={openImport}>
                   <IconUpload /> Import Excel
@@ -2336,37 +2498,41 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                     <th>Description</th>
                     <th>Reference</th>
                     <th>Transaction Type</th>
-                    <th className="bgt-col-amt">Price</th>
-                    <th>Qty</th>
-                    <th className="bgt-col-amt">Discount</th>
-                    <th className="bgt-col-amt">Amount</th>
+                    <th className="bgt-col-amt">Total Amount</th>
                     <th className="bgt-col-actions" />
                   </tr>
                 </thead>
                 <tbody>
-                  {transactions.map((tx) => {
+                  {groupedTransactions.map((tx) => {
                     const txAccountType = accountTypeFromTransactionRecord(tx);
                     const txDirection = transactionDirectionFromAccountType(txAccountType);
+                    const itemIds = transactionItemIds(tx);
+                    const allItemsSelected = itemIds.length > 0 && itemIds.every((id) => selectedTxIds.has(id));
+                    const projectLabel = transactionGroupProjectLabel(tx);
+                    const description = transactionGroupDescription(tx);
                     return (
-                    <tr key={tx.id} className="bgt-table-row">
+                    <tr key={tx.group_key} className="bgt-table-row">
                       <td>
                         <input
                           type="checkbox"
-                          checked={selectedTxIds.has(tx.id)}
-                          onChange={() => toggleTxSelection(tx.id)}
-                          aria-label={`Select transaction ${tx.id}`}
+                          checked={allItemsSelected}
+                          onChange={() => toggleTxSelection(tx)}
+                          aria-label={`Select transaction record ${tx.id}`}
                         />
                       </td>
                       <td className="bgt-cell-date">{formatDate(tx.transaction_date)}</td>
                       <td className="bgt-cell-account">
                         <span className="bgt-account-chip">{tx.account_name || "—"}</span>
-                        {tx.project_id && (
+                        {projectLabel && (
                           <div className="bgt-muted" style={{ marginTop: 5, fontSize: 11 }}>
-                            {tx.customer_name ? `${tx.customer_name} — ` : ""}{tx.project_name}
+                            {projectLabel}
                           </div>
                         )}
                       </td>
-                      <td className="bgt-cell-desc">{tx.description || <span className="bgt-muted">—</span>}</td>
+                      <td className="bgt-cell-desc">
+                        {description || <span className="bgt-muted">—</span>}
+                        {tx.item_count > 1 && <div className="bgt-tx-item-count">{tx.item_count} items</div>}
+                      </td>
                       <td className="bgt-cell-ref">
                         {tx.reference_no ? <code className="bgt-ref-code">{tx.reference_no}</code> : <span className="bgt-muted">—</span>}
                       </td>
@@ -2375,16 +2541,17 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                           {transactionTypeShortLabel(txAccountType)}
                         </span>
                       </td>
-                      <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
-                      <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
-                      <td className="bgt-col-amt">{tx.discount == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.discount)}</>}</td>
                       <td className={`bgt-col-amt bgt-amount--${txDirection}`}>
                         <span className="bgt-amount-sign">{txDirection === "in" ? "+" : "−"}</span>
                         <span>₱{formatMoney(tx.amount)}</span>
                       </td>
                       <td className="bgt-col-actions">
+                        <button className="bgt-row-btn" onClick={() => openTxDetails(tx)} title="View Details">
+                          <IconEye />
+                          View Details
+                        </button>
                         <button className="bgt-row-btn" onClick={() => openEditTx(tx)} title="Edit">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                          <IconEdit />
                           Edit
                         </button>
                         <button className="bgt-row-btn bgt-row-btn--del" onClick={() => setDeletingTx(tx)} title="Delete">
@@ -2398,8 +2565,9 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                 </tbody>
               </table>
               <div className="bgt-table-footer">
-                {transactions.length} transaction{transactions.length !== 1 ? "s" : ""}
-                {selectedTxCount > 0 ? ` • ${selectedTxCount} selected` : ""}
+                {groupedTransactions.length} transaction record{groupedTransactions.length !== 1 ? "s" : ""}
+                {groupedTransactions.length !== transactions.length ? ` | ${transactions.length} item${transactions.length !== 1 ? "s" : ""}` : ""}
+                {selectedTxRecordCount > 0 ? ` | ${selectedTxRecordCount} selected` : ""}
               </div>
             </div>
           )}
@@ -2432,7 +2600,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
             <form className="bgt-modal-body" onSubmit={submitAssignProject}>
               <div className="bgt-field">
                 <label className="bgt-label">Selected Transactions</label>
-                <div className="bgt-account-chip">{selectedTxCount} selected</div>
+                <div className="bgt-account-chip">{selectedTxRecordCount || selectedTxCount} selected</div>
               </div>
               <div className="bgt-field">
                 <label className="bgt-label">Project <span className="bgt-req">*</span></label>
@@ -3341,6 +3509,109 @@ export default function BudgetTab({ moduleMode = "combined" }) {
         </div>
       )}
 
+      {viewingTxDetails && (
+        <div className="bgt-backdrop" onClick={(e) => { if (e.target === e.currentTarget) closeTxDetails(); }}>
+          <div className="bgt-modal bgt-modal--transaction-details" onClick={(e) => e.stopPropagation()}>
+            <div className="bgt-modal-head">
+              <div>
+                <p className="bgt-modal-eyebrow">Transaction details</p>
+                <h3 className="bgt-modal-title">{transactionGroupTitle(viewingTxDetails)}</h3>
+              </div>
+              <button className="bgt-modal-x" onClick={closeTxDetails} aria-label="Close">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+            </div>
+            <div className="bgt-modal-body">
+              <div className="bgt-tx-detail-summary">
+                <div>
+                  <span>Date</span>
+                  <strong>{formatDate(viewingTxDetails.transaction_date)}</strong>
+                </div>
+                <div>
+                  <span>Category</span>
+                  <strong>{viewingTxDetails.account_name || "-"}</strong>
+                </div>
+                <div>
+                  <span>Reference</span>
+                  <strong>{viewingTxDetails.reference_no ? <code className="bgt-ref-code">{viewingTxDetails.reference_no}</code> : "-"}</strong>
+                </div>
+                <div>
+                  <span>Description</span>
+                  <strong>{transactionGroupDescription(viewingTxDetails) || "-"}</strong>
+                </div>
+                <div>
+                  <span>Transaction Type</span>
+                  <span className={`bgt-type-pill bgt-type-pill--${accountTypeFromTransactionRecord(viewingTxDetails)}`}>
+                    {transactionTypeShortLabel(accountTypeFromTransactionRecord(viewingTxDetails))}
+                  </span>
+                </div>
+                <div>
+                  <span>Items</span>
+                  <strong>{transactionItems(viewingTxDetails).length}</strong>
+                </div>
+                <div>
+                  <span>Total Amount</span>
+                  <strong className={`bgt-amount--${transactionDirectionFromAccountType(accountTypeFromTransactionRecord(viewingTxDetails))}`}>
+                    {formatPhpCurrency(viewingTxDetails.amount)}
+                  </strong>
+                </div>
+              </div>
+
+              {txDetailsLoading && (
+                <div className="bgt-tx-detail-loading">
+                  <div className="bgt-spinner" />
+                  <span>Loading all related items...</span>
+                </div>
+              )}
+
+              <div className="bgt-table-wrap bgt-tx-detail-table-wrap">
+                <table className="bgt-table bgt-table--compact bgt-tx-detail-table">
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Project</th>
+                      <th className="bgt-col-amt">Price</th>
+                      <th>Qty</th>
+                      <th className="bgt-col-amt">Discount</th>
+                      <th className="bgt-col-amt">Amount</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactionItems(viewingTxDetails).map((item) => {
+                      const itemAccountType = accountTypeFromTransactionRecord(item);
+                      const itemDirection = transactionDirectionFromAccountType(itemAccountType);
+                      const itemProjectLabel = transactionGroupProjectLabel(item);
+                      return (
+                        <tr key={item.id} className="bgt-table-row">
+                          <td className="bgt-cell-desc">{item.description || <span className="bgt-muted">-</span>}</td>
+                          <td>{itemProjectLabel || <span className="bgt-muted">-</span>}</td>
+                          <td className="bgt-col-amt">{item.price == null ? <span className="bgt-muted">-</span> : formatPhpCurrency(item.price)}</td>
+                          <td>{item.quantity == null ? <span className="bgt-muted">-</span> : formatQuantity(item.quantity)}</td>
+                          <td className="bgt-col-amt">{item.discount == null ? <span className="bgt-muted">-</span> : formatPhpCurrency(item.discount)}</td>
+                          <td className={`bgt-col-amt bgt-amount--${itemDirection}`}>
+                            <span className="bgt-amount-sign">{itemDirection === "in" ? "+" : "-"}</span>
+                            <span>{formatPhpCurrency(item.amount)}</span>
+                          </td>
+                          <td className="bgt-cell-desc bgt-tx-detail-notes">{item.notes || <span className="bgt-muted">-</span>}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="bgt-modal-foot">
+                <button type="button" className="btn btn-ghost" onClick={closeTxDetails}>Close</button>
+                <button type="button" className="btn btn-primary" onClick={() => { const tx = viewingTxDetails; closeTxDetails(); openEditTx(tx); }}>
+                  <IconEdit /> Edit
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Transaction modal */}
       {txFormOpen && (
         <div className="bgt-backdrop" onClick={(e) => { if (e.target === e.currentTarget) closeTxForm(); }}>
@@ -3396,13 +3667,17 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                   <label className="bgt-label">Reference No.</label>
                   <input className="input" type="text" placeholder="OR, receipt, invoice number…" value={txForm.referenceNo} onChange={(e) => setTxForm((f) => ({ ...f, referenceNo: e.target.value }))} />
                 </div>
+                <div className="bgt-field bgt-field--wide bgt-field--tx-description">
+                  <label className="bgt-label">Description</label>
+                  <input className="input" type="text" placeholder="Transaction description" value={txForm.description} onChange={(e) => setTxForm((f) => ({ ...f, description: e.target.value }))} />
+                </div>
               </div>
 
               <div className="bgt-tx-lines">
                 <div className="bgt-tx-lines-head">
                   <div>
                     <span className="bgt-label">Line Entries</span>
-                    <span className="bgt-field-note">All entries use the selected transaction type, category, project, date, and reference.</span>
+                    <span className="bgt-field-note">All items use the selected transaction type, category, project, date, reference, and description.</span>
                   </div>
                   {!editingTx && (
                     <button type="button" className="btn btn-ghost bgt-tx-add-line" onClick={addTxLine}>
@@ -3423,8 +3698,8 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                     </div>
                     <div className="bgt-line-grid">
                       <div className="bgt-field bgt-line-desc">
-                        <label className="bgt-label">Description</label>
-                        <input className="input" type="text" placeholder="What is this for?" value={line.description} onChange={(e) => updateTxLineValue(line.lineKey, "description", e.target.value)} />
+                        <label className="bgt-label">Item</label>
+                        <input className="input" type="text" placeholder="Item name or service" value={line.description} onChange={(e) => updateTxLineValue(line.lineKey, "description", e.target.value)} />
                       </div>
                       <div className="bgt-field">
                         <label className="bgt-label">Price (₱)</label>
@@ -3786,7 +4061,8 @@ export default function BudgetTab({ moduleMode = "combined" }) {
             </div>
             <h3 className="bgt-confirm-title">Delete Selected Transactions?</h3>
             <p className="bgt-confirm-body">
-              This will permanently delete <strong>{selectedTxCount}</strong> selected transaction{selectedTxCount !== 1 ? "s" : ""}. This cannot be undone.
+              This will permanently delete <strong>{selectedTxRecordCount || selectedTxCount}</strong> selected transaction record{(selectedTxRecordCount || selectedTxCount) !== 1 ? "s" : ""}
+              {selectedTxCount !== (selectedTxRecordCount || selectedTxCount) ? ` containing ${selectedTxCount} items` : ""}. This cannot be undone.
             </p>
             <div className="bgt-modal-foot bgt-modal-foot--center">
               <button className="btn btn-ghost" onClick={() => setBulkDeleteOpen(false)} disabled={bulkDeleting}>Cancel</button>
@@ -3807,8 +4083,9 @@ export default function BudgetTab({ moduleMode = "combined" }) {
             </div>
             <h3 className="bgt-confirm-title">Delete Transaction?</h3>
             <p className="bgt-confirm-body">
-              This will permanently delete the {accountTypeLabel(accountTypeFromTransactionRecord(deletingTx)).toLowerCase()} of <strong>₱{formatMoney(deletingTx.amount)}</strong>
-              {deletingTx.description ? ` — "${deletingTx.description}"` : ""}. This cannot be undone.
+              This will permanently delete the {accountTypeLabel(accountTypeFromTransactionRecord(deletingTx)).toLowerCase()} record totaling <strong>₱{formatMoney(deletingTx.amount)}</strong>
+              {transactionItems(deletingTx).length > 1 ? ` with ${transactionItems(deletingTx).length} items` : ""}
+              {transactionGroupDescription(deletingTx) ? ` - "${transactionGroupDescription(deletingTx)}"` : ""}. This cannot be undone.
             </p>
             <div className="bgt-modal-foot bgt-modal-foot--center">
               <button className="btn btn-ghost" onClick={() => setDeletingTx(null)}>Cancel</button>
