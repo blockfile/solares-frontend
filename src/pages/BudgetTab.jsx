@@ -2542,7 +2542,6 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                         </span>
                       </td>
                       <td className={`bgt-col-amt bgt-amount--${txDirection}`}>
-                        <span className="bgt-amount-sign">{txDirection === "in" ? "+" : "−"}</span>
                         <span>₱{formatMoney(tx.amount)}</span>
                       </td>
                       <td className="bgt-col-actions">
@@ -3590,7 +3589,6 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                           <td>{item.quantity == null ? <span className="bgt-muted">-</span> : formatQuantity(item.quantity)}</td>
                           <td className="bgt-col-amt">{item.discount == null ? <span className="bgt-muted">-</span> : formatPhpCurrency(item.discount)}</td>
                           <td className={`bgt-col-amt bgt-amount--${itemDirection}`}>
-                            <span className="bgt-amount-sign">{itemDirection === "in" ? "+" : "-"}</span>
                             <span>{formatPhpCurrency(item.amount)}</span>
                           </td>
                           <td className="bgt-cell-desc bgt-tx-detail-notes">{item.notes || <span className="bgt-muted">-</span>}</td>
