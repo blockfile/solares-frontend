@@ -5768,6 +5768,47 @@ button {
   white-space: nowrap;
 }
 
+.bgt-sort-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  white-space: nowrap;
+}
+
+.bgt-sort-btn:hover {
+  color: var(--primary);
+}
+
+.bgt-sort-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.bgt-sort-btn svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+}
+
+.bgt-sort-direction {
+  border-radius: 4px;
+  background: rgba(60, 111, 181, 0.12);
+  color: var(--primary);
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 5px;
+}
+
 .bgt-table td {
   padding: 13px 16px;
   vertical-align: middle;

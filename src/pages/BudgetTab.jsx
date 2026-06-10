@@ -888,6 +888,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
   const [scopeProjectId, setScopeProjectId] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
+  const [dateSort, setDateSort] = useState("desc");
   const [searchRaw, setSearchRaw] = useState("");
   const search = useDeferredValue(searchRaw);
 
@@ -985,6 +986,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
       if (filterDateFrom) params.set("dateFrom", filterDateFrom);
       if (filterDateTo) params.set("dateTo", filterDateTo);
       if (search) params.set("q", search);
+      params.set("dateSort", dateSort);
       const summaryParams = new URLSearchParams();
       if (scopeMode === "project" && scopeProjectId) summaryParams.set("projectId", scopeProjectId);
       if (filterDateFrom) summaryParams.set("dateFrom", filterDateFrom);
@@ -1051,7 +1053,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
   useEffect(() => {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterType, filterAccount, filterDateFrom, filterDateTo, search, scopeMode, scopeProjectId]);
+  }, [filterType, filterAccount, filterDateFrom, filterDateTo, search, scopeMode, scopeProjectId, dateSort]);
 
   useEffect(() => {
     loadProjectPackages(true);
@@ -1407,6 +1409,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
     if (filterDateFrom) params.set("dateFrom", filterDateFrom);
     if (filterDateTo) params.set("dateTo", filterDateTo);
     if (String(searchRaw || "").trim()) params.set("q", String(searchRaw || "").trim());
+    params.set("dateSort", dateSort);
     if (limit) params.set("limit", String(limit));
     return params;
   }
@@ -2316,7 +2319,19 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                         aria-label="Select all visible transactions"
                       />
                     </th>
-                    <th>Date</th>
+                    <th aria-sort={dateSort === "asc" ? "ascending" : "descending"}>
+                      <button
+                        type="button"
+                        className="bgt-sort-btn"
+                        onClick={() => setDateSort((sort) => (sort === "asc" ? "desc" : "asc"))}
+                        title={`Sort by date ${dateSort === "asc" ? "descending" : "ascending"}`}
+                        aria-label={`Sort by date ${dateSort === "asc" ? "descending" : "ascending"}`}
+                      >
+                        <span>Date</span>
+                        <span className="bgt-sort-direction">{dateSort === "asc" ? "Asc" : "Desc"}</span>
+                        {dateSort === "asc" ? <IconArrowUp /> : <IconArrowDown />}
+                      </button>
+                    </th>
                     <th>Category</th>
                     <th>Description</th>
                     <th>Reference</th>
