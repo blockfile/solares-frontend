@@ -1975,7 +1975,9 @@ export default function BudgetTab({ moduleMode = "combined" }) {
   async function saveTx(e) {
     e.preventDefault(); setTxSaving(true);
     try {
-      const inputLines = editingTx ? txLines : txLines.filter(hasTxLineInput);
+      const inputLines = editingTx
+        ? txLines.filter((line) => line.id || hasTxLineInput(line))
+        : txLines.filter(hasTxLineInput);
       const payloadLines = inputLines.map((line, index) => normalizeTxLineForPayload(line, index));
       const invalidLine = payloadLines.find((line) => line.error);
       if (invalidLine) { flash(invalidLine.error, "error"); return; }
@@ -1992,12 +1994,31 @@ export default function BudgetTab({ moduleMode = "combined" }) {
       };
       if (editingTx) {
         const existingItems = transactionItems(editingTx);
+        const existingIds = existingItems.map((item) => item?.id).filter((id) => id != null);
+        const keptExistingIds = inputLines.map((line) => line.id).filter((id) => id != null);
+        const removedExistingIds = existingIds.filter((id) => !keptExistingIds.some((keptId) => Number(keptId) === Number(id)));
+        const linesToCreate = [];
+
         await Promise.all(items.map((item, index) => {
-          const lineId = inputLines[index]?.id || existingItems[index]?.id;
-          if (!lineId) throw new Error("Missing transaction item id.");
+          const lineId = inputLines[index]?.id;
+          if (!lineId) {
+            linesToCreate.push(item);
+            return Promise.resolve();
+          }
           return api.put(`/budget/${lineId}`, { ...sharedPayload, ...item });
         }));
-        flash(items.length > 1 ? "Transaction record updated." : "Transaction updated.");
+
+        if (linesToCreate.length) {
+          await api.post("/budget", { ...sharedPayload, items: linesToCreate });
+        }
+        if (removedExistingIds.length === 1) {
+          await api.delete(`/budget/${removedExistingIds[0]}`);
+        } else if (removedExistingIds.length > 1) {
+          await api.delete("/budget/bulk", { data: { transactionIds: removedExistingIds } });
+        }
+
+        const savedCount = inputLines.length;
+        flash(savedCount > 1 ? "Transaction record updated." : "Transaction updated.");
       }
       else {
         const res = await api.post("/budget", { ...sharedPayload, items });
@@ -3677,19 +3698,23 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                     <span className="bgt-label">Line Entries</span>
                     <span className="bgt-field-note">All items use the selected transaction type, category, project, date, reference, and description.</span>
                   </div>
-                  {!editingTx && (
-                    <button type="button" className="btn btn-ghost bgt-tx-add-line" onClick={addTxLine}>
-                      <IconPlus /> Add Line
-                    </button>
-                  )}
+                  <button type="button" className="btn btn-ghost bgt-tx-add-line" onClick={addTxLine} disabled={txSaving}>
+                    <IconPlus /> Add Line
+                  </button>
                 </div>
 
                 {txLines.map((line, index) => (
                   <div className="bgt-tx-line" key={line.lineKey}>
                     <div className="bgt-tx-line-head">
                       <span className="bgt-tx-line-title">Entry {index + 1}</span>
-                      {!editingTx && txLines.length > 1 && (
-                        <button type="button" className="bgt-row-btn bgt-row-btn--del" onClick={() => removeTxLine(line.lineKey)}>
+                      {txLines.length > 1 && (
+                        <button
+                          type="button"
+                          className="bgt-row-btn bgt-row-btn--del"
+                          onClick={() => removeTxLine(line.lineKey)}
+                          disabled={txSaving}
+                          aria-label={`Remove entry ${index + 1}`}
+                        >
                           Remove
                         </button>
                       )}
