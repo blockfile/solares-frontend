@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/client";
 import useBodyScrollLock from "../hooks/useBodyScrollLock";
+import "../styles/quotes.css";
 
 const CATEGORY_DEFS = [
   { key: "main_system", label: "A. Main System Components" },
@@ -1775,17 +1776,45 @@ export default function QuotesTab() {
 
   return (
     <div className={`quotes-page ${quoteView === "recent" ? "quotes-page-recent" : ""}`}>
-      <div className="quote-mode-tabs">
+      <header className="page-head quotes-head">
+        <div className="page-head-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
+          </svg>
+        </div>
+        <div className="page-head-text">
+          <h2 className="page-head-title">Quotations</h2>
+          <p className="page-head-desc">Build, price, and export customer quotations</p>
+        </div>
+        <div className="page-head-actions">
+          {quoteView === "create" ? (
+            <span className="page-head-chip">
+              <span className="page-head-chip-label">Estimated total</span>
+              <span className="page-head-chip-value mono">{formatCurrency(created ? created.total : estimatedTotalAfterDiscount)}</span>
+            </span>
+          ) : (
+            <span className="page-head-chip">
+              <span className="page-head-chip-label">Saved quotes</span>
+              <span className="page-head-chip-value mono">{recentQuotes.length}</span>
+            </span>
+          )}
+        </div>
+      </header>
+      <div className="tabs-underline quotes-tabs" role="tablist" aria-label="Quotation views">
         <button
           type="button"
-          className={`step-pill ${quoteView === "create" ? "active" : ""}`}
+          role="tab"
+          aria-selected={quoteView === "create"}
+          className={`tab-underline ${quoteView === "create" ? "active" : ""}`}
           onClick={() => setQuoteView("create")}
         >
           Create Quote
         </button>
         <button
           type="button"
-          className={`step-pill ${quoteView === "recent" ? "active" : ""}`}
+          role="tab"
+          aria-selected={quoteView === "recent"}
+          className={`tab-underline ${quoteView === "recent" ? "active" : ""}`}
           onClick={() => setQuoteView("recent")}
         >
           Recent Quotes
@@ -2267,11 +2296,11 @@ export default function QuotesTab() {
               <>
                 <div className="stat-row">
                   <span>Estimated Materials</span>
-                  <strong>{formatCurrency(estimatedMaterialSubtotal)}</strong>
+                  <strong className="mono">{formatCurrency(estimatedMaterialSubtotal)}</strong>
                 </div>
                 <div className="stat-row">
                   <span>Estimated Installation</span>
-                  <strong>{formatCurrency(estimatedInstallationTotal)}</strong>
+                  <strong className="mono">{formatCurrency(estimatedInstallationTotal)}</strong>
                 </div>
                 <label className="field quote-export-vat-field">
                   <span>Installation Margin %</span>
@@ -2289,17 +2318,17 @@ export default function QuotesTab() {
                 </label>
                 <div className="stat-row">
                   <span>Estimated Subtotal</span>
-                  <strong>{formatCurrency(estimatedSubtotal)}</strong>
+                  <strong className="mono">{formatCurrency(estimatedSubtotal)}</strong>
                 </div>
                 {estimatedDiscountTotal > 0 && (
                   <div className="stat-row stat-row-discount">
                     <span>Estimated Discount</span>
-                    <strong>-{formatCurrency(estimatedDiscountTotal)}</strong>
+                    <strong className="mono">-{formatCurrency(estimatedDiscountTotal)}</strong>
                   </div>
                 )}
                 <div className="stat-row stat-row-total">
                   <span>Estimated Total</span>
-                  <strong>{formatCurrency(estimatedTotalAfterDiscount)}</strong>
+                  <strong className="mono">{formatCurrency(estimatedTotalAfterDiscount)}</strong>
                 </div>
               </>
             )}
@@ -2308,13 +2337,13 @@ export default function QuotesTab() {
               <>
                 <div className="stat-row">
                   <span>Reference</span>
-                  <strong>{created.quoteRef}</strong>
+                  <strong className="mono">{created.quoteRef}</strong>
                 </div>
                 {Number(created.discountAmount) > 0 ? (
                   <>
                     <div className="stat-row">
                       <span>Subtotal</span>
-                      <strong>{formatCurrency(created.subtotal)}</strong>
+                      <strong className="mono">{formatCurrency(created.subtotal)}</strong>
                     </div>
                     {(Array.isArray(created.discountItems) && created.discountItems.length > 0
                       ? created.discountItems
@@ -2322,18 +2351,18 @@ export default function QuotesTab() {
                     ).map((d, i) => (
                       <div className="stat-row stat-row-discount" key={i}>
                         <span>{d.label}</span>
-                        <strong>-{formatCurrency(d.amount)}</strong>
+                        <strong className="mono">-{formatCurrency(d.amount)}</strong>
                       </div>
                     ))}
                     <div className="stat-row stat-row-total">
                       <span>Total after Discount</span>
-                      <strong>{formatCurrency(created.total)}</strong>
+                      <strong className="mono">{formatCurrency(created.total)}</strong>
                     </div>
                   </>
                 ) : (
                   <div className="stat-row">
                     <span>Total</span>
-                    <strong>{formatCurrency(created.total)}</strong>
+                    <strong className="mono">{formatCurrency(created.total)}</strong>
                   </div>
                 )}
                 {exportError && <div className="error-text">{exportError}</div>}
@@ -2363,22 +2392,24 @@ export default function QuotesTab() {
           </aside>
         </div>
       ) : (
-        <div className="quotes-layout quote-review-layout">
+        <>
+          <div className="page-toolbar quotes-toolbar">
+            <input
+              className="input quotes-toolbar-search"
+              placeholder="Search by quote ref, customer, or template"
+              value={recentSearch}
+              onChange={(e) => setRecentSearch(e.target.value)}
+            />
+            <button className="btn btn-secondary" type="button" onClick={() => loadRecentQuotes(recentSearch)}>
+              Search
+            </button>
+            <button className="btn btn-ghost" type="button" onClick={() => loadRecentQuotes()}>
+              Refresh
+            </button>
+          </div>
+
+          <div className="quotes-layout quote-review-layout">
           <div className="materials-card quote-review-shell">
-            <div className="quote-review-toolbar">
-              <input
-                className="input"
-                placeholder="Search by quote ref, customer, or template"
-                value={recentSearch}
-                onChange={(e) => setRecentSearch(e.target.value)}
-              />
-              <button className="btn btn-secondary" type="button" onClick={() => loadRecentQuotes(recentSearch)}>
-                Search
-              </button>
-              <button className="btn btn-ghost" type="button" onClick={() => loadRecentQuotes()}>
-                Refresh
-              </button>
-            </div>
 
             {recentQuoteError && <div className="error-text">{recentQuoteError}</div>}
 
@@ -2390,7 +2421,7 @@ export default function QuotesTab() {
                     <th>Customer</th>
                     <th>Template</th>
                     <th>Quote Date</th>
-                    <th>Total</th>
+                    <th className="num">Total</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -2398,13 +2429,13 @@ export default function QuotesTab() {
                   {recentQuotes.map((quote) => (
                     <tr key={quote.id}>
                       <td>
-                        <strong>{quote.quoteRef}</strong>
-                        <span className="table-subtext">{formatDateTimeLabel(quote.createdAt)}</span>
+                        <strong className="mono">{quote.quoteRef}</strong>
+                        <span className="table-subtext mono">{formatDateTimeLabel(quote.createdAt)}</span>
                       </td>
                       <td>{quote.customerName}</td>
                       <td>{quote.templateName || "-"}</td>
-                      <td>{formatDateLabel(quote.quoteDate)}</td>
-                      <td>{formatCurrency(quote.total)}</td>
+                      <td className="mono">{formatDateLabel(quote.quoteDate)}</td>
+                      <td className="num">{formatCurrency(quote.total)}</td>
                       <td>
                         <div className="materials-actions quote-list-actions">
                           <button
@@ -2483,7 +2514,7 @@ export default function QuotesTab() {
               <>
                 <div className="stat-row">
                   <span>Reference</span>
-                  <strong>{selectedRecentQuoteMeta.quoteRef}</strong>
+                  <strong className="mono">{selectedRecentQuoteMeta.quoteRef}</strong>
                 </div>
                 <div className="stat-row">
                   <span>Customer</span>
@@ -2495,15 +2526,15 @@ export default function QuotesTab() {
                 </div>
                 <div className="stat-row">
                   <span>Quote Date</span>
-                  <strong>{formatDateLabel(selectedRecentQuoteMeta.quoteDate)}</strong>
+                  <strong className="mono">{formatDateLabel(selectedRecentQuoteMeta.quoteDate)}</strong>
                 </div>
                 <div className="stat-row">
                   <span>Valid Until</span>
-                  <strong>{formatDateLabel(selectedRecentQuoteMeta.validUntil)}</strong>
+                  <strong className="mono">{formatDateLabel(selectedRecentQuoteMeta.validUntil)}</strong>
                 </div>
                 <div className="stat-row">
                   <span>Total</span>
-                  <strong>{formatCurrency(selectedRecentQuoteMeta.total)}</strong>
+                  <strong className="mono">{formatCurrency(selectedRecentQuoteMeta.total)}</strong>
                 </div>
                 <div className="stat-row">
                   <span>Created By</span>
@@ -2565,7 +2596,7 @@ export default function QuotesTab() {
                   {exporting ? "Exporting..." : "3) Company Quotation Excel"}
                 </button>
                 <button
-                  className="btn btn-danger"
+                  className="btn btn-outline-danger"
                   type="button"
                   disabled={exporting || deletingQuoteId === Number(selectedRecentQuoteMeta.id)}
                   onClick={() => deleteQuote(selectedRecentQuoteMeta)}
@@ -2584,7 +2615,7 @@ export default function QuotesTab() {
                     <div className="quote-review-item" key={item.id}>
                       <div className="quote-review-item-top">
                         <strong>{item.description}</strong>
-                        <span>{formatCurrency(item.line_total)}</span>
+                        <span className="mono">{formatCurrency(item.line_total)}</span>
                       </div>
                       <div className="quote-review-item-meta">
                         <span>No. {item.item_no}</span>
@@ -2598,7 +2629,8 @@ export default function QuotesTab() {
               </>
             )}
           </aside>
-        </div>
+          </div>
+        </>
       )}
 
       {printPreviewOpen && (

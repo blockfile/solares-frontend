@@ -1,5 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import api from "../api/client";
+import "../styles/inventory.css";
 
 const EMPTY_ITEM_FORM = {
   itemName: "",
@@ -95,6 +96,19 @@ function movementLabel(type) {
   }
 }
 
+const STOCK_STATUS_CHIP = {
+  in_stock: "chip-success",
+  low: "chip-warn",
+  out: "chip-danger",
+  inactive: "chip-danger"
+};
+
+const MOVEMENT_CHIP = {
+  stock_in: "chip-success",
+  stock_out: "chip-danger",
+  adjustment: "chip-warn"
+};
+
 function signedMovement(row) {
   if (row.signed_quantity != null) return toNumber(row.signed_quantity, 0);
   const qty = toNumber(row.quantity, 0);
@@ -115,6 +129,9 @@ export default function InventoryTab() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("active");
+  // UI-only: collapse the create/movement forms behind the page-head buttons (Atlas §4).
+  const [showItemForm, setShowItemForm] = useState(false);
+  const [showMovementForm, setShowMovementForm] = useState(false);
 
   const deferredSearch = useDeferredValue(search);
 
@@ -320,17 +337,71 @@ export default function InventoryTab() {
   return (
     <div className="materials-page-grid inventory-page">
       <div className="materials-card">
-        <div className="module-card-head">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 3.8 19 7.7v8.6L12 20.2 5 16.3V7.7L12 3.8Z" />
-            <path d="M5.6 7.9 12 11.5l6.4-3.6" />
-            <path d="M12 11.5v8.1" />
-          </svg>
-          <div className="module-card-head-text">
-            <strong>Inventory Flow</strong>
-            <span>Add materials, record received stock, record used stock, and keep on-hand balances current.</span>
+        <header className="page-head inventory-head">
+          <div className="page-head-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 8 12 3 3 8v8l9 5 9-5V8Z" />
+              <path d="m3 8 9 5 9-5" />
+              <path d="M12 13v8" />
+            </svg>
           </div>
-          <div className="module-card-head-filter materials-head-actions">
+          <div className="inventory-head-text">
+            <h1>Inventory</h1>
+            <p>Add materials, record received and used stock, and keep on-hand balances current.</p>
+          </div>
+          <div className="inventory-head-actions">
+            <button
+              className={`btn btn-secondary${showMovementForm ? " is-open" : ""}`}
+              type="button"
+              aria-expanded={showMovementForm}
+              onClick={() => setShowMovementForm((open) => !open)}
+            >
+              Record Movement
+            </button>
+            <button
+              className={`btn btn-primary${showItemForm ? " is-open" : ""}`}
+              type="button"
+              aria-expanded={showItemForm}
+              onClick={() => setShowItemForm((open) => !open)}
+            >
+              Add Item
+            </button>
+          </div>
+        </header>
+
+        <div className="inv-stat-row">
+          <div className="inv-stat">
+            <span>Active items</span>
+            <strong className="num">{summary.activeItems}</strong>
+          </div>
+          <div className={`inv-stat${summary.lowItems > 0 ? " inv-stat--warn" : ""}`}>
+            <span>Low stock</span>
+            <strong className="num">{summary.lowItems}</strong>
+          </div>
+          <div className={`inv-stat${summary.outItems > 0 ? " inv-stat--danger" : ""}`}>
+            <span>Out of stock</span>
+            <strong className="num">{summary.outItems}</strong>
+          </div>
+          <div className="inv-stat">
+            <span>On hand</span>
+            <strong className="num">{formatQuantity(summary.totalOnHand)}</strong>
+          </div>
+        </div>
+
+        <div className="page-toolbar inventory-toolbar">
+          <div className="inventory-toolbar-filters">
+            <input
+              className="input materials-filter-search"
+              placeholder="Search item, SKU, location, notes..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <select className="select" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+              <option value="all">All Categories</option>
+              {categoryOptions.map((category) => (
+                <option value={category} key={category}>{category}</option>
+              ))}
+            </select>
             <select className="select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="active">Active Items</option>
               <option value="low">Low Stock</option>
@@ -339,31 +410,20 @@ export default function InventoryTab() {
               <option value="all">All Items</option>
             </select>
           </div>
+          <span className="inventory-toolbar-note">
+            {refreshing ? "Refreshing..." : `${visibleItems.length} of ${items.length} items`}
+          </span>
         </div>
 
-        <div className="materials-dashboard-grid">
-          <div className="materials-summary-card">
-            <strong>{summary.activeItems}</strong>
-            <span>Active items</span>
-          </div>
-          <div className="materials-summary-card">
-            <strong>{summary.lowItems}</strong>
-            <span>Low stock</span>
-          </div>
-          <div className="materials-summary-card">
-            <strong>{summary.outItems}</strong>
-            <span>Out of stock</span>
-          </div>
-          <div className="materials-summary-card">
-            <strong>{formatQuantity(summary.totalOnHand)}</strong>
-            <span>Total quantity on hand</span>
-          </div>
-        </div>
-
+        {(showItemForm || showMovementForm) && (
         <div className="materials-layout-grid inventory-entry-grid">
-          <div className="add-item-card materials-feature-card">
-            <div className="add-item-card-head materials-feature-head">
+          {showItemForm && (
+          <div className="add-item-card materials-feature-card inventory-form-card">
+            <div className="add-item-card-head materials-feature-head inventory-form-card-head">
               <strong>Add Inventory Item</strong>
+              <button className="btn btn-ghost inventory-form-close" type="button" onClick={() => setShowItemForm(false)}>
+                Close
+              </button>
             </div>
             <div className="materials-feature-body">
               <div className="inventory-form-grid">
@@ -452,10 +512,15 @@ export default function InventoryTab() {
               </div>
             </div>
           </div>
+          )}
 
-          <div className="add-item-card materials-feature-card">
-            <div className="add-item-card-head materials-feature-head">
+          {showMovementForm && (
+          <div className="add-item-card materials-feature-card inventory-form-card">
+            <div className="add-item-card-head materials-feature-head inventory-form-card-head">
               <strong>Record Stock Movement</strong>
+              <button className="btn btn-ghost inventory-form-close" type="button" onClick={() => setShowMovementForm(false)}>
+                Close
+              </button>
             </div>
             <div className="materials-feature-body">
               <div className="inventory-form-grid">
@@ -557,7 +622,9 @@ export default function InventoryTab() {
               </div>
             </div>
           </div>
+          )}
         </div>
+        )}
 
         <datalist id="inventory-category-options">
           {categoryOptions.map((category) => (
@@ -568,30 +635,6 @@ export default function InventoryTab() {
         {error && <div className="error-text">{error}</div>}
         {success && <div className="success-text">{success}</div>}
         {loading && <p className="section-note">Loading inventory...</p>}
-
-        <div className="materials-table-toolbar">
-          <div>
-            <strong>Inventory Items</strong>
-            <span>{refreshing ? "Refreshing..." : "Search and edit stock details. Quantities change through movements."}</span>
-          </div>
-          <div className="materials-active-filters inventory-filters">
-            <label className="materials-filter-field">
-              <span>Category</span>
-              <select className="select" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-                <option value="all">All Categories</option>
-                {categoryOptions.map((category) => (
-                  <option value={category} key={category}>{category}</option>
-                ))}
-              </select>
-            </label>
-            <input
-              className="input materials-filter-search"
-              placeholder="Search item, SKU, location, notes..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-        </div>
 
         <div className="materials-table-wrap inventory-table-wrap">
           <table className="materials-table inventory-table">
@@ -626,7 +669,7 @@ export default function InventoryTab() {
                         </div>
                       )}
                     </td>
-                    <td>
+                    <td className="num">
                       <div className="inventory-stock-cell">
                         <strong>{formatQuantity(item.current_quantity)}</strong>
                         <span>{item.unit || "units"}</span>
@@ -643,7 +686,7 @@ export default function InventoryTab() {
                           <option value="0">Inactive</option>
                         </select>
                       ) : (
-                        <span className={`inventory-status-pill inventory-status-${status}`}>
+                        <span className={`chip ${STOCK_STATUS_CHIP[status] || "chip-neutral"}`}>
                           {stockStatusLabel(status)}
                         </span>
                       )}
@@ -662,7 +705,7 @@ export default function InventoryTab() {
                         item.location || "-"
                       )}
                     </td>
-                    <td>
+                    <td className={isEditing ? undefined : "num"}>
                       {isEditing ? (
                         <div className="inventory-edit-stack">
                           <input className="input" value={editForm.unit} onChange={(e) => updateEditForm("unit", e.target.value)} placeholder="Unit" />
@@ -672,7 +715,7 @@ export default function InventoryTab() {
                         `${formatQuantity(item.minimum_quantity)} ${item.unit || ""}`
                       )}
                     </td>
-                    <td>{formatDateTime(item.last_movement_at)}</td>
+                    <td className="mono">{formatDateTime(item.last_movement_at)}</td>
                     <td>
                       <div className="materials-actions inventory-actions">
                         {isEditing ? (
@@ -684,7 +727,7 @@ export default function InventoryTab() {
                           <>
                             <button className="btn btn-ghost" type="button" onClick={() => startEdit(item)}>Edit</button>
                             {Number(item.is_active) === 1 ? (
-                              <button className="btn btn-ghost" type="button" onClick={() => deactivateItem(item)}>Deactivate</button>
+                              <button className="btn btn-ghost inventory-btn-danger" type="button" onClick={() => deactivateItem(item)}>Deactivate</button>
                             ) : (
                               <button className="btn btn-ghost" type="button" onClick={() => startEdit(item)}>Reactivate</button>
                             )}
@@ -698,7 +741,7 @@ export default function InventoryTab() {
 
               {!visibleItems.length && !loading && (
                 <tr>
-                  <td colSpan={8} className="section-note">No inventory items match the current filters.</td>
+                  <td colSpan={8} className="empty-state-cell">No inventory items match the current filters.</td>
                 </tr>
               )}
             </tbody>
@@ -730,9 +773,9 @@ export default function InventoryTab() {
                 const signed = signedMovement(movement);
                 return (
                   <tr key={movement.id}>
-                    <td>{formatDateTime(movement.movement_date)}</td>
+                    <td className="mono">{formatDateTime(movement.movement_date)}</td>
                     <td>
-                      <span className={`inventory-flow-pill inventory-flow-${movement.movement_type}`}>
+                      <span className={`chip ${MOVEMENT_CHIP[movement.movement_type] || "chip-neutral"}`}>
                         {movementLabel(movement.movement_type)}
                       </span>
                     </td>
@@ -740,11 +783,11 @@ export default function InventoryTab() {
                       <strong>{movement.item_name}</strong>
                       <span className="table-subtext">{movement.sku || movement.unit || "-"}</span>
                     </td>
-                    <td className={signed < 0 ? "inventory-negative" : "inventory-positive"}>
+                    <td className={`num ${signed < 0 ? "inventory-negative" : "inventory-positive"}`}>
                       {signed > 0 ? "+" : ""}{formatQuantity(signed)} {movement.unit || ""}
                     </td>
-                    <td>{formatMoney(movement.unit_cost)}</td>
-                    <td>{movement.reference_no || "-"}</td>
+                    <td className="num">{formatMoney(movement.unit_cost)}</td>
+                    <td className="mono">{movement.reference_no || "-"}</td>
                     <td>{movement.notes || "-"}</td>
                   </tr>
                 );
@@ -752,7 +795,7 @@ export default function InventoryTab() {
 
               {!movements.length && !loading && (
                 <tr>
-                  <td colSpan={7} className="section-note">No inventory movement has been recorded yet.</td>
+                  <td colSpan={7} className="empty-state-cell">No inventory movement has been recorded yet.</td>
                 </tr>
               )}
             </tbody>

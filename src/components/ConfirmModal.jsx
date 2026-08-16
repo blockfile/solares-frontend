@@ -20,14 +20,16 @@ export default function ConfirmModal({
   return (
     <div className="modal-backdrop" role="presentation">
       <div
-        className="modal-card"
+        className="modal-card ledger-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-modal-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="modal-copy">
+        <header className="ledger-modal-head">
           <h4 id="confirm-modal-title">{title}</h4>
+        </header>
+        <div className="modal-copy">
           <p>{message}</p>
           {children}
         </div>

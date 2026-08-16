@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useState } from "react";
 import api from "../api/client";
 import { getSupplierTextStyle } from "../constants/supplierColors";
+import "../styles/materials.css";
 
 function toNumber(value, fallback = 0) {
   const n = Number(value);
@@ -64,6 +65,9 @@ export default function MaterialsTab() {
   const [deletingSupplierId, setDeletingSupplierId] = useState(null);
   const [deletingManualCatalog, setDeletingManualCatalog] = useState(false);
   const [selectingPriceKey, setSelectingPriceKey] = useState("");
+
+  // Atlas UI-only state: which page-head quick panel is expanded ("import" | "add" | null).
+  const [openPanel, setOpenPanel] = useState(null);
 
   const loadAll = async ({ background = false } = {}) => {
     if (background) setRefreshing(true);
@@ -381,53 +385,75 @@ export default function MaterialsTab() {
 
   return (
     <div className="materials-page-grid">
-      <div className="materials-card">
-        <div className="module-card-head">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-          </svg>
-          <div className="module-card-head-text">
-            <strong>Material Pricing Hub</strong>
-            <span>Upload supplier PDF, XLSX, CSV, or JSON price lists, compare supplier prices, and keep the active quote catalog in sync.</span>
+        <header className="page-head">
+          <span className="page-head-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+          </span>
+          <div className="page-head-text">
+            <h1>Material Cost</h1>
+            <p>Import supplier PDF, XLSX, CSV, or JSON price lists, compare supplier prices, and keep the active quote catalog in sync.</p>
           </div>
-          <div className="module-card-head-filter materials-head-actions">
+          <div className="page-head-actions">
+            <button
+              className="btn btn-secondary"
+              type="button"
+              aria-expanded={openPanel === "add"}
+              aria-controls="materials-add-panel"
+              onClick={() => setOpenPanel((current) => (current === "add" ? null : "add"))}
+            >
+              Add material
+            </button>
+            <button
+              className="btn btn-primary"
+              type="button"
+              aria-expanded={openPanel === "import"}
+              aria-controls="materials-import-panel"
+              onClick={() => setOpenPanel((current) => (current === "import" ? null : "import"))}
+            >
+              Import price list
+            </button>
+          </div>
+        </header>
+
+        <div className="page-toolbar">
+          <div className="page-toolbar-filters">
             <select
               id="subgroupFilter"
               className="select"
+              aria-label="Filter by material type"
               value={subgroupFilter}
               onChange={(e) => setSubgroupFilter(e.target.value)}
             >
-              <option value="all">All Types</option>
+              <option value="all">All types</option>
               {subgroupOptions.map((sg) => (
                 <option value={sg} key={sg}>{sg}</option>
               ))}
             </select>
           </div>
-        </div>
-
-        <div className="materials-dashboard-grid">
-          <div className="materials-summary-card">
-            <strong>{materials.length}</strong>
-            <span>Active catalog items</span>
-          </div>
-          <div className="materials-summary-card">
-            <strong>{suppliers.length}</strong>
-            <span>Suppliers tracked</span>
-          </div>
-          <div className="materials-summary-card">
-            <strong>{recentImports.length}</strong>
-            <span>Recent price list uploads</span>
-          </div>
-          <div className="materials-summary-card">
-            <strong>{refreshing ? "..." : visibleComparisonRows.length}</strong>
-            <span>Comparison rows</span>
+          <div className="page-toolbar-actions">
+            <button
+              className="btn btn-secondary"
+              type="button"
+              disabled={syncingTemplateCatalog}
+              onClick={syncTemplateCatalog}
+            >
+              {syncingTemplateCatalog ? "Syncing..." : "Sync template links"}
+            </button>
           </div>
         </div>
 
-        <div className="materials-layout-grid">
-          <div className="add-item-card materials-feature-card">
+        {error && <div className="error-text">{error}</div>}
+        {success && <div className="success-text">{success}</div>}
+        {loading && <p className="section-note">Loading materials...</p>}
+        {openPanel === "import" && (
+          <section className="add-item-card materials-feature-card materials-collapse-card" id="materials-import-panel">
             <div className="add-item-card-head materials-feature-head">
               <strong>Supplier Price List Import</strong>
+              <button className="btn btn-ghost materials-panel-close" type="button" onClick={() => setOpenPanel(null)}>
+                Close
+              </button>
             </div>
             <div className="materials-feature-body">
               <p className="materials-feature-copy">
@@ -459,21 +485,21 @@ export default function MaterialsTab() {
                 <label className="materials-option-card">
                   <div className="materials-option-check">
                     <input type="checkbox" checked={markPreferred} onChange={(e) => setMarkPreferred(e.target.checked)} />
-                    <strong>Preferred Supplier</strong>
+                    <strong>Preferred supplier</strong>
                   </div>
                   <span>Favor this supplier when the system auto-picks the active catalog price.</span>
                 </label>
                 <label className="materials-option-card">
                   <div className="materials-option-check">
                     <input type="checkbox" checked={applyToCatalog} onChange={(e) => setApplyToCatalog(e.target.checked)} />
-                    <strong>Auto-Sync Catalog</strong>
+                    <strong>Auto-sync catalog</strong>
                   </div>
                   <span>Immediately update active material prices used by quotes after import.</span>
                 </label>
                 <label className="materials-option-card">
                   <div className="materials-option-check">
                     <input type="checkbox" checked={replaceExisting} onChange={(e) => setReplaceExisting(e.target.checked)} />
-                    <strong>Replace Old Supplier List</strong>
+                    <strong>Replace old supplier list</strong>
                   </div>
                   <span>Remove supplier prices that are no longer present in this newest uploaded list.</span>
                 </label>
@@ -486,15 +512,7 @@ export default function MaterialsTab() {
                     disabled={!supplierName.trim() || !supplierFile || uploading}
                     onClick={uploadPriceList}
                   >
-                    {uploading ? "Uploading..." : "Upload Price List"}
-                  </button>
-                  <button
-                    className="btn btn-secondary"
-                    type="button"
-                    disabled={syncingTemplateCatalog}
-                    onClick={syncTemplateCatalog}
-                  >
-                    {syncingTemplateCatalog ? "Syncing..." : "Sync Template Links"}
+                    {uploading ? "Uploading..." : "Upload price list"}
                   </button>
                   <span className="section-note">Supported: PDF, XLSX, CSV, JSON</span>
                 </div>
@@ -503,81 +521,16 @@ export default function MaterialsTab() {
                 </div>
               </div>
             </div>
-          </div>
+          </section>
+        )}
 
-          <div className="add-item-card materials-feature-card">
-            <div className="add-item-card-head materials-feature-head">
-              <strong>Supplier Directory</strong>
-            </div>
-            <div className="materials-feature-body">
-              <p className="materials-feature-copy">
-                Preferred suppliers are prioritized when the system auto-selects the active catalog price.
-              </p>
-              <div className="materials-supplier-list">
-                {manualCatalogMaterials.length > 0 && (
-                  <div className="materials-supplier-row">
-                    <div>
-                      <strong>Manual Catalog</strong>
-                      <div className="section-note">
-                        {manualCatalogMaterials.length} material{manualCatalogMaterials.length === 1 ? "" : "s"}
-                      </div>
-                    </div>
-                    <div className="materials-supplier-actions">
-                      <span className="section-note">Manual</span>
-                      <button
-                        className="btn btn-ghost"
-                        type="button"
-                        disabled={deletingManualCatalog}
-                        onClick={removeManualCatalog}
-                      >
-                        {deletingManualCatalog ? "Deleting..." : "Delete"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {suppliers.map((supplier) => (
-                <div className="materials-supplier-row" key={supplier.id}>
-                  <div>
-                    <strong className="supplier-color-text" style={getSupplierTextStyle(supplier.supplier_name)}>
-                      {supplier.supplier_name}
-                    </strong>
-                    <div className="section-note">
-                      {supplier.material_count || 0} materials
-                      {" - "}
-                      Last upload: {formatDateTime(supplier.latest_uploaded_at)}
-                    </div>
-                  </div>
-                  <div className="materials-supplier-actions">
-                    <label className="materials-toggle">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(supplier.is_preferred)}
-                        disabled={savingSupplierId === supplier.id || deletingSupplierId === supplier.id}
-                        onChange={(e) => updateSupplierPreference(supplier, e.target.checked)}
-                      />
-                      <span>{Boolean(supplier.is_preferred) ? "Preferred" : "Standard"}</span>
-                    </label>
-                    <button
-                      className="btn btn-ghost"
-                      type="button"
-                      disabled={deletingSupplierId === supplier.id}
-                      onClick={() => removeSupplier(supplier)}
-                    >
-                      {deletingSupplierId === supplier.id ? "Deleting..." : "Delete"}
-                    </button>
-                  </div>
-                </div>
-                ))}
-                {!suppliers.length && !manualCatalogMaterials.length && !loading && <div className="section-note">No suppliers yet. Upload the first price list to create one.</div>}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="materials-layout-grid">
-          <div className="add-item-card materials-feature-card">
+        {openPanel === "add" && (
+          <section className="add-item-card materials-feature-card materials-collapse-card" id="materials-add-panel">
             <div className="add-item-card-head materials-feature-head">
               <strong>Add Material</strong>
+              <button className="btn btn-ghost materials-panel-close" type="button" onClick={() => setOpenPanel(null)}>
+                Close
+              </button>
             </div>
             <div className="materials-feature-body">
               <p className="materials-feature-copy">
@@ -612,8 +565,125 @@ export default function MaterialsTab() {
                   <input className="input" placeholder="battery, inverter, cable..." value={subgroup} onChange={(e) => setSubgroup(e.target.value)} />
                 </label>
                 <button className="btn btn-primary add-item-submit" type="button" onClick={createMaterial} disabled={!materialName.trim()}>
-                  Add Material
+                  Add material
                 </button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        <div className="materials-dashboard-grid">
+          <div className="materials-summary-card metric-accent-orange">
+            <span className="materials-stat-chip" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+              </svg>
+            </span>
+            <div className="materials-stat-text">
+              <span>Active catalog items</span>
+              <strong>{materials.length}</strong>
+            </div>
+          </div>
+          <div className="materials-summary-card metric-accent-green">
+            <span className="materials-stat-chip" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="1" y="3" width="15" height="13" rx="1"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+              </svg>
+            </span>
+            <div className="materials-stat-text">
+              <span>Suppliers tracked</span>
+              <strong>{suppliers.length}</strong>
+            </div>
+          </div>
+          <div className="materials-summary-card metric-accent-blue">
+            <span className="materials-stat-chip" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </span>
+            <div className="materials-stat-text">
+              <span>Recent price list uploads</span>
+              <strong>{recentImports.length}</strong>
+            </div>
+          </div>
+          <div className="materials-summary-card metric-accent-purple">
+            <span className="materials-stat-chip" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+              </svg>
+            </span>
+            <div className="materials-stat-text">
+              <span>Comparison rows</span>
+              <strong>{refreshing ? "..." : visibleComparisonRows.length}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="materials-layout-grid">
+          <div className="add-item-card materials-feature-card">
+            <div className="add-item-card-head materials-feature-head">
+              <strong>Supplier Directory</strong>
+            </div>
+            <div className="materials-feature-body">
+              <p className="materials-feature-copy">
+                Preferred suppliers are prioritized when the system auto-selects the active catalog price.
+              </p>
+              <div className="materials-supplier-list">
+                {manualCatalogMaterials.length > 0 && (
+                  <div className="materials-supplier-row">
+                    <div>
+                      <strong>Manual catalog</strong>
+                      <div className="section-note">
+                        {manualCatalogMaterials.length} material{manualCatalogMaterials.length === 1 ? "" : "s"}
+                      </div>
+                    </div>
+                    <div className="materials-supplier-actions">
+                      <span className="chip chip-neutral">Manual</span>
+                      <button
+                        className="btn btn-danger-outline"
+                        type="button"
+                        disabled={deletingManualCatalog}
+                        onClick={removeManualCatalog}
+                      >
+                        {deletingManualCatalog ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {suppliers.map((supplier) => (
+                <div className="materials-supplier-row" key={supplier.id}>
+                  <div>
+                    <strong className="supplier-color-text" style={getSupplierTextStyle(supplier.supplier_name)}>
+                      {supplier.supplier_name}
+                    </strong>
+                    <div className="section-note">
+                      {supplier.material_count || 0} materials
+                      {" - "}
+                      Last upload: {formatDateTime(supplier.latest_uploaded_at)}
+                    </div>
+                  </div>
+                  <div className="materials-supplier-actions">
+                    <label className="materials-toggle">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(supplier.is_preferred)}
+                        disabled={savingSupplierId === supplier.id || deletingSupplierId === supplier.id}
+                        onChange={(e) => updateSupplierPreference(supplier, e.target.checked)}
+                      />
+                      <span className={Boolean(supplier.is_preferred) ? "chip chip-success" : "chip chip-neutral"}>{Boolean(supplier.is_preferred) ? "Preferred" : "Standard"}</span>
+                    </label>
+                    <button
+                      className="btn btn-danger-outline"
+                      type="button"
+                      disabled={deletingSupplierId === supplier.id}
+                      onClick={() => removeSupplier(supplier)}
+                    >
+                      {deletingSupplierId === supplier.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
+                </div>
+                ))}
+                {!suppliers.length && !manualCatalogMaterials.length && !loading && <div className="section-note">No suppliers yet. Upload the first price list to create one.</div>}
               </div>
             </div>
           </div>
@@ -647,10 +717,7 @@ export default function MaterialsTab() {
           </div>
         </div>
 
-        {error && <div className="error-text">{error}</div>}
-        {success && <div className="success-text">{success}</div>}
-        {loading && <p className="section-note">Loading materials...</p>}
-
+        <section className="materials-table-section">
         <div className="materials-table-toolbar">
           <div>
             <strong>Active Material Cost</strong>
@@ -664,7 +731,7 @@ export default function MaterialsTab() {
                 value={materialCategoryFilter}
                 onChange={(e) => setMaterialCategoryFilter(e.target.value)}
               >
-                <option value="all">All Categories</option>
+                <option value="all">All categories</option>
                 {materialCategoryOptions.map((option) => (
                   <option value={option} key={option}>{option}</option>
                 ))}
@@ -677,7 +744,7 @@ export default function MaterialsTab() {
                 value={materialSubgroupFilter}
                 onChange={(e) => setMaterialSubgroupFilter(e.target.value)}
               >
-                <option value="all">All Subgroups</option>
+                <option value="all">All subgroups</option>
                 {materialSubgroupOptions.map((option) => (
                   <option value={option} key={option}>{option}</option>
                 ))}
@@ -690,7 +757,7 @@ export default function MaterialsTab() {
                 value={materialSourceFilter}
                 onChange={(e) => setMaterialSourceFilter(e.target.value)}
               >
-                <option value="all">All Sources</option>
+                <option value="all">All sources</option>
                 {activeSourceOptions.map((option) => (
                   <option value={option} key={option}>{option}</option>
                 ))}
@@ -711,7 +778,7 @@ export default function MaterialsTab() {
               <tr>
                 <th>Name</th>
                 <th>Unit</th>
-                <th>Base Price</th>
+                <th className="num">Base Price</th>
                 <th>Active Source</th>
                 <th>Category</th>
                 <th>Subgroup</th>
@@ -725,7 +792,7 @@ export default function MaterialsTab() {
                   <tr key={row.id}>
                     <td>{editingId === row.id ? <input className="input" value={editName} onChange={(e) => setEditName(e.target.value)} /> : row.material_name}</td>
                     <td>{editingId === row.id ? <input className="input" value={editUnit} onChange={(e) => setEditUnit(e.target.value)} /> : row.unit || "-"}</td>
-                    <td>
+                    <td className="num">
                       {editingId === row.id ? (
                         <input className="input" type="number" min="0" step="0.01" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} />
                       ) : (
@@ -741,7 +808,7 @@ export default function MaterialsTab() {
                           {match.activeSupplierName}
                         </span>
                       ) : (
-                        "Manual catalog"
+                        <span className="chip chip-neutral">Manual catalog</span>
                       )}
                     </td>
                     <td>
@@ -766,7 +833,7 @@ export default function MaterialsTab() {
                         ) : (
                           <>
                             <button className="btn btn-ghost" type="button" onClick={() => startEdit(row)}>Edit</button>
-                            <button className="btn btn-ghost" type="button" onClick={() => removeMaterial(row.id)}>Delete</button>
+                            <button className="btn btn-danger-outline" type="button" onClick={() => removeMaterial(row.id)}>Delete</button>
                           </>
                         )}
                       </div>
@@ -776,13 +843,16 @@ export default function MaterialsTab() {
               })}
               {!visibleMaterials.length && !loading && (
                 <tr>
-                  <td colSpan={7} className="section-note">No material prices yet.</td>
+                  <td colSpan={7} className="section-note empty-state-cell">No material prices yet.</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
 
+        </section>
+
+        <section className="materials-table-section">
         <div className="materials-table-toolbar">
           <div>
             <strong>Supplier Comparison</strong>
@@ -801,9 +871,9 @@ export default function MaterialsTab() {
             <thead>
               <tr>
                 <th>Material</th>
-                <th>Active Price</th>
+                <th className="num">Active Price</th>
                 <th>Active Supplier</th>
-                <th>Best Supplier Price</th>
+                <th className="num">Best Supplier Price</th>
                 <th>Supplier Price List</th>
               </tr>
             </thead>
@@ -814,17 +884,17 @@ export default function MaterialsTab() {
                     <strong>{row.materialName}</strong>
                     <div className="section-note">{row.subgroup || row.category || "other"}</div>
                   </td>
-                  <td>{row.inCatalog ? formatMoney(row.activePrice) : "Not in catalog"}</td>
+                  <td className="num">{row.inCatalog ? formatMoney(row.activePrice) : <span className="chip chip-neutral">Not in catalog</span>}</td>
                   <td>
                     {row.activeSupplierName ? (
                       <span className="supplier-color-text" style={getSupplierTextStyle(row.activeSupplierName)}>
                         {row.activeSupplierName}
                       </span>
                     ) : (
-                      "Manual catalog"
+                      <span className="chip chip-neutral">Manual catalog</span>
                     )}
                   </td>
-                  <td>{row.bestPrice == null ? "-" : formatMoney(row.bestPrice)}</td>
+                  <td className="num">{row.bestPrice == null ? "-" : formatMoney(row.bestPrice)}</td>
                   <td>
                     <div className="materials-supplier-price-list">
                       {row.supplierPrices.map((price) => {
@@ -835,9 +905,9 @@ export default function MaterialsTab() {
                               <strong className="supplier-color-text" style={getSupplierTextStyle(price.supplierName)}>
                                 {price.supplierName}
                               </strong>
-                              <div className="section-note">
-                                PHP {formatMoney(price.basePrice)}
-                                {price.isPreferred ? " - Preferred" : ""}
+                              <div className="section-note materials-pill-meta">
+                                <span className="mono">PHP {formatMoney(price.basePrice)}</span>
+                                {price.isPreferred ? <span className="chip chip-success">Preferred</span> : null}
                               </div>
                             </div>
                             {row.materialId ? (
@@ -862,13 +932,13 @@ export default function MaterialsTab() {
               ))}
               {!visibleComparisonRows.length && !loading && (
                 <tr>
-                  <td colSpan={5} className="section-note">No supplier comparison data yet.</td>
+                  <td colSpan={5} className="section-note empty-state-cell">No supplier comparison data yet.</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
+        </section>
     </div>
   );
 }

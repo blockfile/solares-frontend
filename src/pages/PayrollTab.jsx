@@ -1,5 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import api from "../api/client";
+import "../styles/payroll.css";
 
 const EMPTY_EMPLOYEE_FORM = {
   employeeName: "",
@@ -79,6 +80,15 @@ function statusLabel(value) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+function statusChipClass(value) {
+  const status = String(value || "").toLowerCase();
+  if (["paid", "active", "completed"].includes(status)) return "chip chip-success";
+  if (["unpaid", "pending", "approved"].includes(status)) return "chip chip-warn";
+  if (["overdue", "failed", "inactive", "rejected", "void"].includes(status)) return "chip chip-danger";
+  if (status === "draft") return "chip chip-info";
+  return "chip chip-neutral";
+}
+
 function calculateDefaultBasicPay(employee, form) {
   if (!employee) return 0;
   const baseRate = toNumber(employee.base_rate, 0);
@@ -130,6 +140,9 @@ export default function PayrollTab() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  // UI-only collapse toggles for the create forms (Atlas page frame).
+  const [showEmployeeForm, setShowEmployeeForm] = useState(false);
+  const [showEntryForm, setShowEntryForm] = useState(false);
 
   const deferredEmployeeSearch = useDeferredValue(employeeSearch);
   const deferredEntrySearch = useDeferredValue(entrySearch);
@@ -387,61 +400,173 @@ export default function PayrollTab() {
   };
 
   return (
-    <div className="materials-page-grid payroll-page">
-      <div className="materials-card">
-        <div className="module-card-head">
+    <div className="payroll-page">
+      <header className="page-head">
+        <span className="page-head-icon" aria-hidden="true">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3.5" y="5" width="17" height="14" rx="2.5" />
             <path d="M7.5 9h9" />
             <path d="M7.5 13h4" />
             <path d="M15 13.5c0 1 .8 1.5 1.8 1.5s1.7-.5 1.7-1.4c0-.8-.5-1.2-1.7-1.5-1.1-.3-1.7-.7-1.7-1.5 0-.9.7-1.5 1.7-1.5s1.7.6 1.7 1.5" />
           </svg>
-          <div className="module-card-head-text">
-            <strong>Payroll</strong>
-            <span>Manage employees, pay periods, manual earnings, deductions, and paid status.</span>
-          </div>
+        </span>
+        <div className="page-head-text">
+          <h1>Payroll</h1>
+          <p>Manage employees, pay periods, manual earnings, deductions, and paid status.</p>
         </div>
-
-        <div className="materials-dashboard-grid">
-          <div className="materials-summary-card">
-            <strong>{summary.activeEmployees || 0}</strong>
-            <span>Active employees</span>
-          </div>
-          <div className="materials-summary-card">
-            <strong>{summary.draftEntries || 0}</strong>
-            <span>Draft payroll</span>
-          </div>
-          <div className="materials-summary-card">
-            <strong>{summary.paidEntries || 0}</strong>
-            <span>Paid records</span>
-          </div>
-          <div className="materials-summary-card">
-            <strong>{formatMoney(summary.paidThisMonth || 0)}</strong>
-            <span>Paid this month</span>
-          </div>
+        <div className="page-head-actions payroll-head-actions">
+          <span className="payroll-head-chip">
+            <span className="payroll-head-chip-label">Paid this month</span>
+            <strong className="mono">PHP {formatMoney(summary.paidThisMonth || 0)}</strong>
+          </span>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            aria-expanded={showEmployeeForm}
+            aria-controls="payroll-employee-form"
+            onClick={() => setShowEmployeeForm((open) => !open)}
+          >
+            Add employee
+          </button>
+          <button
+            className="btn btn-primary"
+            type="button"
+            aria-expanded={showEntryForm}
+            aria-controls="payroll-entry-form"
+            onClick={() => setShowEntryForm((open) => !open)}
+          >
+            Create payroll entry
+          </button>
         </div>
+      </header>
 
-        <div className="materials-layout-grid payroll-entry-grid">
-          <div className="add-item-card materials-feature-card">
-            <div className="add-item-card-head materials-feature-head">
-              <strong>{editingEmployeeId ? "Edit Employee" : "Add Employee"}</strong>
+      <div className="materials-dashboard-grid">
+          <div className="materials-summary-card metric-accent-blue">
+            <span className="payroll-stat-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </span>
+            <div className="payroll-stat-text">
+              <span>Active employees</span>
+              <strong className="mono">{summary.activeEmployees || 0}</strong>
             </div>
-            <div className="materials-feature-body">
-              <div className="payroll-form-grid">
+          </div>
+          <div className="materials-summary-card metric-accent-orange">
+            <span className="payroll-stat-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6" />
+                <path d="M16 13H8" />
+                <path d="M16 17H8" />
+              </svg>
+            </span>
+            <div className="payroll-stat-text">
+              <span>Draft payroll</span>
+              <strong className="mono">{summary.draftEntries || 0}</strong>
+            </div>
+          </div>
+          <div className="materials-summary-card metric-accent-green">
+            <span className="payroll-stat-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <path d="M22 4 12 14.01l-3-3" />
+              </svg>
+            </span>
+            <div className="payroll-stat-text">
+              <span>Paid records</span>
+              <strong className="mono">{summary.paidEntries || 0}</strong>
+            </div>
+          </div>
+          <div className="materials-summary-card metric-accent-gold">
+            <span className="payroll-stat-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="6" width="20" height="12" rx="2" />
+                <circle cx="12" cy="12" r="2.5" />
+                <path d="M6 12h.01" />
+                <path d="M18 12h.01" />
+              </svg>
+            </span>
+            <div className="payroll-stat-text">
+              <span>Paid this month</span>
+              <strong className="mono">{formatMoney(summary.paidThisMonth || 0)}</strong>
+            </div>
+          </div>
+        </div>
+
+      <div className="page-toolbar payroll-toolbar">
+        <div className="payroll-toolbar-filters">
+          <input
+            className="input payroll-toolbar-search"
+            placeholder="Search employees"
+            aria-label="Search employees"
+            value={employeeSearch}
+            onChange={(e) => setEmployeeSearch(e.target.value)}
+          />
+          <select
+            className="select"
+            aria-label="Filter payroll records by status"
+            value={entryStatusFilter}
+            onChange={(e) => setEntryStatusFilter(e.target.value)}
+          >
+            <option value="all">All statuses</option>
+            <option value="draft">Draft</option>
+            <option value="approved">Approved</option>
+            <option value="paid">Paid</option>
+            <option value="void">Void</option>
+          </select>
+          <input
+            className="input payroll-toolbar-search"
+            placeholder="Search payroll records"
+            aria-label="Search payroll records"
+            value={entrySearch}
+            onChange={(e) => setEntrySearch(e.target.value)}
+          />
+        </div>
+        <span className="payroll-toolbar-note">
+          {refreshing ? "Refreshing..." : `${visibleEmployees.length} employees · ${visibleEntries.length} records`}
+        </span>
+      </div>
+
+      {error && <div className="error-text">{error}</div>}
+      {success && <div className="success-text">{success}</div>}
+      {loading && <p className="section-note">Loading payroll...</p>}
+
+      {showEmployeeForm && (
+        <section className="payroll-form-card" id="payroll-employee-form">
+          <div className="payroll-form-card-head">
+              <strong>{editingEmployeeId ? "Edit employee" : "Add employee"}</strong>
+              <button
+                className="btn btn-ghost payroll-form-close"
+                type="button"
+                onClick={() => setShowEmployeeForm(false)}
+                aria-label="Close employee form"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="payroll-form-card-body">
+              <div className="payroll-form-grid payroll-employee-form-grid">
                 <label className="field payroll-field-wide">
                   <span>Name</span>
                   <input className="input" value={employeeForm.employeeName} onChange={(e) => updateEmployeeForm("employeeName", e.target.value)} placeholder="Employee name" />
                 </label>
                 <label className="field">
-                  <span>Employee Code</span>
+                  <span>Employee code</span>
                   <input className="input" value={employeeForm.employeeCode} onChange={(e) => updateEmployeeForm("employeeCode", e.target.value)} placeholder="Optional" />
                 </label>
                 <label className="field">
-                  <span>Role / Position</span>
+                  <span>Role / position</span>
                   <input className="input" value={employeeForm.roleTitle} onChange={(e) => updateEmployeeForm("roleTitle", e.target.value)} placeholder="Installer, admin..." />
                 </label>
                 <label className="field">
-                  <span>Pay Type</span>
+                  <span>Pay type</span>
                   <select className="select" value={employeeForm.payType} onChange={(e) => updateEmployeeForm("payType", e.target.value)}>
                     <option value="monthly">Monthly</option>
                     <option value="daily">Daily</option>
@@ -450,7 +575,7 @@ export default function PayrollTab() {
                   </select>
                 </label>
                 <label className="field">
-                  <span>Base Rate</span>
+                  <span>Base rate</span>
                   <input className="input" type="number" min="0" step="0.01" value={employeeForm.baseRate} onChange={(e) => updateEmployeeForm("baseRate", e.target.value)} />
                 </label>
                 <label className="field">
@@ -471,7 +596,7 @@ export default function PayrollTab() {
               </div>
               <div className="materials-inline-actions">
                 <button className="btn btn-primary" type="button" onClick={saveEmployee} disabled={!employeeForm.employeeName.trim()}>
-                  {editingEmployeeId ? "Save Employee" : "Add Employee"}
+                  {editingEmployeeId ? "Save employee" : "Add employee"}
                 </button>
                 {editingEmployeeId && (
                   <button className="btn btn-ghost" type="button" onClick={resetEmployeeForm}>
@@ -480,14 +605,27 @@ export default function PayrollTab() {
                 )}
               </div>
             </div>
-          </div>
+        </section>
+      )}
 
-          <div className="add-item-card materials-feature-card">
-            <div className="add-item-card-head materials-feature-head">
-              <strong>{editingEntryId ? "Edit Payroll Entry" : "Create Payroll Entry"}</strong>
+      {showEntryForm && (
+        <section className="payroll-form-card" id="payroll-entry-form">
+          <div className="payroll-form-card-head">
+              <strong>{editingEntryId ? "Edit payroll entry" : "Create payroll entry"}</strong>
+              <button
+                className="btn btn-ghost payroll-form-close"
+                type="button"
+                onClick={() => setShowEntryForm(false)}
+                aria-label="Close payroll entry form"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
             </div>
-            <div className="materials-feature-body">
-              <div className="payroll-form-grid">
+            <div className="payroll-form-card-body">
+              <div className="payroll-form-grid payroll-entry-form-grid">
                 <label className="field payroll-field-wide">
                   <span>Employee</span>
                   <select className="select" value={payrollForm.employeeId} onChange={(e) => updatePayrollForm("employeeId", e.target.value)}>
@@ -500,15 +638,15 @@ export default function PayrollTab() {
                   </select>
                 </label>
                 <label className="field">
-                  <span>Period Start</span>
+                  <span>Period start</span>
                   <input className="input" type="date" value={payrollForm.periodStart} onChange={(e) => updatePayrollForm("periodStart", e.target.value)} />
                 </label>
                 <label className="field">
-                  <span>Period End</span>
+                  <span>Period end</span>
                   <input className="input" type="date" value={payrollForm.periodEnd} onChange={(e) => updatePayrollForm("periodEnd", e.target.value)} />
                 </label>
                 <label className="field">
-                  <span>Pay Date</span>
+                  <span>Pay date</span>
                   <input className="input" type="date" value={payrollForm.payDate} onChange={(e) => updatePayrollForm("payDate", e.target.value)} />
                 </label>
                 <label className="field">
@@ -529,15 +667,15 @@ export default function PayrollTab() {
                   <input className="input" type="number" min="0" step="0.01" value={payrollForm.regularHours} onChange={(e) => updatePayrollForm("regularHours", e.target.value)} />
                 </label>
                 <label className="field">
-                  <span>OT Hours</span>
+                  <span>OT hours</span>
                   <input className="input" type="number" min="0" step="0.01" value={payrollForm.overtimeHours} onChange={(e) => updatePayrollForm("overtimeHours", e.target.value)} />
                 </label>
                 <label className="field">
-                  <span>Basic Pay</span>
+                  <span>Basic pay</span>
                   <input className="input" type="number" min="0" step="0.01" value={payrollForm.basicPay} onChange={(e) => updatePayrollForm("basicPay", e.target.value)} placeholder="Auto if blank" />
                 </label>
                 <label className="field">
-                  <span>OT Pay</span>
+                  <span>OT pay</span>
                   <input className="input" type="number" min="0" step="0.01" value={payrollForm.overtimePay} onChange={(e) => updatePayrollForm("overtimePay", e.target.value)} />
                 </label>
                 <label className="field">
@@ -557,7 +695,7 @@ export default function PayrollTab() {
                   <input className="input" type="number" min="0" step="0.01" value={payrollForm.advances} onChange={(e) => updatePayrollForm("advances", e.target.value)} />
                 </label>
                 <label className="field">
-                  <span>Other Deductions</span>
+                  <span>Other deductions</span>
                   <input className="input" type="number" min="0" step="0.01" value={payrollForm.otherDeductions} onChange={(e) => updatePayrollForm("otherDeductions", e.target.value)} />
                 </label>
                 <label className="field">
@@ -572,23 +710,23 @@ export default function PayrollTab() {
               <div className="payroll-preview-row">
                 <div>
                   <span>Gross</span>
-                  <strong>PHP {formatMoney(payrollPreview.grossPay)}</strong>
+                  <strong className="mono">PHP {formatMoney(payrollPreview.grossPay)}</strong>
                 </div>
                 <div>
                   <span>Deductions</span>
-                  <strong>PHP {formatMoney(payrollPreview.deductionsTotal)}</strong>
+                  <strong className="mono">PHP {formatMoney(payrollPreview.deductionsTotal)}</strong>
                 </div>
                 <div>
-                  <span>Net Pay</span>
-                  <strong>PHP {formatMoney(payrollPreview.netPay)}</strong>
+                  <span>Net pay</span>
+                  <strong className="mono">PHP {formatMoney(payrollPreview.netPay)}</strong>
                 </div>
               </div>
               <div className="materials-inline-actions">
                 <button className="btn btn-primary" type="button" onClick={savePayrollEntry} disabled={!payrollForm.employeeId || !payrollForm.periodStart || !payrollForm.periodEnd}>
-                  {editingEntryId ? "Save Payroll" : "Create Payroll"}
+                  {editingEntryId ? "Save payroll" : "Create payroll"}
                 </button>
                 <button className="btn btn-secondary" type="button" onClick={applyDefaultBasicPay} disabled={!selectedEmployee}>
-                  Use Base Rate
+                  Use base rate
                 </button>
                 {editingEntryId && (
                   <button className="btn btn-ghost" type="button" onClick={resetPayrollForm}>
@@ -597,19 +735,15 @@ export default function PayrollTab() {
                 )}
               </div>
             </div>
-          </div>
-        </div>
+        </section>
+      )}
 
-        {error && <div className="error-text">{error}</div>}
-        {success && <div className="success-text">{success}</div>}
-        {loading && <p className="section-note">Loading payroll...</p>}
-
+      <section className="materials-card payroll-section">
         <div className="materials-table-toolbar">
           <div>
             <strong>Employees</strong>
-            <span>{refreshing ? "Refreshing..." : "Maintain payroll employees and base rates."}</span>
+            <span>Maintain payroll employees and base rates.</span>
           </div>
-          <input className="input" placeholder="Search employees" value={employeeSearch} onChange={(e) => setEmployeeSearch(e.target.value)} />
         </div>
 
         <div className="materials-table-wrap payroll-table-wrap">
@@ -618,10 +752,10 @@ export default function PayrollTab() {
               <tr>
                 <th>Name</th>
                 <th>Role</th>
-                <th>Pay Type</th>
-                <th>Base Rate</th>
+                <th>Pay type</th>
+                <th className="th-num">Base rate</th>
                 <th>Status</th>
-                <th>Payroll Count</th>
+                <th className="th-num">Payroll count</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -634,20 +768,27 @@ export default function PayrollTab() {
                   </td>
                   <td>{employee.role_title || "-"}</td>
                   <td>{payTypeLabel(employee.pay_type)}</td>
-                  <td>PHP {formatMoney(employee.base_rate)}</td>
+                  <td className="num">PHP {formatMoney(employee.base_rate)}</td>
                   <td>
-                    <span className={`payroll-status-pill payroll-status-${employee.status}`}>
+                    <span className={statusChipClass(employee.status)}>
                       {statusLabel(employee.status)}
                     </span>
                   </td>
-                  <td>{employee.payroll_count || 0}</td>
+                  <td className="num">{employee.payroll_count || 0}</td>
                   <td>
                     <div className="materials-actions payroll-actions">
-                      <button className="btn btn-ghost" type="button" onClick={() => startEditEmployee(employee)}>
+                      <button
+                        className="btn btn-ghost"
+                        type="button"
+                        onClick={() => {
+                          startEditEmployee(employee);
+                          setShowEmployeeForm(true);
+                        }}
+                      >
                         Edit
                       </button>
                       {employee.status !== "inactive" && (
-                        <button className="btn btn-ghost" type="button" onClick={() => deactivateEmployee(employee)}>
+                        <button className="btn btn-ghost btn-outline-danger" type="button" onClick={() => deactivateEmployee(employee)}>
                           Deactivate
                         </button>
                       )}
@@ -663,24 +804,13 @@ export default function PayrollTab() {
             </tbody>
           </table>
         </div>
+      </section>
 
+      <section className="materials-card payroll-section">
         <div className="materials-table-toolbar">
           <div>
-            <strong>Payroll Records</strong>
+            <strong>Payroll records</strong>
             <span>Track draft, approved, paid, and void payroll entries.</span>
-          </div>
-          <div className="materials-active-filters payroll-filters">
-            <label className="materials-filter-field">
-              <span>Status</span>
-              <select className="select" value={entryStatusFilter} onChange={(e) => setEntryStatusFilter(e.target.value)}>
-                <option value="all">All Statuses</option>
-                <option value="draft">Draft</option>
-                <option value="approved">Approved</option>
-                <option value="paid">Paid</option>
-                <option value="void">Void</option>
-              </select>
-            </label>
-            <input className="input materials-filter-search" placeholder="Search payroll records" value={entrySearch} onChange={(e) => setEntrySearch(e.target.value)} />
           </div>
         </div>
 
@@ -690,10 +820,10 @@ export default function PayrollTab() {
               <tr>
                 <th>Employee</th>
                 <th>Period</th>
-                <th>Pay Date</th>
-                <th>Gross</th>
-                <th>Deductions</th>
-                <th>Net Pay</th>
+                <th>Pay date</th>
+                <th className="th-num">Gross</th>
+                <th className="th-num">Deductions</th>
+                <th className="th-num">Net pay</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -707,24 +837,31 @@ export default function PayrollTab() {
                       <strong>{entry.employee_name}</strong>
                       <span className="table-subtext">{entry.employee_code || entry.role_title || "-"}</span>
                     </td>
-                    <td>{formatDate(entry.period_start)} - {formatDate(entry.period_end)}</td>
-                    <td>{formatDate(entry.pay_date)}</td>
-                    <td>PHP {formatMoney(entry.gross_pay)}</td>
-                    <td>PHP {formatMoney(deductionsTotal)}</td>
-                    <td>
+                    <td className="mono">{formatDate(entry.period_start)} - {formatDate(entry.period_end)}</td>
+                    <td className="mono">{formatDate(entry.pay_date)}</td>
+                    <td className="num">PHP {formatMoney(entry.gross_pay)}</td>
+                    <td className="num">PHP {formatMoney(deductionsTotal)}</td>
+                    <td className="num">
                       <strong>PHP {formatMoney(entry.net_pay)}</strong>
                     </td>
                     <td>
-                      <span className={`payroll-status-pill payroll-status-${entry.status}`}>
+                      <span className={statusChipClass(entry.status)}>
                         {statusLabel(entry.status)}
                       </span>
                     </td>
                     <td>
                       <div className="materials-actions payroll-actions">
-                        <button className="btn btn-ghost" type="button" onClick={() => startEditEntry(entry)}>
+                        <button
+                          className="btn btn-ghost"
+                          type="button"
+                          onClick={() => {
+                            startEditEntry(entry);
+                            setShowEntryForm(true);
+                          }}
+                        >
                           Edit
                         </button>
-                        <button className="btn btn-ghost" type="button" onClick={() => removeEntry(entry)}>
+                        <button className="btn btn-ghost btn-outline-danger" type="button" onClick={() => removeEntry(entry)}>
                           Delete
                         </button>
                       </div>
@@ -740,7 +877,7 @@ export default function PayrollTab() {
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -1,238 +1,202 @@
 import { useEffect, useRef } from "react";
-import * as THREE from "three";
 
 /**
- * Animated WebGL "solar energy field" backdrop for the login screen.
- *
- * Renders a deep-navy space with a softly pulsing solar glow, a drifting
- * gold/azure particle field, and a slowly rotating orbital ring — a thematic
- * nod to Solares' energy business. It is purely decorative:
- *   - falls back silently to the CSS gradient if WebGL is unavailable
- *   - respects prefers-reduced-motion (renders a single static frame)
- *   - pauses while the tab is hidden
- *   - caps the device pixel ratio and disposes everything on unmount
+ * HELIOS login backdrop — pure 2D canvas (no three.js).
+ * A low sun over a receding solar-grid horizon with drifting embers.
+ * Renders behind the login layout; theme tunes sky + intensity.
+ * Respects prefers-reduced-motion (single static frame).
  */
 export default function LoginBackground({ theme = "dark" }) {
-  const mountRef = useRef(null);
+  const canvasRef = useRef(null);
 
   useEffect(() => {
-    const mount = mountRef.current;
-    if (!mount) return undefined;
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return undefined;
 
-    const prefersReducedMotion = window.matchMedia
-      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      : false;
+    const prefersReducedMotion = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)"
+    )?.matches;
 
-    // Palette — the hero stays dark in both themes for a premium, dramatic feel.
-    const GOLD = new THREE.Color("#f0ba1f");
-    const AZURE = new THREE.Color("#7eb6ff");
+    const isDark = theme === "dark";
+    let raf = 0;
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
 
-    let renderer;
-    try {
-      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: "high-performance" });
-    } catch (err) {
-      // WebGL not supported — the CSS gradient behind the canvas is the fallback.
-      return undefined;
-    }
+    const EMBER_COUNT = 70;
+    const embers = Array.from({ length: EMBER_COUNT }, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      r: 0.6 + Math.random() * 1.7,
+      speed: 0.008 + Math.random() * 0.03,
+      drift: (Math.random() - 0.5) * 0.012,
+      phase: Math.random() * Math.PI * 2
+    }));
 
-    const width = mount.clientWidth || window.innerWidth;
-    const height = mount.clientHeight || window.innerHeight;
-
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(width, height);
-    renderer.setClearColor(0x000000, 0);
-    mount.appendChild(renderer.domElement);
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 100);
-    camera.position.z = 14;
-
-    const root = new THREE.Group();
-    scene.add(root);
-
-    // ── Soft radial sprite texture (reused for the glow + round particles) ──
-    const makeGlowTexture = () => {
-      const size = 128;
-      const canvas = document.createElement("canvas");
-      canvas.width = size;
-      canvas.height = size;
-      const ctx = canvas.getContext("2d");
-      const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-      g.addColorStop(0, "rgba(255,255,255,1)");
-      g.addColorStop(0.25, "rgba(255,255,255,0.85)");
-      g.addColorStop(0.55, "rgba(255,255,255,0.25)");
-      g.addColorStop(1, "rgba(255,255,255,0)");
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, size, size);
-      const tex = new THREE.CanvasTexture(canvas);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      return tex;
-    };
-    const glowTexture = makeGlowTexture();
-
-    // ── The "sun" — a large, gently pulsing solar glow ──
-    const sunMaterial = new THREE.SpriteMaterial({
-      map: glowTexture,
-      color: GOLD,
-      transparent: true,
-      opacity: 0.55,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-    const sun = new THREE.Sprite(sunMaterial);
-    sun.scale.set(22, 22, 1);
-    sun.position.set(7, 5, -6);
-    scene.add(sun);
-
-    // ── Drifting particle field (gold + azure embers) ──
-    const COUNT = prefersReducedMotion ? 420 : 1100;
-    const positions = new Float32Array(COUNT * 3);
-    const colors = new Float32Array(COUNT * 3);
-    const scales = new Float32Array(COUNT);
-    for (let i = 0; i < COUNT; i += 1) {
-      const r = 6 + Math.random() * 16;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.7;
-      positions[i * 3 + 2] = r * Math.cos(phi) - 4;
-
-      const tint = Math.random() > 0.5 ? GOLD : AZURE;
-      const shade = 0.55 + Math.random() * 0.45;
-      colors[i * 3] = tint.r * shade;
-      colors[i * 3 + 1] = tint.g * shade;
-      colors[i * 3 + 2] = tint.b * shade;
-      scales[i] = 0.4 + Math.random() * 1.4;
-    }
-    const particleGeo = new THREE.BufferGeometry();
-    particleGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    particleGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    const particleMat = new THREE.PointsMaterial({
-      size: 0.5,
-      map: glowTexture,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.9,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      sizeAttenuation: true
-    });
-    const particles = new THREE.Points(particleGeo, particleMat);
-    root.add(particles);
-
-    // ── Orbital rings — a subtle "energy network" accent ──
-    const ringGroup = new THREE.Group();
-    const ringColors = [GOLD, AZURE, GOLD];
-    [6.5, 9, 11.5].forEach((radius, idx) => {
-      const ringGeo = new THREE.TorusGeometry(radius, 0.012, 8, 140);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: ringColors[idx],
-        transparent: true,
-        opacity: 0.16 - idx * 0.03,
-        blending: THREE.AdditiveBlending
-      });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.rotation.x = Math.PI / 2.3 + idx * 0.12;
-      ring.rotation.y = idx * 0.4;
-      ringGroup.add(ring);
-    });
-    ringGroup.position.set(0, 0, -3);
-    root.add(ringGroup);
-
-    // ── Pointer parallax ──
-    const pointer = { x: 0, y: 0 };
-    const target = { x: 0, y: 0 };
-    const onPointerMove = (e) => {
-      target.x = (e.clientX / window.innerWidth - 0.5) * 2;
-      target.y = (e.clientY / window.innerHeight - 0.5) * 2;
-    };
-    if (!prefersReducedMotion) window.addEventListener("pointermove", onPointerMove, { passive: true });
-
-    // ── Resize ──
-    const handleResize = () => {
-      const w = mount.clientWidth || window.innerWidth;
-      const h = mount.clientHeight || window.innerHeight;
-      renderer.setSize(w, h);
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-    };
-    window.addEventListener("resize", handleResize);
-
-    // ── Animation loop ──
-    let frameId;
-    let running = true;
-    const clock = new THREE.Clock();
-
-    const renderFrame = () => {
-      const t = clock.getElapsedTime();
-      pointer.x += (target.x - pointer.x) * 0.04;
-      pointer.y += (target.y - pointer.y) * 0.04;
-
-      root.rotation.y = t * 0.04 + pointer.x * 0.25;
-      root.rotation.x = pointer.y * 0.18;
-      ringGroup.rotation.z = t * 0.06;
-      particles.rotation.y = t * 0.015;
-
-      const pulse = 0.5 + Math.sin(t * 0.9) * 0.08;
-      sunMaterial.opacity = pulse;
-      sun.scale.setScalar(22 + Math.sin(t * 0.7) * 1.2);
-
-      camera.position.x += (pointer.x * 1.2 - camera.position.x) * 0.04;
-      camera.position.y += (-pointer.y * 0.9 - camera.position.y) * 0.04;
-      camera.lookAt(scene.position);
-
-      renderer.render(scene, camera);
+    const resize = () => {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = canvas.clientWidth;
+      height = canvas.clientHeight;
+      canvas.width = Math.max(1, Math.floor(width * dpr));
+      canvas.height = Math.max(1, Math.floor(height * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
 
-    const animate = () => {
-      if (!running) return;
-      renderFrame();
-      frameId = requestAnimationFrame(animate);
+    const draw = (t) => {
+      const time = t * 0.001;
+      // sun anchor — left third, low
+      const sunX = width * 0.32;
+      const sunY = height * 0.58;
+      const sunR = Math.min(width, height) * 0.16;
+
+      // ── sky
+      const sky = ctx.createLinearGradient(0, 0, 0, height);
+      if (isDark) {
+        sky.addColorStop(0, "#06080c");
+        sky.addColorStop(0.55, "#0b0e15");
+        sky.addColorStop(1, "#13100a");
+      } else {
+        sky.addColorStop(0, "#0d1016");
+        sky.addColorStop(0.5, "#1a1a17");
+        sky.addColorStop(1, "#2b2013");
+      }
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, width, height);
+
+      // ── sun glow
+      const glow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 4.2);
+      const glowStrength = isDark ? 0.5 : 0.62;
+      glow.addColorStop(0, `rgba(255, 178, 36, ${glowStrength})`);
+      glow.addColorStop(0.35, "rgba(255, 140, 20, 0.16)");
+      glow.addColorStop(1, "rgba(255, 140, 20, 0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, width, height);
+
+      // ── rotating rays (very subtle)
+      const rayCount = 18;
+      const spin = prefersReducedMotion ? 0 : time * 0.03;
+      ctx.save();
+      ctx.translate(sunX, sunY);
+      ctx.rotate(spin);
+      for (let i = 0; i < rayCount; i += 1) {
+        const angle = (i / rayCount) * Math.PI * 2;
+        ctx.save();
+        ctx.rotate(angle);
+        const ray = ctx.createLinearGradient(0, 0, sunR * 5, 0);
+        ray.addColorStop(0, "rgba(255, 178, 36, 0.05)");
+        ray.addColorStop(1, "rgba(255, 178, 36, 0)");
+        ctx.fillStyle = ray;
+        ctx.fillRect(sunR * 1.1, -0.75, sunR * 5, 1.5);
+        ctx.restore();
+      }
+      ctx.restore();
+
+      // ── sun disc
+      const disc = ctx.createRadialGradient(
+        sunX - sunR * 0.25,
+        sunY - sunR * 0.25,
+        sunR * 0.1,
+        sunX,
+        sunY,
+        sunR
+      );
+      disc.addColorStop(0, "#ffd489");
+      disc.addColorStop(0.55, "#ffb224");
+      disc.addColorStop(1, "#e07c00");
+      ctx.fillStyle = disc;
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // thin technical rings around the sun
+      ctx.strokeStyle = "rgba(255, 210, 130, 0.35)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, sunR * 1.22, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([2, 6]);
+      ctx.strokeStyle = "rgba(255, 210, 130, 0.22)";
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, sunR * 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // ── horizon + perspective grid (solar field)
+      const horizonY = height * 0.72;
+      ctx.strokeStyle = isDark ? "rgba(255, 178, 36, 0.28)" : "rgba(255, 178, 36, 0.34)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, horizonY);
+      ctx.lineTo(width, horizonY);
+      ctx.stroke();
+
+      const gridAlpha = isDark ? 0.1 : 0.14;
+      ctx.strokeStyle = `rgba(255, 178, 36, ${gridAlpha})`;
+
+      // receding horizontal lines, spacing grows toward viewer
+      const rows = 14;
+      const scroll = prefersReducedMotion ? 0 : (time * 0.35) % 1;
+      for (let i = 0; i < rows; i += 1) {
+        const p = (i + scroll) / rows;
+        const y = horizonY + Math.pow(p, 2.1) * (height - horizonY);
+        ctx.globalAlpha = Math.max(0, 1 - p * 0.65);
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+
+      // converging vertical lines
+      const cols = 22;
+      const vanishX = sunX;
+      for (let i = 0; i <= cols; i += 1) {
+        const xBottom = (i / cols) * width * 1.6 - width * 0.3;
+        ctx.beginPath();
+        ctx.moveTo(vanishX + (xBottom - vanishX) * 0.08, horizonY);
+        ctx.lineTo(xBottom, height);
+        ctx.stroke();
+      }
+
+      // ── embers
+      for (const e of embers) {
+        if (!prefersReducedMotion) {
+          e.y -= e.speed * 0.016;
+          e.x += e.drift * 0.016 + Math.sin(time + e.phase) * 0.00008;
+          if (e.y < -0.05) {
+            e.y = 1.05;
+            e.x = Math.random();
+          }
+        }
+        const ex = e.x * width;
+        const ey = e.y * height;
+        const twinkle = 0.35 + 0.3 * Math.sin(time * 2 + e.phase);
+        ctx.fillStyle = `rgba(255, 190, 80, ${twinkle})`;
+        ctx.beginPath();
+        ctx.arc(ex, ey, e.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (!prefersReducedMotion) {
+        raf = window.requestAnimationFrame(draw);
+      }
     };
 
+    resize();
+    window.addEventListener("resize", resize);
     if (prefersReducedMotion) {
-      renderFrame(); // one static frame
+      draw(0);
     } else {
-      animate();
+      raf = window.requestAnimationFrame(draw);
     }
 
-    // Pause rendering while the tab is hidden to save CPU/GPU.
-    const onVisibility = () => {
-      if (document.hidden) {
-        running = false;
-        if (frameId) cancelAnimationFrame(frameId);
-      } else if (!prefersReducedMotion && !running) {
-        running = true;
-        clock.start();
-        animate();
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-
-    // ── Cleanup ──
     return () => {
-      running = false;
-      if (frameId) cancelAnimationFrame(frameId);
-      window.removeEventListener("resize", handleResize);
-      window.removeEventListener("pointermove", onPointerMove);
-      document.removeEventListener("visibilitychange", onVisibility);
-
-      particleGeo.dispose();
-      particleMat.dispose();
-      sunMaterial.dispose();
-      glowTexture.dispose();
-      ringGroup.children.forEach((ring) => {
-        ring.geometry.dispose();
-        ring.material.dispose();
-      });
-      renderer.dispose();
-      if (renderer.domElement && renderer.domElement.parentNode === mount) {
-        mount.removeChild(renderer.domElement);
-      }
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
     };
-    // theme intentionally excluded — hero palette is fixed for visual consistency
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [theme]);
 
-  return <div ref={mountRef} className="login-fx" aria-hidden="true" />;
+  return <canvas ref={canvasRef} className="hx-login-canvas" aria-hidden="true" />;
 }

@@ -1,0 +1,1245 @@
+/* HELIOS — Sales/CRM module styles. Consumes tokens from index.css only. */
+/* ─────────────────────────────────────────────────────────────────────────────
+   Scope contract
+   · `.sl-*` classes are the sales module's own vocabulary. They are styled
+     UNSCOPED because BudgetTab's report shell reuses the `sl-kpi` family
+     outside the `.sl` root — the `sl-` prefix is the namespace.
+   · `bgt-*` classes rendered inside SalesTab are styled under the `.sl`
+     ancestor so they never collide with budget.css (which scopes its own
+     copies under `.bgt`). The two contexts are mutually exclusive.
+   · §6 globals (btn, input, chip, num, mono, page-head*, page-toolbar,
+     tabs-underline, tab-underline[--on]) are consumed, never restyled.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* ═══ 1. Module roots ═══════════════════════════════════════════════════════ */
+
+.crm-module {
+  display: block;
+  min-width: 0;
+}
+.crm-tabs {
+  margin-bottom: 16px;
+}
+.sl-tabs {
+  margin: 0;
+}
+
+.sl {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding-bottom: 32px;
+}
+
+/* ═══ 2. KPI strip — Space Grotesk values, eyebrow captions ═════════════════ */
+
+.sl-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sl-kpi {
+  /* accent hooks re-pointed per variant below */
+  --kpi-accent: var(--accent);
+  --kpi-accent-soft: var(--accent-soft);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 16px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+}
+
+.sl-kpi--sales {
+  --kpi-accent: var(--success);
+  --kpi-accent-soft: var(--success-soft);
+}
+.sl-kpi--expenses {
+  --kpi-accent: var(--danger);
+  --kpi-accent-soft: var(--danger-soft);
+}
+.sl-kpi--pos {
+  --kpi-accent: var(--success);
+  --kpi-accent-soft: var(--success-soft);
+}
+.sl-kpi--neg {
+  --kpi-accent: var(--danger);
+  --kpi-accent-soft: var(--danger-soft);
+}
+.sl-kpi--margin.sl-kpi--pos {
+  --kpi-accent: var(--primary);
+  --kpi-accent-soft: var(--primary-soft);
+}
+.sl-kpi--margin.sl-kpi--neg {
+  --kpi-accent: var(--danger);
+  --kpi-accent-soft: var(--danger-soft);
+}
+
+/* Hero detail — corner brackets on the Net Margin tile (one per page) */
+.sl-kpi--margin::before,
+.sl-kpi--margin::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+.sl-kpi--margin::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--primary);
+  border-left: 2px solid var(--primary);
+}
+.sl-kpi--margin::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--primary);
+  border-right: 2px solid var(--primary);
+}
+
+.sl-kpi-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Eyebrow caption — mono micro-label with amber tick */
+.sl-kpi-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sl-kpi-label::before {
+  content: "▪ ";
+  color: var(--primary);
+}
+
+.sl-kpi-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius);
+  background: var(--kpi-accent-soft);
+  color: var(--kpi-accent);
+}
+
+.sl-kpi-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(19px, 14px + 0.7vw, 24px);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  min-width: 0;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  margin-top: 4px;
+}
+.sl-kpi--sales .sl-kpi-value { color: var(--success); }
+.sl-kpi--expenses .sl-kpi-value { color: var(--danger); }
+.sl-kpi--pos .sl-kpi-value { color: var(--success); }
+.sl-kpi--neg .sl-kpi-value { color: var(--danger); }
+.sl-kpi--margin.sl-kpi--pos .sl-kpi-value { color: var(--primary-deep); }
+.sl-kpi--margin.sl-kpi--neg .sl-kpi-value { color: var(--danger); }
+
+.sl-kpi-sub {
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+/* Profit/Loss badge — mono tag chip in flow (defends against legacy absolute
+   positioning during the index.css migration) */
+.sl-kpi-badge {
+  position: static;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.sl-kpi-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background: currentColor;
+  flex: 0 0 auto;
+}
+.sl-kpi-badge--pos {
+  background: var(--success-soft);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 30%, transparent);
+}
+.sl-kpi-badge--neg {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+/* ═══ 3. Toolbar — filters left, quiet mono readout chips right ═════════════ */
+
+/* Module extension of the global .page-toolbar: keep the two clusters on one
+   line with tidy wrap behaviour; base chrome stays owned by index.css */
+.sl-toolbar {
+  align-items: center;
+  row-gap: 8px;
+}
+
+.sl-toolbar-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.sl-toolbar-filters:empty {
+  display: none;
+}
+
+.sl-filter-select {
+  min-width: 200px;
+  max-width: 260px;
+}
+
+.sl-toolbar-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.sl-stat-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.sl-stat-chip-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+.sl-stat-chip-val {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ═══ 4. Overview — customer account cards ══════════════════════════════════ */
+
+.sl-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.sl-cust-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--speed) var(--ease-out),
+    box-shadow var(--speed) var(--ease-out),
+    transform var(--speed) var(--ease-out);
+}
+/* Interactive card: hover-elevate */
+.sl-cust-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+/* Amber inset rail when the card is being worked in (focused) or selected */
+.sl-cust-card:focus-within,
+.sl-cust-card.is-open,
+.sl-cust-card.is-selected {
+  border-color: var(--border-strong);
+  box-shadow: inset 2px 0 0 var(--primary), var(--shadow-md);
+}
+
+.sl-cust-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sl-cust-avatar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius);
+  background: var(--primary-soft);
+  color: var(--primary-deep);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.sl-cust-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sl-cust-name {
+  display: block;
+  font-family: var(--font-title);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sl-cust-meta {
+  margin: 2px 0 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sl-cust-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Recessed stat strip: SALES ▪ EXPENSES ▪ MARGIN */
+.sl-cust-stats {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 10px;
+  row-gap: 8px;
+  padding: 10px 14px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.sl-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.sl-stat-label,
+.sl-dstat-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.sl-stat-val {
+  display: block;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: normal;
+}
+.sl-stat-val--sales { color: var(--success); font-weight: 700; }
+.sl-stat-val--exp { color: var(--danger); font-weight: 700; }
+
+.sl-stat-div {
+  width: 1px;
+  min-height: 32px;
+  align-self: stretch;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+/* ── Project sub-rows inside the account card ── */
+.sl-cust-projects {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sl-proj-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--speed) var(--ease-out),
+    border-color var(--speed) var(--ease-out),
+    box-shadow var(--speed) var(--ease-out);
+}
+.sl-proj-row:hover {
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+  border-color: var(--border-strong);
+}
+/* Rail rule — energized left edge while pressed / kept open */
+.sl-proj-row:active,
+.sl-proj-row.is-open {
+  box-shadow: inset 2px 0 0 var(--primary);
+  border-color: var(--border-strong);
+}
+
+.sl-proj-row-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sl-proj-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.sl-proj-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sl-proj-sub {
+  font-size: 11.5px;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sl-proj-row-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  max-width: 68%;
+  color: var(--text-faint);
+}
+
+.sl-proj-margin {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Money emphasis — shared by tables, rows and drawer */
+.sl-amt-pos { color: var(--success); font-weight: 700; }
+.sl-amt-neg { color: var(--danger); font-weight: 700; }
+
+/* Dashed ghost CTA — add project */
+.sl-add-proj-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px;
+  background: transparent;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background var(--speed) var(--ease-out),
+    border-color var(--speed) var(--ease-out),
+    color var(--speed) var(--ease-out);
+}
+.sl-add-proj-btn:hover {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary-deep);
+}
+
+/* ═══ 5. Tables (bgt-* vocabulary inside .sl) ═══════════════════════════════ */
+
+.sl .bgt-table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+}
+
+.sl .bgt-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.sl .bgt-table--compact {
+  min-width: 560px;
+}
+
+.sl .bgt-table thead tr {
+  background: transparent;
+  border: 0;
+}
+.sl .bgt-table th {
+  padding: 9px 14px;
+  text-align: left;
+  background: var(--surface-soft);
+  border: 0;
+  border-bottom: 1px solid var(--border-strong);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.sl .bgt-table--compact th {
+  padding: 8px 12px;
+}
+
+.sl .bgt-table td {
+  padding: 10px 14px;
+  vertical-align: middle;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13px;
+}
+.sl .bgt-table--compact td {
+  padding: 8px 12px;
+  font-size: 12.5px;
+}
+.sl .bgt-table tbody tr:nth-child(even) td {
+  background: var(--surface);
+}
+.sl .bgt-table-row:last-child td,
+.sl .bgt-table tbody tr:last-child td {
+  border-bottom: none;
+}
+/* Row hover: amber tint, never gray */
+.sl .bgt-table tbody tr:hover td,
+.sl .bgt-table-row:hover {
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+}
+
+.sl .sl-row-click,
+.sl-row-click {
+  cursor: pointer;
+}
+
+.sl .bgt-col-amt {
+  text-align: right;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.sl .bgt-table th.bgt-col-amt {
+  text-align: right;
+}
+
+.sl .bgt-cell-date {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.sl .bgt-muted {
+  color: var(--text-faint);
+}
+
+.sl .bgt-account-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 3px 8px;
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Dynamic amount classes: bgt-amount--${tx.type} with type ∈ {in, out} */
+.sl .bgt-amount--in { color: var(--success); font-weight: 700; }
+.sl .bgt-amount--out { color: var(--danger); font-weight: 700; }
+
+.sl .bgt-col-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Quiet row actions */
+.sl .bgt-row-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 4px;
+  padding: 4px 9px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-soft);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--speed) var(--ease-out),
+    color var(--speed) var(--ease-out),
+    border-color var(--speed) var(--ease-out);
+}
+.sl .bgt-row-btn:hover {
+  background: var(--primary-soft);
+  border-color: var(--border);
+  color: var(--text);
+}
+.sl .bgt-row-btn--del {
+  color: var(--text-soft);
+}
+.sl .bgt-row-btn--del:hover {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+  color: var(--danger);
+}
+
+/* ═══ 6. Toasts ══════════════════════════════════════════════════════════════ */
+
+.sl .bgt-toast {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(560px, calc(100vw - 32px));
+  padding: 11px 16px;
+  background: var(--surface-raise);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  animation: sl-toast-in var(--speed-slow) var(--ease-out);
+}
+.sl .bgt-toast--ok {
+  box-shadow: inset 3px 0 0 var(--success), var(--shadow-lg);
+}
+.sl .bgt-toast--ok svg {
+  color: var(--success);
+  flex: 0 0 auto;
+}
+.sl .bgt-toast--err {
+  box-shadow: inset 3px 0 0 var(--danger), var(--shadow-lg);
+}
+.sl .bgt-toast--err svg {
+  color: var(--danger);
+  flex: 0 0 auto;
+}
+
+/* ═══ 7. Empty & loading states ═════════════════════════════════════════════ */
+
+.sl .bgt-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 56px 24px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  text-align: center;
+  color: var(--text-soft);
+}
+.sl .bgt-empty p {
+  margin: 0;
+  max-width: 360px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-soft);
+}
+.sl .bgt-empty-icon {
+  color: var(--text-faint);
+}
+
+.sl .bgt-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: sl-spin 0.7s linear infinite;
+}
+
+.sl-empty-pad {
+  padding: 24px;
+}
+.sl-note {
+  margin: 0;
+  padding: 12px 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+/* ═══ 8. Backdrop, modals, confirm dialogs ══════════════════════════════════ */
+
+.sl .bgt-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(6, 8, 12, 0.62);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: sl-fade-in 160ms var(--ease-out);
+}
+
+/* Modal card — energized 2px amber top edge, shadow-xl */
+.sl .bgt-modal {
+  width: 100%;
+  max-width: 560px;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  background: var(--surface-raise);
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--primary);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  animation: sl-modal-in 200ms var(--ease-out);
+}
+.sl .bgt-modal--sm {
+  max-width: 480px;
+}
+.sl .bgt-modal--confirm {
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 24px 24px;
+  text-align: center;
+}
+
+.sl .bgt-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px 0;
+}
+
+.sl .bgt-modal-eyebrow {
+  margin: 0 0 4px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-faint);
+}
+.sl .bgt-modal-eyebrow::before {
+  content: "▪ ";
+  color: var(--primary);
+}
+
+.sl .bgt-modal-title {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.sl .bgt-modal-x {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: background var(--speed) var(--ease-out),
+    color var(--speed) var(--ease-out),
+    border-color var(--speed) var(--ease-out);
+}
+.sl .bgt-modal-x:hover {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+  color: var(--danger);
+}
+
+.sl .bgt-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 22px 22px;
+}
+
+.sl .bgt-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+.sl .bgt-modal-foot--center {
+  justify-content: center;
+  padding-top: 4px;
+  border-top: none;
+}
+
+/* ── Forms inside modals ── */
+.sl .bgt-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.sl .bgt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.sl .bgt-field--wide {
+  grid-column: 1 / -1;
+}
+.sl .bgt-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+}
+.sl .bgt-req {
+  color: var(--danger);
+  margin-left: 2px;
+}
+.sl .bgt-field-note {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-soft);
+}
+
+/* ── Confirm dialogs ── */
+.sl .bgt-confirm-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 2px;
+  border-radius: var(--radius-lg);
+}
+.sl .bgt-confirm-icon--del {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.sl .bgt-confirm-title {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.sl .bgt-confirm-body {
+  margin: 0;
+  max-width: 320px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-soft);
+}
+.sl .bgt-modal--confirm .bgt-modal-foot {
+  width: 100%;
+}
+
+/* ═══ 9. Project detail drawer — right slide-in panel ═══════════════════════ */
+
+.sl-drawer {
+  /* auto left margin pushes the panel to the right edge of the backdrop;
+     stretch makes it full height inside the backdrop's 20px gutter */
+  margin-left: auto;
+  align-self: stretch;
+  width: min(620px, 100%);
+  min-width: 0;
+  overflow-y: auto;
+  background: var(--surface-raise);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--primary); /* energized edge */
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  animation: sl-drawer-in var(--speed-slow) var(--ease-out);
+}
+
+/* Sticky drawer header with dashed section divider */
+.sl-drawer .bgt-modal-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 18px 22px 14px;
+  background: var(--surface-raise);
+  border-bottom: 1px dashed var(--border);
+}
+
+/* Readout list — label ▸ value rows with dotted leaders */
+.sl .bgt-delete-fields {
+  width: 100%;
+  margin: 0;
+  padding: 4px 14px;
+  display: grid;
+  gap: 0;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  text-align: left;
+}
+.sl .bgt-delete-fields div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+  padding: 8px 0;
+  border-bottom: 1px dotted var(--border-strong);
+}
+.sl .bgt-delete-fields div:last-child {
+  border-bottom: none;
+}
+.sl .bgt-delete-fields dt {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.sl .bgt-delete-fields dt::after {
+  content: " ▸";
+  color: var(--primary);
+}
+.sl .bgt-delete-fields dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.sl .bgt-delete-fields--wide {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 20px;
+}
+.sl .bgt-delete-fields--wide div:nth-last-child(2) {
+  border-bottom: none;
+}
+
+/* Drawer stat tiles */
+.sl-drawer-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.sl-dstat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 14px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+}
+.sl-dstat-val {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.sl-dstat-val--sales { color: var(--success); }
+.sl-dstat-val--exp { color: var(--danger); }
+
+.sl-drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.sl-drawer-section-title {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-faint);
+}
+.sl-drawer-section-title::before {
+  content: "▪ ";
+  color: var(--primary);
+}
+
+/* Scrollable linked-expenses table inside the drawer */
+.sl .bgt-import-preview {
+  max-height: 300px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.sl .bgt-import-preview .bgt-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* ═══ 10. Focus visibility ══════════════════════════════════════════════════ */
+
+.sl-proj-row:focus-visible,
+.sl-add-proj-btn:focus-visible,
+.sl-cust-card:focus-visible,
+.sl .bgt-row-btn:focus-visible,
+.sl .bgt-modal-x:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ═══ 11. Motion — namespaced keyframes ═════════════════════════════════════ */
+
+@keyframes sl-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sl-modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes sl-drawer-in {
+  from { opacity: 0; transform: translateX(28px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes sl-toast-in {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes sl-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sl .bgt-backdrop,
+  .sl .bgt-modal,
+  .sl-drawer,
+  .sl .bgt-toast {
+    animation: none;
+  }
+  .sl .bgt-spinner {
+    animation-duration: 1.6s;
+  }
+  .sl-cust-card,
+  .sl-cust-card:hover,
+  .sl-proj-row,
+  .sl-add-proj-btn,
+  .sl .bgt-row-btn,
+  .sl .bgt-modal-x {
+    transition: none;
+  }
+  .sl-cust-card:hover {
+    transform: none;
+  }
+}
+
+/* ═══ 12. Responsive ════════════════════════════════════════════════════════ */
+
+/* Compress */
+@media (max-width: 1200px) {
+  .sl-kpi-row {
+    gap: 10px;
+  }
+  .sl-kpi-value {
+    font-size: clamp(18px, 12px + 0.7vw, 22px);
+  }
+  .sl-overview-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
+/* Stack / drawer */
+@media (max-width: 900px) {
+  .sl-kpi-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sl-drawer-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+  .sl-drawer {
+    width: min(520px, 100%);
+  }
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .sl-kpi-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .sl-kpi {
+    padding: 12px 14px 14px;
+  }
+  .sl-kpi-value {
+    font-size: 18px;
+  }
+  .sl-overview-grid {
+    grid-template-columns: 1fr;
+  }
+  .sl-toolbar-chips {
+    margin-left: 0;
+  }
+  .sl-filter-select {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+  }
+  .sl-toolbar-filters {
+    width: 100%;
+  }
+  .sl .bgt-backdrop {
+    padding: 12px;
+  }
+  .sl .bgt-modal--confirm {
+    padding: 24px 18px 20px;
+  }
+  .sl .bgt-modal-head {
+    padding: 16px 16px 0;
+  }
+  .sl .bgt-modal-body {
+    padding: 14px 16px 18px;
+  }
+  .sl-drawer {
+    width: 100%;
+  }
+  .sl-drawer .bgt-modal-head {
+    padding: 14px 16px 12px;
+  }
+  .sl-drawer-stats {
+    grid-template-columns: 1fr;
+  }
+  .sl .bgt-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .sl .bgt-delete-fields--wide {
+    grid-template-columns: 1fr;
+  }
+  .sl .bgt-delete-fields--wide div:nth-last-child(2) {
+    border-bottom: 1px dotted var(--border-strong);
+  }
+  .sl .bgt-modal-foot .btn,
+  .sl .bgt-modal-foot--center .btn {
+    flex: 1 1 auto;
+  }
+}

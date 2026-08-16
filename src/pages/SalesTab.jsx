@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../api/client";
+import "../styles/sales.css";
 
 function toNumber(value, fallback = 0) {
   const n = Number(value);
@@ -52,7 +53,7 @@ function localDate(value = new Date()) {
 }
 
 const STATUS_LABELS = { active: "Active", completed: "Completed", cancelled: "Cancelled" };
-const STATUS_COLORS = { active: "sl-pill--active", completed: "sl-pill--done", cancelled: "sl-pill--cancelled" };
+const STATUS_COLORS = { active: "chip-success", completed: "chip-success", cancelled: "chip-danger" };
 const PROJECT_CATEGORY_OPTIONS = [
   { value: "materials", label: "Materials" },
   { value: "labor", label: "Labor" },
@@ -428,25 +429,52 @@ export default function SalesTab() {
 
   return (
     <div className="sl">
+      {/* ── Page head ── */}
+      <header className="page-head">
+        <div className="page-head-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div className="page-head-copy">
+          <h2 className="page-head-title">Sales Listing</h2>
+          <p className="page-head-desc">Customers, projects and contract margins</p>
+        </div>
+        <div className="page-head-actions">
+          {view === "customers" && <button className="btn btn-primary" onClick={openNewCust}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Customer</button>}
+          {view === "projects" && <button className="btn btn-primary" onClick={() => openNewProj()}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Project</button>}
+        </div>
+      </header>
+
       {/* ── KPI Strip ── */}
       <div className="sl-kpi-row">
         <div className="sl-kpi">
-          <span className="sl-kpi-label">Customers</span>
+          <div className="sl-kpi-head">
+            <span className="sl-kpi-label">Customers</span>
+            <span className="sl-kpi-chip" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+          </div>
           <strong className="sl-kpi-value">{summary.totalCustomers}</strong>
           <span className="sl-kpi-sub">{summary.totalProjects} project{summary.totalProjects !== 1 ? "s" : ""}</span>
         </div>
         <div className="sl-kpi sl-kpi--sales">
-          <span className="sl-kpi-label">Total Sales</span>
+          <div className="sl-kpi-head">
+            <span className="sl-kpi-label">Total Sales</span>
+            <span className="sl-kpi-chip" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span>
+          </div>
           <strong className="sl-kpi-value">₱{formatMoney(crmContractValue)}</strong>
           <span className="sl-kpi-sub">contract value</span>
         </div>
         <div className="sl-kpi sl-kpi--expenses">
-          <span className="sl-kpi-label">Total Expenses</span>
+          <div className="sl-kpi-head">
+            <span className="sl-kpi-label">Total Expenses</span>
+            <span className="sl-kpi-chip" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg></span>
+          </div>
           <strong className="sl-kpi-value">₱{formatMoney(crmCostingExpenses)}</strong>
           <span className="sl-kpi-sub">project costing</span>
         </div>
         <div className={`sl-kpi sl-kpi--margin ${netPositive ? "sl-kpi--pos" : "sl-kpi--neg"}`}>
-          <span className="sl-kpi-label">Net Margin</span>
+          <div className="sl-kpi-head">
+            <span className="sl-kpi-label">Net Margin</span>
+            <span className="sl-kpi-chip" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+          </div>
           <strong className="sl-kpi-value">₱{formatMoney(crmMargin)}</strong>
           <span className={`sl-kpi-badge ${netPositive ? "sl-kpi-badge--pos" : "sl-kpi-badge--neg"}`}>{netPositive ? "Profit" : "Loss"}</span>
         </div>
@@ -456,25 +484,36 @@ export default function SalesTab() {
       {success && <div className="bgt-toast bgt-toast--ok"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>{success}</div>}
       {error   && <div className="bgt-toast bgt-toast--err"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>{error}</div>}
 
-      {/* ── Toolbar ── */}
-      <div className="bgt-toolbar">
-        <div className="bgt-seg">
-          <button className={`bgt-seg-btn${view === "overview" ? " bgt-seg-btn--on" : ""}`} onClick={() => { setView("overview"); setSelectedCustomer(null); }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-            Overview
-          </button>
-          <button className={`bgt-seg-btn${view === "customers" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("customers")}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Customers
-          </button>
-          <button className={`bgt-seg-btn${view === "projects" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("projects")}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-            Projects
-          </button>
+      {/* ── Sub-navigation ── */}
+      <nav className="tabs-underline sl-tabs" aria-label="Sales listing views">
+        <button className={`tab-underline${view === "overview" ? " tab-underline--on" : ""}`} type="button" aria-current={view === "overview" ? "page" : undefined} onClick={() => { setView("overview"); setSelectedCustomer(null); }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Overview
+        </button>
+        <button className={`tab-underline${view === "customers" ? " tab-underline--on" : ""}`} type="button" aria-current={view === "customers" ? "page" : undefined} onClick={() => setView("customers")}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Customers
+        </button>
+        <button className={`tab-underline${view === "projects" ? " tab-underline--on" : ""}`} type="button" aria-current={view === "projects" ? "page" : undefined} onClick={() => setView("projects")}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          Projects
+        </button>
+      </nav>
+
+      {/* ── Toolbar: filters left, quiet stat chips right ── */}
+      <div className="page-toolbar sl-toolbar">
+        <div className="sl-toolbar-filters">
+          {view === "projects" && (
+            <select className="input sl-filter-select" value={selectedCustomer || ""} onChange={(e) => setSelectedCustomer(e.target.value ? Number(e.target.value) : null)}>
+              <option value="">All customers</option>
+              {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
         </div>
-        <div className="bgt-toolbar-actions">
-          {view === "customers" && <button className="btn btn-primary" onClick={openNewCust}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Customer</button>}
-          {view === "projects" && <button className="btn btn-primary" onClick={() => openNewProj()}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Project</button>}
+        <div className="sl-toolbar-chips">
+          <span className="sl-stat-chip"><span className="sl-stat-chip-label">Total sales:</span> <span className="sl-stat-chip-val">₱{formatMoney(crmContractValue)}</span></span>
+          <span className="sl-stat-chip"><span className="sl-stat-chip-label">Expenses:</span> <span className="sl-stat-chip-val">₱{formatMoney(crmCostingExpenses)}</span></span>
+          <span className="sl-stat-chip"><span className="sl-stat-chip-label">Net margin:</span> <span className="sl-stat-chip-val">₱{formatMoney(crmMargin)}</span></span>
         </div>
       </div>
 
@@ -526,14 +565,14 @@ export default function SalesTab() {
                         return (
                           <button key={p.id} className="sl-proj-row" onClick={() => openDetail(p)}>
                             <div className="sl-proj-row-left">
-                              <span className={`sl-pill ${STATUS_COLORS[p.status] || ""}`}>{STATUS_LABELS[p.status] || p.status}</span>
+                              <span className={`chip ${STATUS_COLORS[p.status] || "chip-neutral"}`}>{STATUS_LABELS[p.status] || p.status}</span>
                               <div className="sl-proj-copy">
                                 <span className="sl-proj-name">{p.project_name}</span>
                                 <span className="sl-proj-sub">{p.system_package || "No package selected"} • Cost ₱{formatMoney(projectCost)}</span>
                               </div>
                             </div>
                             <div className="sl-proj-row-right">
-                              <span className="sl-proj-margin" style={{ color: projectMargin >= 0 ? "#147845" : "#b83a3a" }}>
+                              <span className={`sl-proj-margin ${projectMargin >= 0 ? "sl-amt-pos" : "sl-amt-neg"}`}>
                                 ₱{formatMoney(projectMargin)}
                               </span>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
@@ -576,10 +615,10 @@ export default function SalesTab() {
                     <tr key={c.id} className="bgt-table-row">
                       <td><strong>{c.name}</strong></td>
                       <td className="bgt-muted">{c.contact || "—"}</td>
-                      <td>{c.project_count}</td>
-                      <td className="bgt-col-amt" style={{ color: "#147845", fontWeight: 700 }}>₱{formatMoney(customerSales)}</td>
-                      <td className="bgt-col-amt" style={{ color: "#b83a3a", fontWeight: 700 }}>₱{formatMoney(customerCost)}</td>
-                      <td className="bgt-col-amt" style={{ color: margin >= 0 ? "#147845" : "#b83a3a", fontWeight: 700 }}>₱{formatMoney(margin)}</td>
+                      <td className="num">{c.project_count}</td>
+                      <td className="bgt-col-amt num sl-amt-pos">₱{formatMoney(customerSales)}</td>
+                      <td className="bgt-col-amt num sl-amt-neg">₱{formatMoney(customerCost)}</td>
+                      <td className={`bgt-col-amt num ${margin >= 0 ? "sl-amt-pos" : "sl-amt-neg"}`}>₱{formatMoney(margin)}</td>
                       <td className="bgt-col-actions">
                         <button className="bgt-row-btn" onClick={() => openEditCust(c)}>Edit</button>
                         <button className="bgt-row-btn bgt-row-btn--del" onClick={() => setDeletingCust(c)}>Delete</button>
@@ -596,12 +635,6 @@ export default function SalesTab() {
       {/* ── Projects table ── */}
       {view === "projects" && (
         <>
-          <div className="sl-filter-bar">
-            <select className="input sl-filter-select" value={selectedCustomer || ""} onChange={(e) => setSelectedCustomer(e.target.value ? Number(e.target.value) : null)}>
-              <option value="">All customers</option>
-              {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
           {filteredProjects.length === 0 ? (
             <div className="bgt-empty"><p>No projects found.</p><button className="btn btn-primary" onClick={() => openNewProj()}>Add Project</button></div>
           ) : (
@@ -613,15 +646,15 @@ export default function SalesTab() {
                     const projectCost = projectCostAmount(p);
                     const margin = toNumber(p.sale_amount, 0) - projectCost;
                     return (
-                      <tr key={p.id} className="bgt-table-row" style={{ cursor: "pointer" }} onClick={() => openDetail(p)}>
+                      <tr key={p.id} className="bgt-table-row sl-row-click" onClick={() => openDetail(p)}>
                         <td><span className="bgt-account-chip">{p.customer_name}</span></td>
                         <td><strong>{p.project_name}</strong></td>
                         <td>{p.system_package || <span className="bgt-muted">—</span>}</td>
-                        <td className="bgt-cell-date">{formatDate(p.project_date)}</td>
-                        <td><span className={`sl-pill ${STATUS_COLORS[p.status] || ""}`}>{STATUS_LABELS[p.status] || p.status}</span></td>
-                        <td className="bgt-col-amt" style={{ color: "#147845", fontWeight: 700 }}>₱{formatMoney(p.sale_amount)}</td>
-                        <td className="bgt-col-amt" style={{ color: "#b83a3a", fontWeight: 700 }}>₱{formatMoney(projectCost)}</td>
-                        <td className="bgt-col-amt" style={{ color: margin >= 0 ? "#147845" : "#b83a3a", fontWeight: 700 }}>₱{formatMoney(margin)}</td>
+                        <td className="bgt-cell-date mono">{formatDate(p.project_date)}</td>
+                        <td><span className={`chip ${STATUS_COLORS[p.status] || "chip-neutral"}`}>{STATUS_LABELS[p.status] || p.status}</span></td>
+                        <td className="bgt-col-amt num sl-amt-pos">₱{formatMoney(p.sale_amount)}</td>
+                        <td className="bgt-col-amt num sl-amt-neg">₱{formatMoney(projectCost)}</td>
+                        <td className={`bgt-col-amt num ${margin >= 0 ? "sl-amt-pos" : "sl-amt-neg"}`}>₱{formatMoney(margin)}</td>
                         <td className="bgt-col-actions" onClick={(e) => e.stopPropagation()}>
                           <button className="bgt-row-btn" onClick={() => openEditProj(p)}>Edit</button>
                           <button className="bgt-row-btn bgt-row-btn--del" onClick={() => setDeletingProj(p)}>Delete</button>
@@ -757,9 +790,9 @@ export default function SalesTab() {
               <div className="sl-drawer-section">
                 <p className="sl-drawer-section-title">Linked Expenses ({detailTx.length})</p>
                 {detailLoading ? (
-                  <div className="bgt-empty" style={{ padding: 24 }}><div className="bgt-spinner" /></div>
+                  <div className="bgt-empty sl-empty-pad"><div className="bgt-spinner" /></div>
                 ) : detailTx.length === 0 ? (
-                  <p className="bgt-muted" style={{ padding: "12px 0", fontSize: 13 }}>No expenses linked to this project yet. Assign transactions via Financial Management.</p>
+                  <p className="bgt-muted sl-note">No expenses linked to this project yet. Assign transactions via Financial Management.</p>
                 ) : (
                   <div className="bgt-import-preview">
                     <table className="bgt-table bgt-table--compact">
@@ -767,13 +800,13 @@ export default function SalesTab() {
                       <tbody>
                         {detailTx.map((tx) => (
                           <tr key={tx.id}>
-                            <td className="bgt-cell-date">{formatDate(tx.transaction_date)}</td>
+                            <td className="bgt-cell-date mono">{formatDate(tx.transaction_date)}</td>
                             <td>{tx.description || <span className="bgt-muted">—</span>}</td>
                             <td><span className="bgt-account-chip">{tx.account_name}</span></td>
-                            <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
-                            <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
-                            <td className="bgt-col-amt">{tx.discount == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.discount)}</>}</td>
-                            <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatMoney(tx.amount)}</td>
+                            <td className="bgt-col-amt num">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
+                            <td className="num">{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
+                            <td className="bgt-col-amt num">{tx.discount == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.discount)}</>}</td>
+                            <td className={`bgt-col-amt num bgt-amount--${tx.type}`}>₱{formatMoney(tx.amount)}</td>
                           </tr>
                         ))}
                       </tbody>

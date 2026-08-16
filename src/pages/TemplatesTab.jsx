@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/client";
 import ConfirmModal from "../components/ConfirmModal";
 import { getSupplierTextStyle } from "../constants/supplierColors";
+import "../styles/templates.css";
 
 const CATEGORY_DEFS = [
   { key: "main_system", label: "A. Main System Components" },
@@ -541,6 +542,10 @@ export default function TemplatesTab() {
   const [activeSectionKey, setActiveSectionKey] = useState(CATEGORY_DEFS[0].key);
   const [confirmModal, setConfirmModal] = useState(null);
   const [modalBusy, setModalBusy] = useState(false);
+
+  // Atlas page-frame UI-only toggles (presentation state, no data logic).
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showAddItem, setShowAddItem] = useState(false);
 
   const loadTemplates = async (nextTemplateId = null) => {
     setLoadingTemplates(true);
@@ -1208,54 +1213,45 @@ export default function TemplatesTab() {
   };
 
   return (
-    <div>
-      <div className="materials-card">
-        <div className="module-card-head">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <div className="templates-module">
+      <header className="page-head">
+        <div className="page-head-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
           </svg>
-          <div className="module-card-head-text">
-            <strong>Template Manager</strong>
-            <span>Build reusable bill-of-materials templates. Select an existing template or create a new one to start editing.</span>
-          </div>
         </div>
+        <div className="page-head-text">
+          <h2 className="page-head-title">Template Manager</h2>
+          <p className="page-head-desc">
+            Build reusable bill-of-materials templates. Open an existing template from the toolbar or create a new one to start editing.
+          </p>
+        </div>
+        <div className="page-head-actions">
+          <span className="page-chip-quiet">
+            Templates
+            <strong className="mono">{templates.length}</strong>
+          </span>
+          {selectedTemplate && (
+            <span className="page-chip-quiet">
+              Saved items
+              <strong className="mono">{Number(selectedTemplate.item_count || 0)}</strong>
+            </span>
+          )}
+          <button
+            className="btn btn-primary"
+            type="button"
+            aria-expanded={showCreateForm}
+            onClick={() => setShowCreateForm((prev) => !prev)}
+          >
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="8"/><path d="M10 6v8M6 10h8"/></svg>
+            New Template
+          </button>
+        </div>
+      </header>
 
-        <div className="template-header-grid">
-          <div className="template-zone">
-            <div className="template-zone-label">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
-              </svg>
-              Create New Template
-            </div>
-            <div className="template-inline-actions">
-              <input
-                id="newTemplateName"
-                className="input"
-                placeholder="Template name…"
-                value={newTemplateName}
-                onChange={(e) => setNewTemplateName(e.target.value)}
-              />
-              <button
-                className="btn btn-primary"
-                type="button"
-                disabled={!newTemplateName.trim() || savingTemplate}
-                onClick={createTemplate}
-              >
-                {savingTemplate ? "Creating…" : "Create Template"}
-              </button>
-            </div>
-          </div>
-
-          <div className="template-zone-or">OR</div>
-
-          <div className="template-zone">
-            <div className="template-zone-label">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-              </svg>
-              Open Existing Template
-            </div>
+      <div className="page-toolbar">
+        <div className="page-toolbar-left">
+          <div className="template-open-picker">
             <SearchableSelect
               groups={templatePickerGroups}
               selectedOption={selectedTemplate}
@@ -1271,128 +1267,174 @@ export default function TemplatesTab() {
               clearLabel="-- Select a template --"
             />
           </div>
-        </div>
-
-        {error && <div className="error-text">{error}</div>}
-        {loadingTemplates && <p className="section-note">Loading templates...</p>}
-
-        {!templateId && !loadingTemplates && (
-          <div className="template-empty-state">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
-            </svg>
-            <strong>No template selected</strong>
-            <p>
-              Create a new template using the panel above, or select an existing one to start
-              editing its sections and items.
-            </p>
-            {templates.length > 0 && (
-              <p className="template-empty-count">
-                {templates.length} template{templates.length !== 1 ? "s" : ""} available — pick one from the dropdown above.
-              </p>
-            )}
-          </div>
-        )}
-
-        {selectedTemplate && (
-          <>
-            <div className="template-toolbar">
-              <div className="template-inline-actions">
-                <input
-                  className="input"
-                  value={templateName}
-                  onChange={(e) => setTemplateName(e.target.value)}
-                />
-                <button
-                  className="btn btn-secondary"
-                  type="button"
-                  disabled={!templateName.trim() || savingTemplate}
-                  onClick={saveTemplateName}
-                >
-                  Save Name
-                </button>
-                <button
-                  className="btn btn-ghost"
-                  type="button"
-                  disabled={exportingTemplate}
-                  onClick={exportTemplateExcel}
-                >
-                  {exportingTemplate ? "Exporting..." : "Export Excel"}
-                </button>
-                <button
-                  className="btn btn-ghost"
-                  type="button"
-                  disabled={exportingAllTemplates}
-                  onClick={exportAllTemplatesExcel}
-                >
-                  {exportingAllTemplates ? "Bundling..." : "Export All Tabs"}
-                </button>
-                <label className="field template-export-vat-field">
-                  <span>Export VAT</span>
-                  <SearchableSelect
-                    groups={[
-                      {
-                        key: "template-vat-mode",
-                        label: "Export VAT",
-                        options: templateVatModeOptions
-                      }
-                    ]}
-                    selectedOption={selectedTemplateVatModeOption}
-                    onSelectOption={(option) => setTemplateExportVatMode(option?.value || "incl")}
-                    getOptionKey={(option) => option.value}
-                    getOptionLabel={(option) => option.label}
-                    getOptionSearchText={(option) => option.label}
-                    placeholder="Select VAT mode"
-                    searchPlaceholder="Search VAT mode..."
-                    emptyMessage="No VAT mode found."
-                    showGroupLabels={false}
-                  />
-                </label>
-                <button
-                  className="btn btn-ghost"
-                  type="button"
-                  disabled={duplicatingTemplate}
-                  onClick={openDuplicateTemplateModal}
-                >
-                  {duplicatingTemplate ? "Duplicating..." : "Duplicate Template"}
-                </button>
-              </div>
+          {selectedTemplate && (
+            <div className="template-rename-group">
+              <input
+                className="input"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+              />
               <button
-                className="btn btn-danger"
+                className="btn btn-secondary"
                 type="button"
-                disabled={deletingTemplate}
-                onClick={openDeleteTemplateModal}
+                disabled={!templateName.trim() || savingTemplate}
+                onClick={saveTemplateName}
               >
-                {deletingTemplate ? "Deleting..." : "Delete Template"}
+                Save Name
               </button>
             </div>
+          )}
+        </div>
+        {selectedTemplate && (
+          <div className="page-toolbar-right">
+            <label className="field template-export-vat-field">
+              <span>Export VAT</span>
+              <SearchableSelect
+                groups={[
+                  {
+                    key: "template-vat-mode",
+                    label: "Export VAT",
+                    options: templateVatModeOptions
+                  }
+                ]}
+                selectedOption={selectedTemplateVatModeOption}
+                onSelectOption={(option) => setTemplateExportVatMode(option?.value || "incl")}
+                getOptionKey={(option) => option.value}
+                getOptionLabel={(option) => option.label}
+                getOptionSearchText={(option) => option.label}
+                placeholder="Select VAT mode"
+                searchPlaceholder="Search VAT mode..."
+                emptyMessage="No VAT mode found."
+                showGroupLabels={false}
+              />
+            </label>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              disabled={exportingTemplate}
+              onClick={exportTemplateExcel}
+            >
+              {exportingTemplate ? "Exporting..." : "Export Excel"}
+            </button>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              disabled={exportingAllTemplates}
+              onClick={exportAllTemplatesExcel}
+            >
+              {exportingAllTemplates ? "Bundling..." : "Export All Tabs"}
+            </button>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              disabled={duplicatingTemplate}
+              onClick={openDuplicateTemplateModal}
+            >
+              {duplicatingTemplate ? "Duplicating..." : "Duplicate Template"}
+            </button>
+            <button
+              className="btn btn-danger"
+              type="button"
+              disabled={deletingTemplate}
+              onClick={openDeleteTemplateModal}
+            >
+              {deletingTemplate ? "Deleting..." : "Delete Template"}
+            </button>
+          </div>
+        )}
+      </div>
 
-            <p className="section-note">
-              Selected template has {selectedTemplate.item_count || 0} saved item
-              {Number(selectedTemplate.item_count || 0) === 1 ? "" : "s"}.
+      {showCreateForm && (
+        <div className="template-create-card">
+          <div className="template-create-card-head">
+            <strong>Create new template</strong>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={() => setShowCreateForm(false)}
+            >
+              Close
+            </button>
+          </div>
+          <div className="template-inline-actions">
+            <input
+              id="newTemplateName"
+              className="input"
+              placeholder="Template name…"
+              value={newTemplateName}
+              onChange={(e) => setNewTemplateName(e.target.value)}
+            />
+            <button
+              className="btn btn-primary"
+              type="button"
+              disabled={!newTemplateName.trim() || savingTemplate}
+              onClick={createTemplate}
+            >
+              {savingTemplate ? "Creating…" : "Create Template"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && <div className="error-text">{error}</div>}
+      {loadingTemplates && <p className="section-note">Loading templates...</p>}
+
+      {!templateId && !loadingTemplates && (
+        <div className="template-empty-state">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+          </svg>
+          <strong>No template selected</strong>
+          <p>
+            Create a new template with the New Template button above, or open an existing one
+            from the toolbar to start editing its sections and items.
+          </p>
+          {templates.length > 0 && (
+            <p className="template-empty-count">
+              {templates.length} template{templates.length !== 1 ? "s" : ""} available — pick one from the toolbar dropdown.
             </p>
+          )}
+        </div>
+      )}
 
-            <div className="items-editor template-sections-card">
-              <div className="items-editor-title">Template Sections</div>
-              <div className="quote-stepper">
-                {steps.map((step) => (
-                  <button
-                    key={step.key}
-                    type="button"
-                    className={`step-pill ${activeSectionKey === step.key ? "active" : ""}`}
-                    onClick={() => setActiveSectionKey(step.key)}
-                  >
-                    {step.label}
-                  </button>
-                ))}
+      {selectedTemplate && (
+        <div className="template-editor-card">
+          <div className="tabs-underline" aria-label="Template sections">
+            {steps.map((step) => (
+              <button
+                key={step.key}
+                type="button"
+                className={`tab-underline-item${activeSectionKey === step.key ? " active" : ""}`}
+                aria-pressed={activeSectionKey === step.key}
+                onClick={() => setActiveSectionKey(step.key)}
+              >
+                {step.label}
+                <span className="tab-underline-count">{step.items.length}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="template-section-bar">
+            {activeStep && (
+              <div className="template-section-info">
+                <strong>{activeStep.label}</strong>
+                <span>
+                  <span className="mono">{activeStep.items.length}</span> item
+                  {activeStep.items.length === 1 ? "" : "s"} in this section
+                </span>
               </div>
-              {activeStep && (
-                <div className="items-editor-note">
-                  {activeStep.label} ({activeStep.items.length} items)
-                </div>
-              )}
-            </div>
+            )}
+            <button
+              className="btn btn-secondary"
+              type="button"
+              aria-expanded={showAddItem}
+              onClick={() => setShowAddItem((prev) => !prev)}
+            >
+              {showAddItem ? "Hide Item Form" : "Add Item"}
+            </button>
+          </div>
 
+          {showAddItem && (
             <div className="add-item-card">
               <div className="add-item-card-head">
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="8"/><path d="M10 6v8M6 10h8"/></svg>
@@ -1508,18 +1550,19 @@ export default function TemplatesTab() {
               </div>
               <p className="template-vat-row-note">{vatReferenceLabel(selectedCreateMaterial)}</p>
             </div>
+          )}
 
-            {loadingItems && <p className="section-note">Loading template items...</p>}
+          {loadingItems && <p className="section-note">Loading template items...</p>}
 
             <div className="materials-table-wrap">
               <table className="materials-table">
                 <thead>
                   <tr>
-                    <th>No.</th>
+                    <th className="num">No.</th>
                     <th>Description</th>
                     <th>Unit</th>
-                    <th>Qty</th>
-                    <th>Price Reference</th>
+                    <th className="num">Qty</th>
+                    <th className="num">Price reference</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -1531,7 +1574,7 @@ export default function TemplatesTab() {
                       key={row.id}
                       className={editingItemId === row.id ? "template-item-row editing" : "template-item-row"}
                     >
-                      <td>
+                      <td className="num">
                         {editingItemId === row.id ? (
                           <input
                             className="input"
@@ -1633,7 +1676,7 @@ export default function TemplatesTab() {
                           row.unit || "-"
                         )}
                       </td>
-                      <td>
+                      <td className="num">
                         {editingItemId === row.id ? (
                           <input
                             className="input"
@@ -1649,7 +1692,7 @@ export default function TemplatesTab() {
                           row.qty
                         )}
                       </td>
-                      <td>
+                      <td className="num">
                         {editingItemId === row.id ? (
                           <input
                             className="input"
@@ -1667,11 +1710,12 @@ export default function TemplatesTab() {
                               <>
                                 <strong>Base: {formatMoney(priceRef.basePrice)}</strong>
                                 <span>VAT incl. used: {formatMoney(priceRef.vatInclusivePrice)}</span>
+                                <span className="chip chip-success">Catalog</span>
                               </>
                             ) : (
                               <>
                                 <strong>Used: {formatMoney(row.base_price)}</strong>
-                                <span>Manual item</span>
+                                <span className="chip chip-neutral">Manual item</span>
                               </>
                             )}
                           </div>
@@ -1702,7 +1746,7 @@ export default function TemplatesTab() {
                                 Edit
                               </button>
                               <button
-                                className="btn btn-ghost"
+                                className="btn btn-ghost template-row-delete"
                                 type="button"
                                 onClick={() => openDeleteItemModal(row.id)}
                               >
@@ -1717,7 +1761,7 @@ export default function TemplatesTab() {
 
                   {!(activeStep?.items || []).length && !loadingItems && (
                     <tr>
-                      <td colSpan={6} className="section-note">
+                      <td colSpan={6} className="empty-state-cell">
                         No items yet in this section.
                       </td>
                     </tr>
@@ -1725,9 +1769,8 @@ export default function TemplatesTab() {
                 </tbody>
               </table>
             </div>
-          </>
-        )}
-      </div>
+        </div>
+      )}
 
       <ConfirmModal
         open={Boolean(confirmModal)}

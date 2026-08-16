@@ -1,0 +1,1425 @@
+/* ════════════════════════════════════════════════════════════════════
+   HELIOS — Calendar module ("Operations Calendar")
+   Solar command console: mission-planning board. Porcelain/obsidian
+   stage, hairline gridlines, mono data readouts, amber energy accents.
+
+   Scope: everything below lives under .calendar-module (plus the
+   FullCalendar popover, which renders inside .calendar-module .fc).
+   Consumes ONLY index.css tokens — both themes flip automatically.
+
+   Owned here (not in the §6 global list):
+   - .calendar-* / .cal-* module classes
+   - .calendar-status-tabs button (JSX renders bare <button>, not
+     .tab-underline — the underline-tab recipe is replicated here)
+   - .metric-accent-{blue|gold|orange|green} (scoped to the stat cards)
+   - .calendar-module .field > span (bare caption span; global sheet
+     only covers .field label / span.label)
+   - all .fc-* FullCalendar v6 overrides + --fc-* variable remap
+
+   Consumed globals left untouched (§6): page-head kit, page-toolbar,
+   tabs-underline (container), btn kit, chip kit, field/input/select/
+   textarea base, section-note, error-text, modal-backdrop/card/copy/
+   actions, ledger-modal (ConfirmModal), toast, hx-* keyframes.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── 00 · Module scaffold · page head ────────────────────────────── */
+.calendar-module {
+  min-width: 0;
+}
+
+.calendar-module .calendar-page-head {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.calendar-module .calendar-page-head-copy h3 {
+  font-family: var(--font-title);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.calendar-module .calendar-page-head-copy p {
+  font-size: 13px;
+  color: var(--text-soft);
+  max-width: 70ch;
+}
+
+.calendar-module .calendar-page-head-actions {
+  align-items: center;
+}
+
+/* ── 01 · Status filter — mono underline tabs ────────────────────── */
+.calendar-module .calendar-page-toolbar {
+  row-gap: 10px;
+}
+
+/* container chrome comes from .tabs-underline; it sits inside the
+   toolbar row, so its own bottom margin is neutralized */
+.calendar-module .calendar-status-tabs {
+  margin-bottom: 0;
+}
+
+.calendar-module .calendar-status-tabs button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 13px 11px;
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--speed) var(--ease-out);
+}
+
+.calendar-module .calendar-status-tabs button::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -1px;
+  height: 2px;
+  background: transparent;
+  transition: background var(--speed) var(--ease-out);
+}
+
+.calendar-module .calendar-status-tabs button:hover {
+  color: var(--text);
+}
+
+.calendar-module .calendar-status-tabs button.active {
+  color: var(--text);
+}
+
+.calendar-module .calendar-status-tabs button.active::after {
+  background: var(--primary);
+}
+
+/* ── 02 · Ops summary — instrument stat cards ────────────────────── */
+.calendar-module .calendar-ops-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+/* icon tile · Space Grotesk value · eyebrow caption; 2px accent rule
+   along the top, tokenized per variant (no rainbow hexes) */
+.calendar-module .calendar-ops-stat {
+  --cal-stat-accent: var(--primary-deep);
+  --cal-stat-soft: var(--primary-soft);
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 1px;
+  align-items: center;
+  min-width: 0;
+  padding: 13px 16px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  overflow: hidden;
+}
+
+.calendar-module .calendar-ops-stat::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--cal-stat-accent);
+}
+
+/* accent map — both class vocabularies present in the JSX resolve to
+   the same semantic tokens */
+.calendar-module .calendar-ops-stat-blue,
+.calendar-module .calendar-ops-stat.metric-accent-blue {
+  --cal-stat-accent: var(--info);
+  --cal-stat-soft: var(--info-soft);
+}
+
+.calendar-module .calendar-ops-stat-amber,
+.calendar-module .calendar-ops-stat.metric-accent-gold {
+  --cal-stat-accent: var(--primary-deep);
+  --cal-stat-soft: var(--primary-soft);
+}
+
+.calendar-module .calendar-ops-stat-orange,
+.calendar-module .calendar-ops-stat.metric-accent-orange {
+  --cal-stat-accent: var(--warn);
+  --cal-stat-soft: var(--warn-soft);
+}
+
+.calendar-module .calendar-ops-stat-green,
+.calendar-module .calendar-ops-stat.metric-accent-green {
+  --cal-stat-accent: var(--success);
+  --cal-stat-soft: var(--success-soft);
+}
+
+.calendar-module .calendar-stat-icon-wrap {
+  grid-row: 1 / 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius);
+  background: var(--cal-stat-soft);
+  color: var(--cal-stat-accent);
+  pointer-events: none;
+}
+
+.calendar-module .calendar-stat-icon-wrap svg {
+  width: 17px;
+  height: 17px;
+}
+
+.calendar-module .calendar-ops-stat > strong {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.calendar-module .calendar-ops-stat > span {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* ── 03 · Board + sidebar layout · mobile view toggle ────────────── */
+.calendar-module .calendar-ops-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 356px;
+  gap: 16px;
+  align-items: start;
+}
+
+/* segmented control — desktop hidden; surfaces at the stack breakpoint */
+.calendar-module .cal-view-toggle {
+  display: none;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.calendar-module .cal-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--speed) var(--ease-out), color var(--speed) var(--ease-out),
+    box-shadow var(--speed) var(--ease-out);
+}
+
+.calendar-module .cal-toggle-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.calendar-module .cal-toggle-btn:hover {
+  color: var(--text);
+}
+
+.calendar-module .cal-toggle-btn.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border-strong), var(--shadow-sm);
+}
+
+.calendar-module .cal-toggle-btn.active svg {
+  color: var(--primary-deep);
+}
+
+/* ── 04 · Board card ─────────────────────────────────────────────── */
+.calendar-module .calendar-board-card {
+  min-width: 0;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.calendar-module .calendar-board-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.calendar-module .calendar-board-head h4 {
+  font-family: var(--font-title);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.calendar-module .calendar-board-card > .error-text {
+  margin: 0 0 12px;
+}
+
+.calendar-module .calendar-wrap,
+.calendar-module .calendar-ops-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+/* ── 05 · FullCalendar re-theme ──────────────────────────────────── */
+/* 05a — variable remap: every --fc-* slot points at a HELIOS token,
+   so the grid flips with the Daylight/Night stage automatically */
+.calendar-module .fc {
+  --fc-small-font-size: 10.5px;
+  --fc-page-bg-color: var(--surface);
+  --fc-neutral-bg-color: var(--surface-soft);
+  --fc-neutral-text-color: var(--text-soft);
+  --fc-border-color: var(--border-soft);
+  --fc-button-text-color: var(--text);
+  --fc-button-bg-color: var(--surface);
+  --fc-button-border-color: var(--border-strong);
+  --fc-button-hover-bg-color: var(--primary-soft);
+  --fc-button-hover-border-color: var(--primary);
+  --fc-button-active-bg-color: var(--primary);
+  --fc-button-active-border-color: var(--primary-strong);
+  --fc-event-bg-color: transparent;
+  --fc-event-border-color: transparent;
+  --fc-event-text-color: var(--text);
+  --fc-event-selected-overlay-color: transparent;
+  --fc-more-link-bg-color: var(--surface-soft);
+  --fc-more-link-text-color: var(--primary-deep);
+  --fc-non-business-color: color-mix(in srgb, var(--bg-deep) 45%, transparent);
+  --fc-bg-event-color: var(--accent);
+  --fc-bg-event-opacity: 0.12;
+  --fc-highlight-color: var(--primary-soft);
+  --fc-today-bg-color: var(--primary-soft);
+  --fc-now-indicator-color: var(--danger);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+}
+
+/* FC renders day numbers, headers, and more-links as anchors — keep
+   them out of the global amber-link treatment */
+.calendar-module .fc a {
+  text-decoration: none;
+}
+
+/* 05b — toolbar: Space Grotesk month title + compact console buttons */
+.calendar-module .fc .fc-toolbar.fc-header-toolbar {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.calendar-module .fc .fc-toolbar-title {
+  font-family: var(--font-title);
+  font-size: 16.5px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.calendar-module .fc .fc-toolbar-title::before {
+  content: "▪";
+  display: inline-block;
+  margin-right: 9px;
+  color: var(--primary);
+  font-size: 10px;
+  vertical-align: 3px;
+}
+
+.calendar-module .fc .fc-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--ctrl-h-sm);
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-transform: capitalize;
+  box-shadow: none;
+  transition: background var(--speed) var(--ease-out), border-color var(--speed) var(--ease-out),
+    color var(--speed) var(--ease-out), box-shadow var(--speed) var(--ease-out);
+}
+
+.calendar-module .fc .fc-button .fc-icon {
+  font-size: 15px;
+}
+
+.calendar-module .fc .fc-button-primary:hover {
+  color: var(--primary-deep);
+}
+
+.calendar-module .fc .fc-button-primary:not(:disabled):active,
+.calendar-module .fc .fc-button-primary:not(:disabled).fc-button-active {
+  color: var(--primary-ink);
+}
+
+.calendar-module .fc .fc-button-primary:disabled {
+  background: var(--surface-soft);
+  border-color: var(--border-soft);
+  color: var(--text-faint);
+  opacity: 1;
+}
+
+.calendar-module .fc .fc-button:focus,
+.calendar-module .fc .fc-button-primary:focus,
+.calendar-module .fc .fc-button-primary:not(:disabled):active:focus,
+.calendar-module .fc .fc-button-primary:not(:disabled).fc-button-active:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.calendar-module .fc .fc-button:focus-visible {
+  border-color: var(--primary-strong);
+  box-shadow: var(--ring);
+}
+
+/* 05c — grid frame: hairline gridlines, sharp clipped corners */
+.calendar-module .fc-theme-standard .fc-scrollgrid {
+  border-color: var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* day-of-week band: soft chrome strip, mono caps; weekends fall back */
+.calendar-module .fc .fc-col-header-cell {
+  background: var(--surface-soft);
+  border-bottom-color: var(--border-strong);
+}
+
+.calendar-module .fc .fc-col-header-cell-cushion {
+  padding: 8px 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.calendar-module .fc .fc-day-sat .fc-col-header-cell-cushion,
+.calendar-module .fc .fc-day-sun .fc-col-header-cell-cushion {
+  color: var(--text-faint);
+}
+
+/* 05d — day cells: mono 11px indices, quiet interaction wash */
+.calendar-module .fc .fc-daygrid-day {
+  cursor: pointer;
+  transition: background var(--speed) var(--ease-out);
+}
+
+.calendar-module .fc .fc-daygrid-day:not(.fc-day-today):hover {
+  background: color-mix(in srgb, var(--primary) 4%, transparent);
+}
+
+.calendar-module .fc .fc-daygrid-day-frame {
+  min-height: 118px;
+  padding: 2px 2px 4px;
+}
+
+.calendar-module .fc .fc-daygrid-day-number {
+  padding: 4px 6px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.calendar-module .fc .fc-daygrid-month-start {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* adjacent-month cells: recessed stage, faint indices */
+.calendar-module .fc .fc-day-other .fc-daygrid-day-top {
+  opacity: 1;
+}
+
+.calendar-module .fc .fc-day-other .fc-daygrid-day-frame {
+  background: color-mix(in srgb, var(--surface-soft) 70%, transparent);
+}
+
+.calendar-module .fc .fc-day-other .fc-daygrid-day-number {
+  color: var(--text-faint);
+}
+
+/* today: primary-soft wash (via --fc-today-bg-color) + 2px amber rule */
+.calendar-module .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-frame {
+  box-shadow: inset 0 2px 0 0 var(--primary);
+}
+
+.calendar-module .fc .fc-day-today .fc-daygrid-day-number {
+  color: var(--primary-deep);
+  font-weight: 700;
+}
+
+/* selected day (dayCellClassNames hook): 1px amber instrument ring */
+.calendar-module .fc .calendar-day-selected .fc-daygrid-day-frame {
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.calendar-module .fc .fc-day-today.calendar-day-selected .fc-daygrid-day-frame {
+  box-shadow: inset 0 0 0 1px var(--primary), inset 0 2px 0 0 var(--primary);
+}
+
+/* 05e — events: compact mono tag-chips, status left rule */
+.calendar-module .fc .fc-daygrid-event {
+  margin: 2px 2px 0;
+  border-radius: var(--radius-sm);
+  white-space: normal;
+  cursor: pointer;
+}
+
+.calendar-module .fc .fc-daygrid-dot-event {
+  padding: 0;
+}
+
+.calendar-module .fc .fc-daygrid-dot-event:hover,
+.calendar-module .fc .fc-daygrid-dot-event.fc-event-mirror {
+  background: transparent;
+}
+
+.calendar-module .fc .fc-h-event {
+  border: 0;
+  background: transparent;
+}
+
+/* neutralize FC's dark focus overlay; ring lands on the chip instead */
+.calendar-module .fc-event:focus {
+  box-shadow: none;
+}
+
+.calendar-module .fc-event:focus::after {
+  background: transparent;
+}
+
+.calendar-module .fc .fc-event:focus-visible .calendar-event-chip {
+  box-shadow: var(--ring);
+}
+
+.calendar-module .calendar-event-chip {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  min-width: 0;
+  padding: 4px 7px 5px 8px;
+  background: var(--cal-status-soft, var(--info-soft));
+  border-left: 2px solid var(--cal-status, var(--info));
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--text);
+  overflow: hidden;
+  transition: background var(--speed) var(--ease-out);
+}
+
+.calendar-module .fc .fc-daygrid-event:hover .calendar-event-chip {
+  background: color-mix(in srgb, var(--cal-status, var(--info)) 18%, var(--surface));
+}
+
+.calendar-module .calendar-event-chip-type {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cal-status, var(--info));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-module .calendar-event-chip-schedule {
+  display: block;
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-module .calendar-event-chip > strong {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* cancelled chips read as struck-through, de-energized rows */
+.calendar-module .calendar-event-chip-cancelled > strong {
+  text-decoration: line-through;
+  color: var(--text-soft);
+}
+
+/* 05f — "+N more" link + overflow popover */
+.calendar-module .fc .fc-daygrid-more-link {
+  margin: 1px 2px 0;
+  padding: 2px 5px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--primary-deep);
+}
+
+.calendar-module .fc .fc-daygrid-more-link:hover {
+  background: var(--primary-soft);
+}
+
+.calendar-module .fc-popover {
+  z-index: 40;
+  max-width: min(320px, calc(100vw - 24px));
+  background: var(--surface-raise);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: cal-pop-in 160ms var(--ease-out) both;
+}
+
+.calendar-module .fc .fc-popover-header {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.calendar-module .fc .fc-popover-title {
+  font-family: var(--font-title);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.calendar-module .fc .fc-popover-close {
+  color: var(--text-soft);
+  opacity: 1;
+  transition: color var(--speed) var(--ease-out);
+}
+
+.calendar-module .fc .fc-popover-close:hover {
+  color: var(--text);
+}
+
+.calendar-module .fc .fc-more-popover .fc-popover-body {
+  min-width: 240px;
+  padding: 8px;
+}
+
+/* ── 06 · Status accent map (cards · chips · readout rows) ───────── */
+/* set on the fc event harness (eventClassNames), the chip itself, and
+   the sidebar cards/rows — all resolve to semantic tokens */
+.calendar-module .calendar-event-planned,
+.calendar-module .calendar-event-chip-planned,
+.calendar-module .calendar-status-planned {
+  --cal-status: var(--info);
+  --cal-status-soft: var(--info-soft);
+}
+
+.calendar-module .calendar-event-in_progress,
+.calendar-module .calendar-event-chip-in_progress,
+.calendar-module .calendar-status-in_progress {
+  --cal-status: var(--warn);
+  --cal-status-soft: var(--warn-soft);
+}
+
+.calendar-module .calendar-event-completed,
+.calendar-module .calendar-event-chip-completed,
+.calendar-module .calendar-status-completed {
+  --cal-status: var(--success);
+  --cal-status-soft: var(--success-soft);
+}
+
+.calendar-module .calendar-event-cancelled,
+.calendar-module .calendar-event-chip-cancelled,
+.calendar-module .calendar-status-cancelled {
+  --cal-status: var(--text-faint);
+  --cal-status-soft: var(--surface-soft);
+}
+
+/* ── 07 · Sidebar — mission log ──────────────────────────────────── */
+.calendar-module .calendar-sidebar-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.calendar-module .calendar-sidebar-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.calendar-module .calendar-sidebar-top h4 {
+  font-family: var(--font-title);
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  color: var(--text);
+}
+
+/* eyebrow caption over the selected date, amber tick included */
+.calendar-module .calendar-selected-label {
+  display: block;
+  margin-bottom: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.calendar-module .calendar-selected-label::before {
+  content: "▪ ";
+  color: var(--primary);
+}
+
+/* sidebar sections divide with dashed drafting rules */
+.calendar-module .calendar-day-activity-list,
+.calendar-module .calendar-focus-card,
+.calendar-module .calendar-upcoming-card {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+
+/* section heads: mono eyebrow + §8 dotted leader toward the count */
+.calendar-module .calendar-sidebar-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.calendar-module .calendar-sidebar-section-head strong {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.calendar-module .calendar-sidebar-section-head strong::after {
+  content: "";
+  flex: 1;
+  min-width: 12px;
+  border-bottom: 1px dotted var(--border-strong);
+  transform: translateY(-3px);
+}
+
+.calendar-module .calendar-sidebar-section-head > span:not(.chip) {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+/* empty states: dashed void card with the ∅ glyph */
+.calendar-module .calendar-empty-card {
+  display: grid;
+  gap: 3px;
+  padding: 18px 14px;
+  background: var(--surface-soft);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.calendar-module .calendar-empty-card::before {
+  content: "∅";
+  display: block;
+  margin: 0 auto 4px;
+  font-family: var(--font-mono);
+  font-size: 17px;
+  color: var(--text-faint);
+}
+
+.calendar-module .calendar-empty-card strong {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.calendar-module .calendar-empty-card span {
+  font-size: 12px;
+  color: var(--text-soft);
+  line-height: 1.55;
+}
+
+/* day activity cards: status left rule, amber selection state */
+.calendar-module .calendar-activity-card {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 11px 12px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--cal-status, var(--border-strong));
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--speed) var(--ease-out), border-color var(--speed) var(--ease-out),
+    box-shadow var(--speed) var(--ease-out);
+}
+
+.calendar-module .calendar-activity-card + .calendar-activity-card {
+  margin-top: 8px;
+}
+
+.calendar-module .calendar-activity-card:hover {
+  background: var(--surface-soft);
+  border-color: var(--border-strong);
+  border-left-color: var(--cal-status, var(--border-strong));
+}
+
+.calendar-module .calendar-activity-card.active {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  border-left-color: var(--cal-status, var(--primary));
+  box-shadow: var(--shadow-sm);
+}
+
+.calendar-module .calendar-activity-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.calendar-module .calendar-activity-type {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-module .calendar-activity-card > strong {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.calendar-module .calendar-activity-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+
+.calendar-module .calendar-activity-meta span {
+  padding: 2px 7px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+/* ── 08 · Focus card — activity detail readout ───────────────────── */
+.calendar-module .calendar-focus-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.calendar-module .calendar-focus-title-row h4 {
+  font-family: var(--font-title);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.calendar-module .calendar-focus-title-row p {
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* key/value instrument cluster */
+.calendar-module .calendar-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.calendar-module .calendar-detail-item {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 10px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+}
+
+.calendar-module .calendar-detail-item span {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.calendar-module .calendar-detail-item strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* note cards: field-log entries with an edge rule */
+.calendar-module .calendar-note-card {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+  border-left: 2px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.calendar-module .calendar-note-card span {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.calendar-module .calendar-note-card p {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+
+.calendar-module .calendar-note-card-completion {
+  border-left-color: var(--success);
+}
+
+.calendar-module .calendar-note-card-completion strong {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--success);
+}
+
+/* proof photos */
+.calendar-module .calendar-proof-card {
+  margin: 12px 0 0;
+}
+
+.calendar-module .calendar-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.calendar-module .calendar-proof-thumb {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  text-decoration: none;
+  transition: border-color var(--speed) var(--ease-out), box-shadow var(--speed) var(--ease-out);
+}
+
+.calendar-module .calendar-proof-thumb:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+}
+
+.calendar-module .calendar-proof-thumb img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.calendar-module .calendar-proof-thumb span {
+  padding: 4px 7px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-module .calendar-action-stack {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.calendar-module .calendar-action-stack .btn {
+  width: 100%;
+}
+
+/* ── 09 · Upcoming queue — §8 readout rows ───────────────────────── */
+.calendar-module .calendar-upcoming-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-module .calendar-upcoming-item {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 6px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--border-strong) 55%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--speed) var(--ease-out);
+}
+
+.calendar-module .calendar-upcoming-item:first-child {
+  border-top: 0;
+}
+
+.calendar-module .calendar-upcoming-item:hover {
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+}
+
+/* mono status key + dotted leader running toward the status chip */
+.calendar-module .calendar-upcoming-item-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.calendar-module .calendar-upcoming-type {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cal-status, var(--primary-deep));
+  white-space: nowrap;
+}
+
+.calendar-module .calendar-upcoming-type::after {
+  content: "";
+  flex: 1;
+  min-width: 12px;
+  border-bottom: 1px dotted var(--border-strong);
+  transform: translateY(-3px);
+}
+
+.calendar-module .calendar-upcoming-item > strong {
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.calendar-module .calendar-upcoming-item > span {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+
+/* ── 10 · Modal extensions — editor · field report ───────────────── */
+.calendar-module .calendar-modal-card {
+  width: min(720px, 100%);
+}
+
+/* bare caption spans inside .field (global covers only label variants) */
+.calendar-module .field > span {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.calendar-module .calendar-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.calendar-module .calendar-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.calendar-module .calendar-field-span-2 {
+  grid-column: 1 / -1;
+}
+
+.calendar-module textarea.calendar-textarea {
+  height: auto;
+  min-height: 96px;
+  padding: 9px 11px;
+  line-height: 1.5;
+  font-family: var(--font-body);
+  font-size: 13px;
+  resize: vertical;
+}
+
+/* upload shell: dashed intake slot wrapping a hidden file input */
+.calendar-module .calendar-upload-shell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  background: var(--surface-soft);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color var(--speed) var(--ease-out), background var(--speed) var(--ease-out),
+    box-shadow var(--speed) var(--ease-out);
+}
+
+.calendar-module .calendar-upload-shell:hover {
+  border-color: var(--primary);
+}
+
+.calendar-module .calendar-upload-shell:focus-within {
+  border-color: var(--primary-strong);
+  box-shadow: var(--ring);
+}
+
+.calendar-module .calendar-upload-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.calendar-module .calendar-upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--ctrl-h-sm);
+  padding: 0 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.calendar-module .calendar-upload-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.calendar-module .calendar-upload-name.is-selected {
+  color: var(--primary-deep);
+  font-weight: 600;
+}
+
+.calendar-module .calendar-upload-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.calendar-module .calendar-upload-pill {
+  max-width: 100%;
+  padding: 3px 8px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* current photos recap inside the report modal */
+.calendar-module .calendar-proof-card-inline {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+}
+
+.calendar-module .calendar-proof-card-inline .calendar-proof-grid {
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+}
+
+.calendar-module .calendar-proof-card-inline .calendar-proof-thumb {
+  background: var(--surface);
+}
+
+/* ── 11 · Breakpoints ────────────────────────────────────────────── */
+/* 1240 — narrow desktop: slimmer sidebar, shorter day cells */
+@media (max-width: 1240px) {
+  .calendar-module .calendar-ops-layout {
+    grid-template-columns: minmax(0, 1fr) 330px;
+  }
+
+  .calendar-module .fc .fc-daygrid-day-frame {
+    min-height: 104px;
+  }
+}
+
+/* 1100 — stack: single column, segmented toggle takes over routing */
+@media (max-width: 1100px) {
+  .calendar-module .calendar-ops-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .calendar-module .cal-view-toggle {
+    display: grid;
+  }
+
+  .calendar-module .cal-mobile-hide {
+    display: none;
+  }
+}
+
+/* 900 — tablets: stat cards 2-up, shorter cells */
+@media (max-width: 900px) {
+  .calendar-module .calendar-ops-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .calendar-module .fc .fc-daygrid-day-frame {
+    min-height: 92px;
+  }
+}
+
+/* 640 — phones: single-column forms, dense grid, full-width actions */
+@media (max-width: 640px) {
+  .calendar-module .calendar-page-head-actions {
+    width: 100%;
+  }
+
+  .calendar-module .calendar-page-head-actions .btn {
+    flex: 1;
+  }
+
+  .calendar-module .calendar-board-card {
+    padding: 12px;
+  }
+
+  .calendar-module .calendar-sidebar-card {
+    padding: 14px;
+  }
+
+  .calendar-module .calendar-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-module .calendar-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-module .calendar-proof-grid {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  }
+
+  .calendar-module .fc .fc-toolbar.fc-header-toolbar {
+    margin-bottom: 12px;
+  }
+
+  .calendar-module .fc .fc-toolbar-title {
+    font-size: 15px;
+  }
+
+  .calendar-module .fc .fc-daygrid-day-frame {
+    min-height: 64px;
+    padding: 1px 1px 2px;
+  }
+
+  .calendar-module .fc .fc-daygrid-day-number {
+    padding: 3px 4px;
+    font-size: 10px;
+  }
+
+  /* keep cells legible: drop the schedule line, tighten chips */
+  .calendar-module .calendar-event-chip {
+    padding: 3px 5px 4px 6px;
+  }
+
+  .calendar-module .calendar-event-chip-schedule {
+    display: none;
+  }
+
+  .calendar-module .calendar-event-chip > strong {
+    font-size: 9.5px;
+  }
+}
+
+/* 420 — dense phones: stats single file, tighter tabs */
+@media (max-width: 420px) {
+  .calendar-module .calendar-ops-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-module .calendar-ops-stat > strong {
+    font-size: 20px;
+  }
+
+  .calendar-module .calendar-status-tabs button {
+    padding: 8px 10px 10px;
+  }
+}
+
+/* ── 12 · Keyframes · motion guard ───────────────────────────────── */
+@keyframes cal-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calendar-module .fc-popover {
+    animation: none;
+  }
+
+  .calendar-module .calendar-status-tabs button,
+  .calendar-module .calendar-status-tabs button::after,
+  .calendar-module .cal-toggle-btn,
+  .calendar-module .fc .fc-button,
+  .calendar-module .fc .fc-daygrid-day,
+  .calendar-module .calendar-event-chip,
+  .calendar-module .calendar-activity-card,
+  .calendar-module .calendar-upcoming-item,
+  .calendar-module .calendar-proof-thumb,
+  .calendar-module .calendar-upload-shell {
+    transition: none;
+  }
+}

@@ -1,0 +1,1536 @@
+/* HELIOS — Quotes module styles. Consumes tokens from index.css only.
+
+   Scope: every rule lives under .quotes-page (QuotesTab), plus the
+   quote-print-* document/preview family and the body.quote-print-mode
+   print flow, which are quote-namespaced and owned here.
+
+   Shared vocabulary owned by index.css (§6 — extended for density only,
+   never restyled): .page-head*, .page-toolbar, .tabs-underline,
+   .tab-underline (--on variant), .btn* (incl. .btn-outline-danger),
+   .field, .input, .select, .eyebrow, .section-note, .error-text,
+   .mono, .num, .materials-card, .materials-table*, .materials-actions,
+   .table-subtext, .empty-state-cell, .modal-backdrop, .modal-card,
+   .modal-copy, .modal-actions.
+   NOTE: the JSX toggles the class `active` (not `--on`) on
+   .tab-underline and .step-pill — the module maps those states.
+
+   Contents
+   01. Page frame + head readout chip
+   02. Mode tabs (active mapping)
+   03. Workspace layouts — builder rail + review rail
+   04. Section cards — configurator heads with QS·nn counter tags
+   05. Field grids + grouped template dropdown
+   06. Discount editor
+   07. Items editor shell — stepper (amber rail §8), note, nav
+   08. Ledger grids — mobile stack / ≥901px instrument rows
+   09. Cell instruments — item no, link-mini, picker, qty + auto chip
+   10. Create card
+   11. Summary rail — dotted-leader readouts (§8) + bracketed total (§8)
+   12. Recent quotes — toolbar, table shell, row actions
+   13. Quote review card — item plates
+   14. Confirm modal extension
+   15. Print preview overlay (screen)
+   16. Quotation document sheet (screen, tokens both themes)
+   17. Motion — namespaced keyframes + reduced-motion guard
+   18. Breakpoints — 1200 / 600 (901 lives with §08)
+   19. @media print — A4 ink contract (#000/#666 allowed here only)   */
+
+/* ── 01. Page frame + head readout chip ───────────────────────── */
+
+.quotes-page {
+  min-width: 0;
+}
+
+.quotes-page .quotes-head {
+  align-items: center;
+}
+
+/* Quiet mono readout in the head — `LABEL ▸ value` (§8). Not a §6
+   global: page-head-chip is quote-owned vocabulary. */
+.quotes-page .page-head-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  white-space: nowrap;
+}
+
+.quotes-page .page-head-chip-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.quotes-page .page-head-chip-label::after {
+  content: " ▸";
+  color: var(--primary);
+}
+
+.quotes-page .page-head-chip-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ── 02. Mode tabs — map the JSX `active` state to the §6 look ── */
+
+.quotes-page .quotes-tabs .tab-underline.active {
+  color: var(--text);
+}
+
+.quotes-page .quotes-tabs .tab-underline.active::after {
+  background: var(--primary);
+}
+
+/* Recent view: pull the toolbar closer to the tab rail. */
+.quotes-page.quotes-page-recent .tabs-underline {
+  margin-bottom: 14px;
+}
+
+/* ── 03. Workspace layouts ────────────────────────────────────── */
+
+.quotes-page .quotes-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+  gap: 18px;
+  align-items: start;
+  min-width: 0;
+}
+
+.quotes-page .quotes-layout > * {
+  min-width: 0;
+}
+
+/* Review split: saved-quotes ledger + review rail. */
+.quotes-page .quote-review-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 350px);
+}
+
+.quotes-page .quote-form-stack {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+  counter-reset: quote-section;
+}
+
+/* Summary rail keeps the running total in view while configuring. */
+.quotes-page .quotes-layout > .result-card {
+  position: sticky;
+  top: calc(var(--top-h, 58px) + 16px);
+  align-self: start;
+  max-height: calc(100vh - var(--top-h, 58px) - 32px);
+  overflow-y: auto;
+}
+
+/* ── 04. Section cards — precision-configurator heads ─────────── */
+
+.quotes-page .quote-section-card,
+.quotes-page .items-editor {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+}
+
+/* Numbered spec-sections: QS·01, QS·02, … (create card excluded). */
+.quotes-page .quote-form-stack > .quote-section-card:not(.quote-create-card),
+.quotes-page .quote-form-stack > .items-editor {
+  counter-increment: quote-section;
+}
+
+.quotes-page .quote-section-head,
+.quotes-page .items-editor-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 16px;
+  border-bottom: 1px dashed var(--border);
+  min-width: 0;
+}
+
+.quotes-page .quote-section-head > svg,
+.quotes-page .items-editor-head > svg {
+  flex-shrink: 0;
+  color: var(--primary-deep);
+}
+
+.quotes-page .quote-section-head strong,
+.quotes-page .items-editor-head strong {
+  font-family: var(--font-title);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.quotes-page .quote-section-head-sub,
+.quotes-page .items-editor-head > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-soft);
+}
+
+.quotes-page .quote-section-head::after,
+.quotes-page .items-editor-head::after {
+  content: "QS·" counter(quote-section, decimal-leading-zero);
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+
+/* ── 05. Field grids + grouped template dropdown ──────────────── */
+
+.quotes-page .quote-section-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px 14px;
+  padding: 14px 16px 16px;
+}
+
+.quotes-page .quote-section-fields .section-note {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+/* Grouped template dropdown: optgroup headers read as mono section
+   tags; options return to body voice. */
+.quotes-page .template-group-select optgroup {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+
+.quotes-page .template-group-select option {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text);
+}
+
+/* ── 06. Discount editor ──────────────────────────────────────── */
+
+.quotes-page .discount-rows {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px 0;
+  border-top: 1px dashed var(--border);
+}
+
+.quotes-page .discount-row-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 128px var(--ctrl-h);
+  gap: 8px;
+  align-items: center;
+}
+
+.quotes-page .discount-row-item .input[type="number"] {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Row remove — quiet danger ghost, square slot. */
+.quotes-page .discount-row-remove {
+  width: var(--ctrl-h);
+  padding: 0;
+  color: var(--danger);
+}
+
+.quotes-page .discount-row-remove:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 35%, transparent);
+}
+
+.quotes-page .discount-row-remove:focus-visible {
+  outline-color: var(--danger);
+}
+
+/* Add line — dashed ghost affordance. */
+.quotes-page .discount-add-btn {
+  width: max-content;
+  height: var(--ctrl-h-sm);
+  margin: 12px 16px 14px;
+  padding: 0 10px;
+  border: 1px dashed var(--border-strong);
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.quotes-page .discount-add-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-deep);
+}
+
+/* ── 07. Items editor shell ───────────────────────────────────── */
+
+/* Wide ledger scrolls inside its own card, never the page. */
+.quotes-page .items-editor {
+  overflow-x: auto;
+}
+
+.quotes-page .quote-stepper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 12px 16px 0;
+}
+
+/* Package-section pills — squared mono switches. */
+.quotes-page .step-pill {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--speed) var(--ease-out), border-color var(--speed) var(--ease-out),
+    color var(--speed) var(--ease-out), box-shadow var(--speed) var(--ease-out);
+}
+
+.quotes-page .step-pill:hover:not(:disabled):not(.active) {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+/* Selected package section — amber inset rail (§8). */
+.quotes-page .step-pill.active {
+  background: var(--primary-soft);
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  color: var(--primary-deep);
+  box-shadow: inset 2px 0 0 var(--primary);
+}
+
+.quotes-page .step-pill:disabled {
+  opacity: 0.45;
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+/* Active-section note — technical readout voice. */
+.quotes-page .items-editor-note {
+  padding: 12px 16px 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--text-soft);
+}
+
+/* "Add Item" — dashed ghost, direct child of the editor. */
+.quotes-page .items-editor > .btn {
+  height: var(--ctrl-h-sm);
+  margin: 10px 16px 2px;
+  padding: 0 10px;
+  border: 1px dashed var(--border-strong);
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.quotes-page .items-editor > .btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-deep);
+}
+
+.quotes-page .step-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px 16px 14px;
+  border-top: 1px dashed var(--border);
+}
+
+/* ── 08. Ledger grids — items + others ────────────────────────── */
+/* Mobile-first: header hidden, each row becomes a compact plate.
+   ≥901px (kept trigger): instrument rows under a mono header rule. */
+
+.quotes-page .items-grid,
+.quotes-page .others-grid {
+  min-width: 0;
+}
+
+.quotes-page .items-grid-head,
+.quotes-page .others-grid-head {
+  display: none;
+}
+
+.quotes-page .items-grid-row,
+.quotes-page .others-grid-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 10px;
+  align-items: center;
+  margin: 10px 14px 0;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+  transition: background var(--speed) var(--ease-out);
+}
+
+.quotes-page .items-grid-row > div {
+  min-width: 0;
+}
+
+/* Description block spans the stacked plate. */
+.quotes-page .items-grid-row > div:nth-child(3),
+.quotes-page .others-grid-row > .input:first-child {
+  grid-column: 1 / -1;
+}
+
+/* Compact in-grid controls (module density extension). */
+.quotes-page .items-grid-row .input,
+.quotes-page .items-grid-row .select,
+.quotes-page .others-grid-row .input {
+  width: 100%;
+  height: var(--ctrl-h-sm);
+  padding: 0 8px;
+  font-size: 12.5px;
+}
+
+.quotes-page .items-grid-row .input[type="number"],
+.quotes-page .others-grid-row .input[type="number"] {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Derived / locked values read as instrument output. */
+.quotes-page .items-grid-row .input[readonly],
+.quotes-page .others-grid-row .input[readonly] {
+  background: var(--surface-soft);
+  border-style: dashed;
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+/* Computed quote price — the row verdict. */
+.quotes-page .items-grid-row > div:last-child .input {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.quotes-page .others-grid-row .input:last-child {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  font-weight: 700;
+  color: var(--text);
+}
+
+@media (min-width: 901px) {
+  .quotes-page .items-grid,
+  .quotes-page .others-grid {
+    display: grid;
+    column-gap: 10px;
+    align-items: center;
+    padding: 9px 16px;
+  }
+
+  .quotes-page .items-grid {
+    grid-template-columns:
+      44px 52px minmax(190px, 1.7fr) minmax(64px, 92px) minmax(68px, 92px)
+      minmax(104px, 128px) minmax(84px, 106px) minmax(106px, 132px);
+  }
+
+  .quotes-page .others-grid {
+    grid-template-columns:
+      minmax(180px, 1.6fr) minmax(70px, 96px) minmax(72px, 96px)
+      minmax(96px, 120px) minmax(96px, 120px) minmax(112px, 148px);
+  }
+
+  /* Header rule — mono micro-labels between hairlines. */
+  .quotes-page .items-grid-head,
+  .quotes-page .others-grid-head {
+    margin-top: 12px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    background: var(--surface-soft);
+    border-top: 1px solid var(--border-soft);
+    border-bottom: 1px solid var(--border-strong);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+
+  .quotes-page .items-grid-head > div,
+  .quotes-page .others-grid-head > div {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .quotes-page .items-grid-row,
+  .quotes-page .others-grid-row {
+    margin: 0;
+    border: 0;
+    border-bottom: 1px solid var(--border-soft);
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .quotes-page .items-grid-row:hover,
+  .quotes-page .others-grid-row:hover {
+    background: color-mix(in srgb, var(--primary) 5%, transparent);
+  }
+
+  .quotes-page .items-grid-row > div:nth-child(3),
+  .quotes-page .others-grid-row > .input:first-child {
+    grid-column: auto;
+  }
+}
+
+/* ── 09. Cell instruments ─────────────────────────────────────── */
+
+.quotes-page .item-no-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.quotes-page .item-no-col > span {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+/* Manual-row remove — micro mono link. */
+.quotes-page .link-mini {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  width: max-content;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--danger);
+  cursor: pointer;
+}
+
+.quotes-page .link-mini:hover {
+  text-decoration: underline;
+}
+
+/* Catalog picker sits above the free-text description. */
+.quotes-page .material-pick-select {
+  height: 26px;
+  margin-bottom: 5px;
+  padding: 0 24px 0 8px;
+  background-position: right 8px center;
+  font-size: 11.5px;
+  color: var(--text-soft);
+}
+
+.quotes-page .qty-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* Auto-derived qty — accent tag pinned inside the (disabled) input. */
+.quotes-page .auto-chip {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  transform: translateY(-50%);
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.6;
+  pointer-events: none;
+}
+
+.quotes-page .qty-wrap .input:disabled {
+  padding-right: 48px;
+}
+
+/* ── 10. Create card ──────────────────────────────────────────── */
+
+.quotes-page .quote-create-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.quotes-page .quote-create-error {
+  margin: 0;
+}
+
+.quotes-page .quote-create-btn {
+  width: 100%;
+  height: var(--ctrl-h-lg);
+  font-size: 13.5px;
+  letter-spacing: 0.02em;
+}
+
+/* ── 11. Summary rail — readouts + bracketed grand total ──────── */
+
+.quotes-page .result-card {
+  display: grid;
+  gap: 9px;
+  align-content: start;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+}
+
+.quotes-page .module-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.quotes-page .result-card-head {
+  margin: -16px -16px 4px;
+  padding: 13px 16px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.quotes-page .result-card-head > svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--primary-deep);
+}
+
+.quotes-page .module-card-head-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.quotes-page .module-card-head-text strong {
+  font-family: var(--font-title);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.quotes-page .module-card-head-text span {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-soft);
+}
+
+/* Dotted-leader readout rows (§8):
+   LABEL ····························· value */
+.quotes-page .stat-row {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 1px;
+  min-width: 0;
+}
+
+.quotes-page .stat-row > span {
+  order: 1;
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.quotes-page .stat-row::after {
+  content: "";
+  order: 2;
+  flex: 1 1 20px;
+  min-width: 20px;
+  align-self: center;
+  transform: translateY(2px);
+  border-bottom: 1px dotted var(--border-strong);
+}
+
+.quotes-page .stat-row > strong {
+  order: 3;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+
+.quotes-page .stat-row-discount > span,
+.quotes-page .stat-row-discount > strong {
+  color: var(--danger);
+}
+
+/* Grand total — the page hero: amber plate with corner brackets (§8).
+   The dotted leader (base ::after) is re-purposed into the bottom-right
+   bracket; ::before draws the top-left one. */
+.quotes-page .stat-row-total {
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  padding: 12px 14px;
+  background: var(--primary-soft);
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  border-radius: var(--radius-sm);
+}
+
+.quotes-page .stat-row-total::before,
+.quotes-page .stat-row-total::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  flex: none;
+  min-width: 0;
+  transform: none;
+  border: 0;
+  pointer-events: none;
+}
+
+.quotes-page .stat-row-total::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--primary);
+  border-left: 2px solid var(--primary);
+}
+
+.quotes-page .stat-row-total::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--primary);
+  border-right: 2px solid var(--primary);
+}
+
+.quotes-page .stat-row-total > span {
+  color: var(--primary-deep);
+}
+
+.quotes-page .stat-row-total > strong {
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+/* Export / review actions stack the full rail width. */
+.quotes-page .result-card > .btn {
+  width: 100%;
+}
+
+/* Installation margin — instrument field inside the rail. */
+.quotes-page .quote-export-vat-field {
+  padding: 2px 0;
+}
+
+.quotes-page .quote-export-vat-field .input {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ── 12. Recent quotes — toolbar, ledger shell, row actions ───── */
+
+.quotes-page .quotes-toolbar {
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.quotes-page .quotes-toolbar-search {
+  flex: 1 1 280px;
+  max-width: 460px;
+}
+
+.quotes-page .quote-review-shell {
+  align-self: start;
+  min-width: 0;
+}
+
+.quotes-page .quote-review-shell > .error-text {
+  margin: 12px 16px 0;
+}
+
+/* Row action cluster — compact, single line. */
+.quotes-page .quote-list-actions {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.quotes-page .quote-list-actions .btn {
+  height: var(--ctrl-h-sm);
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+/* ── 13. Quote review card — item plates ──────────────────────── */
+
+.quotes-page .quote-review-card h4 {
+  margin: 0 0 2px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--border);
+  font-family: var(--font-title);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.quotes-page .quote-review-items {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+/* "Items (n)" caption — mono eyebrow voice. */
+.quotes-page .items-editor-title {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.quotes-page .items-editor-title::before {
+  content: "▪ ";
+  color: var(--primary);
+}
+
+.quotes-page .quote-review-item {
+  display: grid;
+  gap: 7px;
+  padding: 9px 11px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+  transition: border-color var(--speed) var(--ease-out);
+}
+
+.quotes-page .quote-review-item:hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+.quotes-page .quote-review-item-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.quotes-page .quote-review-item-top strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.quotes-page .quote-review-item-top span {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.quotes-page .quote-review-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.quotes-page .quote-review-item-meta span {
+  padding: 2px 6px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* ── 14. Confirm modal extension ──────────────────────────────── */
+
+.quotes-page .quote-confirm-modal {
+  width: min(430px, 100%);
+}
+
+/* ── 15. Print preview overlay (screen) ───────────────────────── */
+
+.quotes-page .quote-print-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 24px 16px 44px;
+  background: rgba(6, 8, 12, 0.62);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* Sheet desk — stage-toned card carrying the document. */
+.quotes-page .quote-print-preview-shell {
+  width: min(860px, 100%);
+  margin: 0 auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+}
+
+.quotes-page .quote-print-preview-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding: 13px 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-soft);
+  border-radius: 8px 8px 0 0;
+}
+
+.quotes-page .quote-print-preview-head h3 {
+  font-family: var(--font-title);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.quotes-page .quote-print-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quotes-page .quote-print-loading {
+  padding: 56px 20px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.quotes-page .quote-print-loading::before {
+  content: "●";
+  margin-right: 8px;
+  color: var(--primary);
+}
+
+/* ── 16. Quotation document sheet (screen) ────────────────────── */
+/* Themed via tokens on screen (porcelain / obsidian paper); §19
+   forces the true ink-on-A4 rendering for both themes. */
+
+.quotes-page .quote-print-document {
+  width: min(780px, calc(100% - 32px));
+  margin: 24px auto 32px;
+  padding: 34px 36px 40px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* Letterhead — logo · company block · setup callout. */
+.quotes-page .quote-print-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 16px 20px;
+  align-items: start;
+  padding-bottom: 14px;
+  border-bottom: 2px solid var(--text);
+}
+
+.quotes-page .quote-print-logo {
+  width: 84px;
+  height: auto;
+  object-fit: contain;
+}
+
+.quotes-page .quote-print-company h2 {
+  font-family: var(--font-title);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.quotes-page .quote-print-company p {
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.quotes-page .quote-print-contact {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.quotes-page .quote-print-contact strong {
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Suggested set-up — the document's energy callout. */
+.quotes-page .quote-print-setup {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 150px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+.quotes-page .quote-print-setup strong {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.quotes-page .quote-print-setup span {
+  font-family: var(--font-title);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--primary-deep);
+}
+
+/* Document tables — hairline-gridded business tables. */
+.quotes-page .quote-print-table {
+  width: 100%;
+  margin-top: 14px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.quotes-page .quote-print-table th,
+.quotes-page .quote-print-table td {
+  border: 1px solid var(--border-strong);
+  padding: 6px 9px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.quotes-page .quote-print-table th {
+  background: var(--surface-soft);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--text-soft);
+}
+
+.quotes-page .quote-print-table td strong {
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Meta table — label cells hold their line. */
+.quotes-page .quote-print-info-table td {
+  font-size: 12px;
+}
+
+.quotes-page .quote-print-info-table td strong {
+  white-space: nowrap;
+}
+
+/* Items ledger — line items center on the row axis. */
+.quotes-page .quote-print-items-table td {
+  vertical-align: middle;
+  line-height: 1.45;
+}
+
+/* Items table column plan. */
+.quotes-page .quote-print-col-no {
+  width: 44px;
+}
+
+.quotes-page .quote-print-col-item {
+  width: auto;
+}
+
+.quotes-page .quote-print-col-qty {
+  width: 84px;
+}
+
+.quotes-page .quote-print-col-money {
+  width: 108px;
+}
+
+.quotes-page .quote-print-center {
+  text-align: center;
+}
+
+.quotes-page .quote-print-money {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Totals band — ink rule above the first total line. */
+.quotes-page .quote-print-total-row td {
+  background: var(--surface-soft);
+  border-top: 2px solid var(--text);
+  font-weight: 700;
+}
+
+.quotes-page .quote-print-total-row + .quote-print-total-row td {
+  border-top: 1px solid var(--border-strong);
+}
+
+.quotes-page .quote-print-discount-row td {
+  color: var(--danger);
+}
+
+/* Spec sheet — label column reads as the form side. */
+.quotes-page .quote-print-spec-table td:first-child {
+  width: 34%;
+  background: var(--surface-soft);
+}
+
+.quotes-page .quote-print-note-row td {
+  background: var(--warn-soft);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+  color: var(--warn);
+}
+
+.quotes-page .quote-print-footer-table td {
+  font-size: 12px;
+}
+
+/* Spacer row — open sides between footer bands. */
+.quotes-page .quote-print-gap td {
+  border: 0;
+  height: 12px;
+  padding: 0;
+  background: transparent;
+}
+
+/* ── 17. Motion — namespaced, guarded ─────────────────────────── */
+
+@media (prefers-reduced-motion: no-preference) {
+  .quotes-page .items-editor,
+  .quotes-page .discount-row-item {
+    animation: quotes-rise var(--speed-slow) var(--ease-out) both;
+  }
+
+  .quotes-page .quote-print-preview-backdrop {
+    animation: quotes-fade 160ms var(--ease-out) both;
+  }
+
+  .quotes-page .quote-print-preview-shell {
+    animation: quotes-sheet-in var(--speed-slow) var(--ease-out) both;
+  }
+
+  .quotes-page .quote-print-loading::before {
+    animation: quotes-pulse 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes quotes-rise {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes quotes-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes quotes-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes quotes-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quotes-page .items-editor,
+  .quotes-page .discount-row-item,
+  .quotes-page .quote-print-preview-backdrop,
+  .quotes-page .quote-print-preview-shell,
+  .quotes-page .quote-print-loading::before {
+    animation: none;
+  }
+
+  .quotes-page .step-pill,
+  .quotes-page .quote-review-item,
+  .quotes-page .items-grid-row,
+  .quotes-page .others-grid-row {
+    transition: none;
+  }
+}
+
+/* ── 18. Breakpoints (kept triggers: 1200 / 600; 901 in §08) ──── */
+
+@media (max-width: 1200px) {
+  .quotes-page .quotes-layout,
+  .quotes-page .quote-review-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Rail unpins when it stacks under the builder. */
+  .quotes-page .quotes-layout > .result-card {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+  }
+}
+
+@media (max-width: 600px) {
+  .quotes-page .page-head-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .quotes-page .quotes-toolbar-search {
+    max-width: none;
+  }
+
+  .quotes-page .quote-section-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .quotes-page .discount-row-item {
+    grid-template-columns: minmax(0, 1fr) 106px var(--ctrl-h);
+  }
+
+  .quotes-page .quote-print-preview-backdrop {
+    padding: 12px 8px 28px;
+  }
+
+  .quotes-page .quote-print-document {
+    width: calc(100% - 16px);
+    margin: 14px auto 20px;
+    padding: 20px 16px 26px;
+  }
+
+  .quotes-page .quote-print-header {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .quotes-page .quote-print-setup {
+    width: 100%;
+  }
+}
+
+/* ── 19. @media print — A4 ink contract ───────────────────────── */
+/* index.css already removes the app chrome (.hx-side/.hx-top/…).
+   This block owns the quote sheet: a clean black-on-white A4
+   business document from either theme. The only non-token colors
+   allowed in this file (#000/#666/#fff) live here. */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  /* Release scroll locks so the sheet paginates fully. */
+  body.quote-print-mode,
+  body.body-scroll-locked {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  .quotes-page tr {
+    break-inside: avoid;
+  }
+
+  /* — Fallback: printing the workspace without the preview open —
+     strip interactive chrome, flatten cards to hairline records. */
+  .quotes-page .page-head-actions,
+  .quotes-page .quotes-tabs,
+  .quotes-page .quotes-toolbar,
+  .quotes-page .quote-stepper,
+  .quotes-page .step-nav,
+  .quotes-page .discount-add-btn,
+  .quotes-page .discount-row-remove,
+  .quotes-page .link-mini,
+  .quotes-page .quote-create-card,
+  .quotes-page .quote-list-actions,
+  .quotes-page .quote-print-actions,
+  .quotes-page .result-card > .btn,
+  .quotes-page .items-editor > .btn,
+  .quotes-page .modal-backdrop {
+    display: none !important;
+  }
+
+  .quotes-page,
+  .quotes-page .stat-row > span,
+  .quotes-page .stat-row > strong,
+  .quotes-page .items-editor-note {
+    color: #000 !important;
+  }
+
+  .quotes-page .quote-section-card,
+  .quotes-page .items-editor,
+  .quotes-page .result-card,
+  .quotes-page .quote-review-item,
+  .quotes-page .items-grid-row,
+  .quotes-page .others-grid-row,
+  .quotes-page .stat-row-total {
+    background: #fff !important;
+    border-color: #666 !important;
+    box-shadow: none !important;
+  }
+
+  .quotes-page .stat-row-total::before,
+  .quotes-page .stat-row-total::after {
+    border-color: #000 !important;
+  }
+
+  .quotes-page .stat-row::after {
+    border-bottom-color: #666 !important;
+  }
+
+  .quotes-page .quotes-layout > .result-card {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .quotes-page .materials-table th,
+  .quotes-page .materials-table td {
+    background: #fff !important;
+    border-color: #666 !important;
+    color: #000 !important;
+  }
+
+  /* — Quote document flow — triggered by the Print button
+     (body.quote-print-mode) or any print while the preview is open
+     (:has fallback, kept as separate rules so unsupporting engines
+     only lose the redundant path). Everything but the sheet hides. */
+  body.quote-print-mode .quotes-page > :not(.quote-print-preview-backdrop) {
+    display: none !important;
+  }
+
+  .quotes-page:has(.quote-print-preview-backdrop) > :not(.quote-print-preview-backdrop) {
+    display: none !important;
+  }
+
+  /* Overlay flattens into the page flow. */
+  .quotes-page .quote-print-preview-backdrop {
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: #fff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    animation: none !important;
+  }
+
+  .quotes-page .quote-print-preview-shell {
+    width: 100% !important;
+    margin: 0 !important;
+    background: #fff !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    animation: none !important;
+  }
+
+  .quotes-page .quote-print-preview-head,
+  .quotes-page .quote-print-loading {
+    display: none !important;
+  }
+
+  /* The sheet becomes the page. */
+  .quotes-page .quote-print-document {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    font-size: 11.5px;
+  }
+
+  /* Force ink — every token color flattens to black-on-white. */
+  .quotes-page .quote-print-document,
+  .quotes-page .quote-print-document * {
+    color: #000 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  .quotes-page .quote-print-header {
+    border-bottom-color: #000 !important;
+  }
+
+  .quotes-page .quote-print-company h2 {
+    font-size: 16px;
+  }
+
+  .quotes-page .quote-print-setup {
+    border-color: #000 !important;
+  }
+
+  .quotes-page .quote-print-setup span {
+    font-size: 16px;
+  }
+
+  .quotes-page .quote-print-table {
+    margin-top: 10px;
+    font-size: 11px;
+    break-inside: auto;
+  }
+
+  .quotes-page .quote-print-table thead {
+    display: table-header-group;
+  }
+
+  .quotes-page .quote-print-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .quotes-page .quote-print-table th,
+  .quotes-page .quote-print-table td {
+    border: 1px solid #666 !important;
+    padding: 5px 8px;
+  }
+
+  .quotes-page .quote-print-total-row td {
+    border-top: 2px solid #000 !important;
+  }
+
+  .quotes-page .quote-print-total-row + .quote-print-total-row td {
+    border-top: 1px solid #666 !important;
+  }
+
+  .quotes-page .quote-print-gap td {
+    border: 0 !important;
+    height: 10px;
+  }
+}

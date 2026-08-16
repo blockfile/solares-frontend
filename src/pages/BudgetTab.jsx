@@ -1,5 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import api from "../api/client";
+import "../styles/budget.css";
 
 function localDateInput(value = new Date()) {
   const date = new Date(value);
@@ -210,7 +211,7 @@ const PROJECT_CATEGORY_OPTIONS = [
   { value: "others", label: "Others" }
 ];
 const STATUS_LABELS = { active: "Active", completed: "Completed", cancelled: "Cancelled" };
-const STATUS_COLORS = { active: "sl-pill--active", completed: "sl-pill--done", cancelled: "sl-pill--cancelled" };
+const STATUS_COLORS = { active: "chip-success", completed: "chip-success", cancelled: "chip-danger" };
 const BOOKKEEPING_SECTIONS = [
   { key: "sales", label: "General Journal" },
   { key: "accounts_receivable", label: "Receipt Journal" },
@@ -591,9 +592,9 @@ function ProjectDetailsSummary({ project }) {
             {materials.map((row, index) => (
               <div className="bgt-detail-row" key={`mat-${index}`}>
                 <span>{row.item || "-"}</span>
-                <span>{formatQuantity(row.qty)}</span>
-                <span>₱{formatMoney(row.unitCost)}</span>
-                <span>₱{formatMoney(materialDetailTotal(row))}</span>
+                <span className="mono">{formatQuantity(row.qty)}</span>
+                <span className="mono">₱{formatMoney(row.unitCost)}</span>
+                <span className="mono">₱{formatMoney(materialDetailTotal(row))}</span>
               </div>
             ))}
           </div>
@@ -673,15 +674,15 @@ function FinancialReportsPanel({ page, summary, transactions, projects, accounts
       <div className="bgt-table-wrap">
         <table className="bgt-table">
           <thead>
-            <tr><th>{isCashFlow ? "Cash Flow Category" : "Financial Report Line"}</th><th className="bgt-col-amt">Inflow</th><th className="bgt-col-amt">Outflow</th><th className="bgt-col-amt">Net</th><th>Entries</th></tr>
+            <tr><th>{isCashFlow ? "Cash Flow Category" : "Financial Report Line"}</th><th className="bgt-col-amt num">Inflow</th><th className="bgt-col-amt num">Outflow</th><th className="bgt-col-amt num">Net</th><th>Entries</th></tr>
           </thead>
           <tbody>
             {accountRows.map((row) => (
               <tr key={row.id} className="bgt-table-row">
                 <td><span className="bgt-account-chip">{row.name}</span> <span className="bgt-muted">{accountTypeLabel(row.type)}</span></td>
-                <td className="bgt-col-amt bgt-amount--in">₱{formatMoney(row.inflow)}</td>
-                <td className="bgt-col-amt bgt-amount--out">₱{formatMoney(row.outflow)}</td>
-                <td className={`bgt-col-amt ${row.net >= 0 ? "bgt-amount--in" : "bgt-amount--out"}`}>₱{formatMoney(row.net)}</td>
+                <td className="bgt-col-amt num bgt-amount--in">₱{formatMoney(row.inflow)}</td>
+                <td className="bgt-col-amt num bgt-amount--out">₱{formatMoney(row.outflow)}</td>
+                <td className={`bgt-col-amt num ${row.net >= 0 ? "bgt-amount--in" : "bgt-amount--out"}`}>₱{formatMoney(row.net)}</td>
                 <td>{row.transaction_count || 0}</td>
               </tr>
             ))}
@@ -692,18 +693,18 @@ function FinancialReportsPanel({ page, summary, transactions, projects, accounts
       {isCashFlow && (
         <div className="bgt-table-wrap">
           <table className="bgt-table bgt-table--compact">
-            <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Type</th><th className="bgt-col-amt">Amount</th></tr></thead>
+            <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Type</th><th className="bgt-col-amt num">Amount</th></tr></thead>
             <tbody>
               {recentCashRows.map((tx) => {
                 const txAccountType = accountTypeFromTransactionRecord(tx);
                 const txDirection = transactionDirectionFromAccountType(txAccountType);
                 return (
                   <tr key={tx.id}>
-                    <td className="bgt-cell-date">{formatDate(tx.transaction_date)}</td>
+                    <td className="bgt-cell-date mono">{formatDate(tx.transaction_date)}</td>
                     <td><span className="bgt-account-chip">{tx.account_name || "-"}</span></td>
                     <td>{tx.description || <span className="bgt-muted">-</span>}</td>
                     <td>{transactionTypeShortLabel(txAccountType)}</td>
-                    <td className={`bgt-col-amt bgt-amount--${txDirection}`}>₱{formatMoney(tx.amount)}</td>
+                    <td className={`bgt-col-amt num bgt-amount--${txDirection}`}>₱{formatMoney(tx.amount)}</td>
                   </tr>
                 );
               })}
@@ -750,7 +751,7 @@ function AccountingReportsPanel({ page, accounts, bookkeepingRows }) {
       <div className="bgt-table-wrap">
         <table className="bgt-table">
           <thead>
-            <tr><th>{isStatements ? "Financial Statement Line" : "Account"}</th><th>Type</th><th className="bgt-col-amt">Debit</th><th className="bgt-col-amt">Credit</th><th>Entries</th></tr>
+            <tr><th>{isStatements ? "Financial Statement Line" : "Account"}</th><th>Type</th><th className="bgt-col-amt num">Debit</th><th className="bgt-col-amt num">Credit</th><th>Entries</th></tr>
           </thead>
           <tbody>
             {accounts.map((account) => {
@@ -759,8 +760,8 @@ function AccountingReportsPanel({ page, accounts, bookkeepingRows }) {
                 <tr key={account.id} className="bgt-table-row">
                   <td><strong>{account.name}</strong></td>
                   <td><span className={`bgt-pill bgt-pill--${account.type}`}>{accountTypeLabel(account.type)}</span></td>
-                  <td className="bgt-col-amt">{balance >= 0 ? formatPhpCurrency(balance) : "-"}</td>
-                  <td className="bgt-col-amt">{balance < 0 ? formatPhpCurrency(Math.abs(balance)) : "-"}</td>
+                  <td className="bgt-col-amt num">{balance >= 0 ? formatPhpCurrency(balance) : "-"}</td>
+                  <td className="bgt-col-amt num">{balance < 0 ? formatPhpCurrency(Math.abs(balance)) : "-"}</td>
                   <td>{account.transaction_count || 0}</td>
                 </tr>
               );
@@ -866,9 +867,9 @@ function CategoryList({ accounts, onCreate, onEdit, onDelete, showEmptyAction = 
             <th>Category</th>
             <th>Type</th>
             <th>Status</th>
-            <th className="bgt-col-amt">In</th>
-            <th className="bgt-col-amt">Out</th>
-            <th className="bgt-col-amt">Balance</th>
+            <th className="bgt-col-amt num">In</th>
+            <th className="bgt-col-amt num">Out</th>
+            <th className="bgt-col-amt num">Balance</th>
             <th>Entries</th>
             <th className="bgt-col-actions" />
           </tr>
@@ -889,10 +890,10 @@ function CategoryList({ accounts, onCreate, onEdit, onDelete, showEmptyAction = 
                   </div>
                 </td>
                 <td><span className={`bgt-pill bgt-pill--${acc.type}`}>{accountTypeLabel(acc.type)}</span></td>
-                <td>{inactive ? <span className="bgt-pill bgt-pill--inactive">Inactive</span> : <span className="sl-pill sl-pill--active">Active</span>}</td>
-                <td className="bgt-col-amt bgt-amount--in">+{formatPhpCurrency(acc.total_in)}</td>
-                <td className="bgt-col-amt bgt-amount--out">-{formatPhpCurrency(acc.total_out)}</td>
-                <td className={`bgt-col-amt ${bal >= 0 ? "bgt-amount--in" : "bgt-amount--out"}`}>{formatPhpCurrency(acc.balance)}</td>
+                <td>{inactive ? <span className="chip chip-danger">Inactive</span> : <span className="chip chip-success">Active</span>}</td>
+                <td className="bgt-col-amt num bgt-amount--in">+{formatPhpCurrency(acc.total_in)}</td>
+                <td className="bgt-col-amt num bgt-amount--out">-{formatPhpCurrency(acc.total_out)}</td>
+                <td className={`bgt-col-amt num ${bal >= 0 ? "bgt-amount--in" : "bgt-amount--out"}`}>{formatPhpCurrency(acc.balance)}</td>
                 <td>{acc.transaction_count || 0}</td>
                 <td className="bgt-col-actions">
                   <button className="bgt-row-btn" type="button" onClick={() => onEdit(acc)}>Edit</button>
@@ -939,7 +940,7 @@ function summarizePrCodeGeneralJournal(option, generalJournalRows = []) {
 function PrCodeCatalog({ generalJournalRows = [] }) {
   return (
     <div className="bgt-pr-code-shell">
-      <div className="bgt-section-head">
+      <div className="bgt-section-head sheet-banner">
         <div>
           <p className="bgt-section-eyebrow">Accounting</p>
           <h3 className="bgt-section-title">Chart of Accounts</h3>
@@ -948,7 +949,7 @@ function PrCodeCatalog({ generalJournalRows = [] }) {
       <div className="bgt-table-wrap">
         <table className="bgt-table bgt-table--compact bgt-table--pr-codes">
           <thead>
-            <tr><th>PR Code</th><th>Account Name</th><th>Class</th><th className="bgt-col-amt">In</th><th className="bgt-col-amt">Out</th><th className="bgt-col-amt">Balance</th><th>Entries</th></tr>
+            <tr><th>PR Code</th><th>Account Name</th><th>Class</th><th className="bgt-col-amt num">In</th><th className="bgt-col-amt num">Out</th><th className="bgt-col-amt num">Balance</th><th>Entries</th></tr>
           </thead>
           <tbody>
             {BOOKKEEPING_PR_CODE_OPTIONS.map((option) => {
@@ -960,9 +961,9 @@ function PrCodeCatalog({ generalJournalRows = [] }) {
                   <td className="bgt-cell-ref"><code className="bgt-ref-code">{option.value}</code></td>
                   <td><strong>{nameFromLabel || option.label}</strong></td>
                   <td><span className="bgt-account-chip">{classLabel}</span></td>
-                  <td className="bgt-col-amt bgt-amount--in">+{formatPhpCurrency(totals.totalIn)}</td>
-                  <td className="bgt-col-amt bgt-amount--out">-{formatPhpCurrency(totals.totalOut)}</td>
-                  <td className={`bgt-col-amt ${totals.balance >= 0 ? "bgt-amount--in" : "bgt-amount--out"}`}>{formatPhpCurrency(totals.balance)}</td>
+                  <td className="bgt-col-amt num bgt-amount--in">+{formatPhpCurrency(totals.totalIn)}</td>
+                  <td className="bgt-col-amt num bgt-amount--out">-{formatPhpCurrency(totals.totalOut)}</td>
+                  <td className={`bgt-col-amt num ${totals.balance >= 0 ? "bgt-amount--in" : "bgt-amount--out"}`}>{formatPhpCurrency(totals.balance)}</td>
                   <td>{totals.entries}</td>
                 </tr>
               );
@@ -2198,6 +2199,90 @@ export default function BudgetTab({ moduleMode = "combined" }) {
   return (
     <div className="bgt">
 
+      {/* ── Page head (Atlas frame) ────────────────────────────────────────── */}
+      <div className="page-head bgt-page-head">
+        <div className="bgt-page-head-main">
+          <span className="page-head-icon bgt-page-head-icon" aria-hidden="true">
+            {isAccountingMode ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" /><path d="M9 7h7M9 11h5" /></svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 12h.01M18 12h.01" /></svg>
+            )}
+          </span>
+          <div className="bgt-page-head-text">
+            <h2 className="bgt-page-title">
+              {isAccountingMode ? "Accounting" : isFinanceMode ? "Financial Management" : "Budget"}
+            </h2>
+            <p className="bgt-page-desc">
+              {isAccountingMode
+                ? "Chart of accounts, journals, ledgers, and financial statements."
+                : isFinanceMode
+                ? "Collections, expenses, project costing, and financial reports."
+                : "Transactions, categories, and bookkeeping."}
+            </p>
+          </div>
+        </div>
+        <div className="bgt-page-head-actions">
+          {view === "transactions" && scopeMode !== "project" && (
+            <>
+              <button className="btn btn-ghost" onClick={() => openNewPayment()} disabled={!defaultIncomeAccountId}>
+                <IconArrowDown /> Record Payment
+              </button>
+              <button className="btn btn-primary" onClick={() => openNewTx()}>
+                <IconPlus /> Record Transaction
+              </button>
+            </>
+          )}
+          {view === "accounts" && (
+            <button className="btn btn-primary" onClick={openNewAcc}>
+              <IconPlus /> New Category
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Sub-navigation (underline tabs) ───────────────────────────────── */}
+      <nav className="tabs-underline bgt-subnav" aria-label="Budget pages">
+        {isFinanceMode && FINANCIAL_PAGE_OPTIONS.map((page) => (
+          <button
+            key={page.key}
+            className={`tab-underline${financialPage === page.key ? " is-active" : ""}`}
+            aria-current={financialPage === page.key ? "page" : undefined}
+            onClick={() => selectFinancialPage(page.key)}
+            type="button"
+          >
+            {page.label}
+          </button>
+        ))}
+        {isAccountingMode && ACCOUNTING_PAGE_OPTIONS.map((page) => (
+          <button
+            key={page.key}
+            className={`tab-underline${accountingPage === page.key ? " is-active" : ""}`}
+            aria-current={accountingPage === page.key ? "page" : undefined}
+            onClick={() => selectAccountingPage(page.key)}
+            type="button"
+          >
+            {page.label}
+          </button>
+        ))}
+        {!isFinanceMode && !isAccountingMode && (
+          <>
+            <button type="button" className={`tab-underline${view === "transactions" ? " is-active" : ""}`} aria-current={view === "transactions" ? "page" : undefined} onClick={() => setView("transactions")}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12h6M9 16h4" /></svg>
+              Transactions
+            </button>
+            <button type="button" className={`tab-underline${view === "accounts" ? " is-active" : ""}`} aria-current={view === "accounts" ? "page" : undefined} onClick={() => setView("accounts")}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /><path d="M7 15h2M12 15h2" /></svg>
+              Category
+            </button>
+            <button type="button" className={`tab-underline${view === "bookkeeping" ? " is-active" : ""}`} aria-current={view === "bookkeeping" ? "page" : undefined} onClick={() => setView("bookkeeping")}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3.5h12a1.5 1.5 0 0 1 1.5 1.5v15.5l-2.2-1.2-2.2 1.2-2.2-1.2-2.2 1.2-2.2-1.2-2.2 1.2V5A1.5 1.5 0 0 1 6 3.5Z" /><path d="M8.5 8h7" /><path d="M8.5 11.5h7" /><path d="M8.5 15h4.5" /></svg>
+              Bookkeeping
+            </button>
+          </>
+        )}
+      </nav>
+
       {/* ── KPI Strip ──────────────────────────────────────────────────────── */}
       {projectScoped ? (
         <div className="bgt-kpi-row">
@@ -2214,7 +2299,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
               <span className="bgt-kpi-label">Collected Payments</span>
               <strong className="bgt-kpi-value">₱{formatMoney(summary.collectedIncome ?? summary.totalIn)}</strong>
             </div>
-            <div className="bgt-kpi-sub" style={{ color: toNumber(summary.balanceDue, 0) > 0 ? "#b86d12" : "#147845" }}>
+            <div className={`bgt-kpi-sub ${toNumber(summary.balanceDue, 0) > 0 ? "bgt-kpi-sub--due" : "bgt-kpi-sub--ok"}`}>
               Balance due ₱{formatMoney(summary.balanceDue)}
             </div>
           </div>
@@ -2247,7 +2332,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
               <span className="bgt-kpi-sub">total contract value</span>
             </div>
           </div>
-          <div className="bgt-kpi bgt-kpi--in" style={{ opacity: 0.85 }}>
+          <div className="bgt-kpi bgt-kpi--in bgt-kpi--alt">
             <div className="bgt-kpi-icon"><IconArrowDown /></div>
             <div className="bgt-kpi-body">
               <span className="bgt-kpi-label">Total Collected</span>
@@ -2289,37 +2374,8 @@ export default function BudgetTab({ moduleMode = "combined" }) {
         </div>
       )}
 
-      {/* ── Toolbar ────────────────────────────────────────────────────────── */}
-      <div className="bgt-toolbar">
-        <div className="bgt-seg">
-          {isFinanceMode && FINANCIAL_PAGE_OPTIONS.map((page) => (
-            <button key={page.key} className={`bgt-seg-btn${financialPage === page.key ? " bgt-seg-btn--on" : ""}`} onClick={() => selectFinancialPage(page.key)} type="button">
-              {page.label}
-            </button>
-          ))}
-          {isAccountingMode && ACCOUNTING_PAGE_OPTIONS.map((page) => (
-            <button key={page.key} className={`bgt-seg-btn${accountingPage === page.key ? " bgt-seg-btn--on" : ""}`} onClick={() => selectAccountingPage(page.key)} type="button">
-              {page.label}
-            </button>
-          ))}
-          {!isFinanceMode && !isAccountingMode && (
-            <>
-              <button className={`bgt-seg-btn${view === "transactions" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("transactions")}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12h6M9 16h4" /></svg>
-                Transactions
-              </button>
-              <button className={`bgt-seg-btn${view === "accounts" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("accounts")}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /><path d="M7 15h2M12 15h2" /></svg>
-                Category
-              </button>
-              <button className={`bgt-seg-btn${view === "bookkeeping" ? " bgt-seg-btn--on" : ""}`} onClick={() => setView("bookkeeping")}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3.5h12a1.5 1.5 0 0 1 1.5 1.5v15.5l-2.2-1.2-2.2 1.2-2.2-1.2-2.2 1.2-2.2-1.2-2.2 1.2V5A1.5 1.5 0 0 1 6 3.5Z" /><path d="M8.5 8h7" /><path d="M8.5 11.5h7" /><path d="M8.5 15h4.5" /></svg>
-                Bookkeeping
-              </button>
-            </>
-          )}
-        </div>
-
+      {/* ── Toolbar (secondary actions) ───────────────────────────────────── */}
+      <div className="page-toolbar bgt-toolbar">
         <div className="bgt-toolbar-actions">
           {view === "transactions" && (
             scopeMode === "project" ? (
@@ -2338,19 +2394,8 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                 <button className="btn btn-ghost bgt-btn-import" onClick={exportRawLogsExcel} disabled={exportingRawLogs}>
                   <IconDownload /> {exportingRawLogs ? "Exporting..." : "Export Raw Logs"}
                 </button>
-                <button className="btn btn-ghost" onClick={() => openNewPayment()} disabled={!defaultIncomeAccountId}>
-                  <IconArrowDown /> Record Payment
-                </button>
-                <button className="btn btn-primary" onClick={() => openNewTx()}>
-                  <IconPlus /> Record Transaction
-                </button>
               </>
             )
-          )}
-          {view === "accounts" && (
-            <button className="btn btn-primary" onClick={openNewAcc}>
-              <IconPlus /> New Category
-            </button>
           )}
           {view === "bookkeeping" && !accountingPageHasNoContent && (
             <button className="btn btn-ghost bgt-btn-import" onClick={() => loadBookkeeping()} disabled={bookkeepingLoading}>
@@ -2443,8 +2488,8 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                       <th>Project</th>
                       <th>System Package</th>
                       <th>Location</th>
-                      <th className="bgt-col-amt">Total Cost</th>
-                      <th className="bgt-col-amt">Selling Price</th>
+                      <th className="bgt-col-amt num">Total Cost</th>
+                      <th className="bgt-col-amt num">Selling Price</th>
                       <th>Status</th>
                       <th className="bgt-col-actions" />
                     </tr>
@@ -2452,17 +2497,17 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                   <tbody>
                     {projectCostingRows.map((project) => (
                       <tr key={project.id} className="bgt-table-row">
-                        <td className="bgt-cell-date">{formatDate(project.start_date)}</td>
-                        <td className="bgt-cell-date">{formatDate(project.end_date)}</td>
+                        <td className="bgt-cell-date mono">{formatDate(project.start_date)}</td>
+                        <td className="bgt-cell-date mono">{formatDate(project.end_date)}</td>
                         <td><span className="bgt-account-chip">{project.customer_name || "-"}</span></td>
                         <td>
                           <strong>{project.project_name}</strong>
                         </td>
                         <td>{project.system_package || <span className="bgt-muted">—</span>}</td>
                         <td>{project.location || <span className="bgt-muted">—</span>}</td>
-                        <td className="bgt-col-amt" style={{ color: "#b83a3a", fontWeight: 700 }}>₱{formatMoney(projectDetailsTotalCost(project))}</td>
-                        <td className="bgt-col-amt" style={{ color: "#147845", fontWeight: 700 }}>₱{formatMoney(project.sale_amount)}</td>
-                        <td><span className={`sl-pill ${STATUS_COLORS[project.status] || ""}`}>{STATUS_LABELS[project.status] || project.status || "Active"}</span></td>
+                        <td className="bgt-col-amt num bgt-amount--out">₱{formatMoney(projectDetailsTotalCost(project))}</td>
+                        <td className="bgt-col-amt num bgt-amount--in">₱{formatMoney(project.sale_amount)}</td>
+                        <td><span className={`chip ${STATUS_COLORS[project.status] || "chip-neutral"}`}>{STATUS_LABELS[project.status] || project.status || "Active"}</span></td>
                         <td className="bgt-col-actions">
                           <button className="bgt-row-btn" onClick={() => setViewingProjDetails(project)} title="View Details">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M1.5 12s4-7 10.5-7 10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z" /><circle cx="12" cy="12" r="3" /></svg>
@@ -2519,7 +2564,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                     <th>Description</th>
                     <th>Reference</th>
                     <th>Transaction Type</th>
-                    <th className="bgt-col-amt">Total Amount</th>
+                    <th className="bgt-col-amt num">Total Amount</th>
                     <th className="bgt-col-actions" />
                   </tr>
                 </thead>
@@ -2541,7 +2586,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                           aria-label={`Select transaction record ${tx.id}`}
                         />
                       </td>
-                      <td className="bgt-cell-date">{formatDate(tx.transaction_date)}</td>
+                      <td className="bgt-cell-date mono">{formatDate(tx.transaction_date)}</td>
                       <td className="bgt-cell-account">
                         <span className="bgt-account-chip">{tx.account_name || "—"}</span>
                         {projectLabel && (
@@ -2562,7 +2607,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                           {transactionTypeShortLabel(txAccountType)}
                         </span>
                       </td>
-                      <td className={`bgt-col-amt bgt-amount--${txDirection}`}>
+                      <td className={`bgt-col-amt num bgt-amount--${txDirection}`}>
                         <span>₱{formatMoney(tx.amount)}</span>
                       </td>
                       <td className="bgt-col-actions">
@@ -2642,7 +2687,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
 
       {view === "finance_settings" && (
         <div className="bgt-settings-section">
-          <div className="bgt-section-head">
+          <div className="bgt-section-head sheet-banner">
             <div>
               <p className="bgt-section-eyebrow">Financial Management</p>
               <h3 className="bgt-section-title">Category</h3>
@@ -2687,7 +2732,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                     </div>
                     <div className="bgt-acc-badges">
                       <span className={`bgt-pill bgt-pill--${acc.type}`}>{accountTypeLabel(acc.type)}</span>
-                      {inactive && <span className="bgt-pill bgt-pill--inactive">Inactive</span>}
+                      {inactive && <span className="chip chip-danger">Inactive</span>}
                     </div>
                   </div>
 
@@ -2758,11 +2803,12 @@ export default function BudgetTab({ moduleMode = "combined" }) {
         return (
           <div className="bgt-bookkeeping-shell">
             {showBookkeepingTabs && (
-              <div className="bgt-seg bgt-bookkeeping-tabs">
+              <nav className="tabs-underline bgt-bookkeeping-tabs" aria-label="Bookkeeping journals">
                 {BOOKKEEPING_SECTIONS.map((section) => (
                   <button
                     key={section.key}
-                    className={`bgt-seg-btn${bookkeepingView === section.key ? " bgt-seg-btn--on" : ""}`}
+                    className={`tab-underline${bookkeepingView === section.key ? " is-active" : ""}`}
+                    aria-current={bookkeepingView === section.key ? "page" : undefined}
                     onClick={() => {
                       setBookkeepingView(section.key);
                       setBookkeepingFormOpen(false);
@@ -2773,7 +2819,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                     {section.label}
                   </button>
                 ))}
-              </div>
+              </nav>
             )}
 
             <div className="bgt-bookkeeping-actions">
@@ -2868,13 +2914,13 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                 <table className="bgt-table bgt-table--bookkeeping">
                   <thead>
                     {isLedgerSection && (
-                      <tr><th>Date</th><th>PR Code</th><th>Description</th><th>Note</th><th className="bgt-col-amt">Debit</th><th className="bgt-col-amt">Credit</th><th className="bgt-col-actions" /></tr>
+                      <tr><th>Date</th><th>PR Code</th><th>Description</th><th>Note</th><th className="bgt-col-amt num">Debit</th><th className="bgt-col-amt num">Credit</th><th className="bgt-col-actions" /></tr>
                     )}
                     {isReceivableSection && (
-                      <tr><th>Date</th><th>Customer</th><th>Invoice No</th><th>Description</th><th>Mode of Payment</th><th className="bgt-col-amt">Amount</th><th>Reference</th><th className="bgt-col-actions" /></tr>
+                      <tr><th>Date</th><th>Customer</th><th>Invoice No</th><th>Description</th><th>Mode of Payment</th><th className="bgt-col-amt num">Amount</th><th>Reference</th><th className="bgt-col-actions" /></tr>
                     )}
                     {isPayableSection && (
-                      <tr><th>Date</th><th>Customer</th><th>Invoice No</th><th>Description</th><th>Mode of Payment</th><th className="bgt-col-amt">Amount</th><th>Reference</th><th className="bgt-col-actions" /></tr>
+                      <tr><th>Date</th><th>Customer</th><th>Invoice No</th><th>Description</th><th>Mode of Payment</th><th className="bgt-col-amt num">Amount</th><th>Reference</th><th className="bgt-col-actions" /></tr>
                     )}
                   </thead>
                   <tbody>
@@ -2884,33 +2930,33 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                         <tr key={row.id} className="bgt-table-row">
                           {isLedgerSection && (
                             <>
-                              <td className="bgt-cell-date">{formatDate(row.entry_date)}</td>
+                              <td className="bgt-cell-date mono">{formatDate(row.entry_date)}</td>
                               <td className="bgt-cell-ref">{row.pr_code ? <code className="bgt-ref-code">{bookkeepingPrCodeLabel(row.pr_code)}</code> : <span className="bgt-muted">-</span>}</td>
                               <td className="bgt-cell-desc">{row.description || <span className="bgt-muted">-</span>}</td>
                               <td className="bgt-cell-desc">{row.note || <span className="bgt-muted">-</span>}</td>
-                              <td className="bgt-col-amt">{formatPhpCurrency(row.debit)}</td>
-                              <td className="bgt-col-amt">{formatPhpCurrency(row.credit)}</td>
+                              <td className="bgt-col-amt num">{formatPhpCurrency(row.debit)}</td>
+                              <td className="bgt-col-amt num">{formatPhpCurrency(row.credit)}</td>
                             </>
                           )}
                           {isReceivableSection && (
                             <>
-                              <td className="bgt-cell-date">{formatDate(row.entry_date)}</td>
+                              <td className="bgt-cell-date mono">{formatDate(row.entry_date)}</td>
                               <td><span className="bgt-account-chip">{row.client || "-"}</span></td>
                               <td className="bgt-cell-ref">{row.invoice_no ? <code className="bgt-ref-code">{row.invoice_no}</code> : <span className="bgt-muted">-</span>}</td>
                               <td className="bgt-cell-desc">{row.description || <span className="bgt-muted">-</span>}</td>
                               <td>{row.mode_of_payment || <span className="bgt-muted">-</span>}</td>
-                              <td className="bgt-col-amt">{formatPhpCurrency(row.amount ?? row.total)}</td>
+                              <td className="bgt-col-amt num">{formatPhpCurrency(row.amount ?? row.total)}</td>
                               <td className="bgt-cell-ref">{row.reference_no ? <code className="bgt-ref-code">{row.reference_no}</code> : <span className="bgt-muted">-</span>}</td>
                             </>
                           )}
                           {isPayableSection && (
                             <>
-                              <td className="bgt-cell-date">{formatDate(row.entry_date || row.due_date)}</td>
+                              <td className="bgt-cell-date mono">{formatDate(row.entry_date || row.due_date)}</td>
                               <td><span className="bgt-account-chip">{row.client || row.supplier || "-"}</span></td>
                               <td className="bgt-cell-ref">{row.invoice_no ? <code className="bgt-ref-code">{row.invoice_no}</code> : <span className="bgt-muted">-</span>}</td>
                               <td className="bgt-cell-desc">{row.description || row.note || <span className="bgt-muted">-</span>}</td>
                               <td>{row.mode_of_payment || <span className="bgt-muted">-</span>}</td>
-                              <td className="bgt-col-amt">{formatPhpCurrency(row.amount ?? row.total ?? row.amount_due)}</td>
+                              <td className="bgt-col-amt num">{formatPhpCurrency(row.amount ?? row.total ?? row.amount_due)}</td>
                               <td className="bgt-cell-ref">{row.reference_no ? <code className="bgt-ref-code">{row.reference_no}</code> : <span className="bgt-muted">-</span>}</td>
                             </>
                           )}
@@ -2938,7 +2984,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
 
       {view === "sales" && (() => {
         const STATUS_LABELS = { active: "Active", completed: "Completed", cancelled: "Cancelled" };
-        const STATUS_COLORS = { active: "sl-pill--active", completed: "sl-pill--done", cancelled: "sl-pill--cancelled" };
+        const STATUS_COLORS = { active: "chip-success", completed: "chip-success", cancelled: "chip-danger" };
         const netPos = salesProjectCostingMargin >= 0;
         return (
           <>
@@ -2967,10 +3013,10 @@ export default function BudgetTab({ moduleMode = "combined" }) {
             </div>
 
             {/* Sub-view toggle */}
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className={`bgt-seg-btn${salesView === "overview" ? " bgt-seg-btn--on" : ""}`} style={{ background: salesView === "overview" ? "#fff" : "transparent", borderRadius: 9, padding: "7px 14px", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13 }} onClick={() => setSalesView("overview")}>Overall</button>
-              <button className={`bgt-seg-btn${salesView === "projects" ? " bgt-seg-btn--on" : ""}`} style={{ background: salesView === "projects" ? "#fff" : "transparent", borderRadius: 9, padding: "7px 14px", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13 }} onClick={() => setSalesView("projects")}>All Projects</button>
-            </div>
+            <nav className="tabs-underline bgt-seg--sub" aria-label="Sales views">
+              <button type="button" className={`tab-underline${salesView === "overview" ? " is-active" : ""}`} aria-current={salesView === "overview" ? "page" : undefined} onClick={() => setSalesView("overview")}>Overall</button>
+              <button type="button" className={`tab-underline${salesView === "projects" ? " is-active" : ""}`} aria-current={salesView === "projects" ? "page" : undefined} onClick={() => setSalesView("projects")}>All Projects</button>
+            </nav>
 
             {/* Overview — customer cards */}
             {salesView === "overview" && (
@@ -3015,14 +3061,14 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                               return (
                                 <button key={p.id} className="sl-proj-row" onClick={() => openDetail(p)}>
                                   <div className="sl-proj-row-left">
-                                    <span className={`sl-pill ${STATUS_COLORS[p.status] || ""}`}>{STATUS_LABELS[p.status] || p.status}</span>
+                                    <span className={`chip ${STATUS_COLORS[p.status] || "chip-neutral"}`}>{STATUS_LABELS[p.status] || p.status}</span>
                                     <div className="sl-proj-copy">
                                       <span className="sl-proj-name">{p.project_name}</span>
                                       <span className="sl-proj-sub">Expenses ₱{formatMoney(projectExpense)} • Collected ₱{formatMoney(p.total_income)} of ₱{formatMoney(p.sale_amount)}</span>
                                     </div>
                                   </div>
                                   <div className="sl-proj-row-right">
-                                    <span className="sl-proj-margin" style={{ color: projectMargin >= 0 ? "#147845" : "#b83a3a" }}>₱{formatMoney(projectMargin)}</span>
+                                    <span className={`sl-proj-margin mono ${projectMargin >= 0 ? "bgt-amt-pos" : "bgt-amt-neg"}`}>₱{formatMoney(projectMargin)}</span>
                                     {toNumber(p.total_income, 0) > 0 && (
                                       <button className="bgt-row-btn" onClick={(e) => { e.stopPropagation(); openPaymentDetails(p); }}>View Payment Details</button>
                                     )}
@@ -3058,7 +3104,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                   ) : (
                     <div className="bgt-table-wrap">
                       <table className="bgt-table">
-                        <thead><tr><th>Customer</th><th>Project</th><th>Date</th><th>Status</th><th className="bgt-col-amt">Contract</th><th className="bgt-col-amt">Expenses</th><th className="bgt-col-amt">Margin</th><th /></tr></thead>
+                        <thead><tr><th>Customer</th><th>Project</th><th>Date</th><th>Status</th><th className="bgt-col-amt num">Contract</th><th className="bgt-col-amt num">Expenses</th><th className="bgt-col-amt num">Margin</th><th /></tr></thead>
                         <tbody>
                           {filtered.map((p) => {
                             const projectExpense = projectDetailsTotalCost(p);
@@ -3067,11 +3113,11 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                               <tr key={p.id} className="bgt-table-row" style={{ cursor: "pointer" }} onClick={() => openDetail(p)}>
                                 <td><span className="bgt-account-chip">{p.customer_name}</span></td>
                                 <td><strong>{p.project_name}</strong></td>
-                                <td className="bgt-cell-date">{formatDate(p.project_date)}</td>
-                                <td><span className={`sl-pill ${STATUS_COLORS[p.status] || ""}`}>{STATUS_LABELS[p.status] || p.status}</span></td>
-                                <td className="bgt-col-amt" style={{ color: "#147845", fontWeight: 700 }}>₱{formatMoney(p.sale_amount)}</td>
-                                <td className="bgt-col-amt" style={{ color: "#b83a3a", fontWeight: 700 }}>₱{formatMoney(projectExpense)}</td>
-                                <td className="bgt-col-amt" style={{ color: m >= 0 ? "#147845" : "#b83a3a", fontWeight: 700 }}>₱{formatMoney(m)}</td>
+                                <td className="bgt-cell-date mono">{formatDate(p.project_date)}</td>
+                                <td><span className={`chip ${STATUS_COLORS[p.status] || "chip-neutral"}`}>{STATUS_LABELS[p.status] || p.status}</span></td>
+                                <td className="bgt-col-amt num bgt-amount--in">₱{formatMoney(p.sale_amount)}</td>
+                                <td className="bgt-col-amt num bgt-amount--out">₱{formatMoney(projectExpense)}</td>
+                                <td className={`bgt-col-amt num ${m >= 0 ? "bgt-amount--in" : "bgt-amount--out"}`}>₱{formatMoney(m)}</td>
                                 <td className="bgt-col-actions" onClick={(e) => e.stopPropagation()}>
                                   {toNumber(p.total_income, 0) > 0 && (
                                     <button className="bgt-row-btn" onClick={() => openPaymentDetails(p)}>View Payment Details</button>
@@ -3102,7 +3148,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                   <div className="bgt-modal-body">
                     <div className="sl-drawer-stats">
                       <div className="sl-dstat"><span className="sl-dstat-label">Collected</span><strong className="sl-dstat-val sl-dstat-val--sales">₱{formatMoney(detailProj.total_income)}</strong></div>
-                      <div className="sl-dstat"><span className="sl-dstat-label">Balance Due</span><strong className="sl-dstat-val" style={{ color: toNumber(detailProj.balance_due, 0) > 0 ? "#b86d12" : "#147845" }}>₱{formatMoney(detailProj.balance_due)}</strong></div>
+                      <div className="sl-dstat"><span className="sl-dstat-label">Balance Due</span><strong className={`sl-dstat-val mono ${toNumber(detailProj.balance_due, 0) > 0 ? "bgt-amt-due" : "bgt-amt-pos"}`}>₱{formatMoney(detailProj.balance_due)}</strong></div>
                       <div className="sl-dstat"><span className="sl-dstat-label">Sale Amount</span><strong className="sl-dstat-val sl-dstat-val--sales">₱{formatMoney(detailProj.sale_amount)}</strong></div>
                       <div className="sl-dstat"><span className="sl-dstat-label">Expenses</span><strong className="sl-dstat-val sl-dstat-val--exp">₱{formatMoney(projectDetailsTotalCost(detailProj))}</strong></div>
                       <div className="sl-dstat"><span className="sl-dstat-label">Margin</span><strong className={`sl-dstat-val ${toNumber(detailProj.sale_amount, 0) - projectDetailsTotalCost(detailProj) >= 0 ? "sl-dstat-val--sales" : "sl-dstat-val--exp"}`}>₱{formatMoney(toNumber(detailProj.sale_amount, 0) - projectDetailsTotalCost(detailProj))}</strong></div>
@@ -3123,17 +3169,17 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                       ) : (
                         <div className="bgt-import-preview">
                           <table className="bgt-table bgt-table--compact">
-                            <thead><tr><th>Date</th><th>Description</th><th>Category</th><th className="bgt-col-amt">Price</th><th>Qty</th><th className="bgt-col-amt">Discount</th><th className="bgt-col-amt">Amount</th></tr></thead>
+                            <thead><tr><th>Date</th><th>Description</th><th>Category</th><th className="bgt-col-amt num">Price</th><th>Qty</th><th className="bgt-col-amt num">Discount</th><th className="bgt-col-amt num">Amount</th></tr></thead>
                             <tbody>
                               {detailTx.map((tx) => (
                                 <tr key={tx.id}>
-                                  <td className="bgt-cell-date">{formatDate(tx.transaction_date)}</td>
+                                  <td className="bgt-cell-date mono">{formatDate(tx.transaction_date)}</td>
                                   <td>{tx.description || <span className="bgt-muted">—</span>}</td>
                                   <td><span className="bgt-account-chip">{tx.account_name}</span></td>
-                                  <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
-                                  <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
-                                  <td className="bgt-col-amt">{tx.discount == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.discount)}</>}</td>
-                                  <td className={`bgt-col-amt bgt-amount--${tx.type}`}>₱{formatMoney(tx.amount)}</td>
+                                  <td className="bgt-col-amt num">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
+                                  <td className="num">{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
+                                  <td className="bgt-col-amt num">{tx.discount == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.discount)}</>}</td>
+                                  <td className={`bgt-col-amt num bgt-amount--${tx.type}`}>₱{formatMoney(tx.amount)}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -3176,15 +3222,15 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                     ) : (
                       <div className="bgt-import-preview">
                         <table className="bgt-table bgt-table--compact">
-                          <thead><tr><th>Date</th><th>Description</th><th>Reference</th><th>Category</th><th className="bgt-col-amt">Amount</th></tr></thead>
+                          <thead><tr><th>Date</th><th>Description</th><th>Reference</th><th>Category</th><th className="bgt-col-amt num">Amount</th></tr></thead>
                           <tbody>
                             {paymentDetailsRows.map((tx) => (
                               <tr key={tx.id}>
-                                <td className="bgt-cell-date">{formatDate(tx.transaction_date)}</td>
+                                <td className="bgt-cell-date mono">{formatDate(tx.transaction_date)}</td>
                                 <td>{tx.description || <span className="bgt-muted">-</span>}</td>
                                 <td>{tx.reference_no || <span className="bgt-muted">-</span>}</td>
                                 <td><span className="bgt-account-chip">{tx.account_name || "-"}</span></td>
-                                <td className="bgt-col-amt bgt-amount--in">₱{formatMoney(tx.amount)}</td>
+                                <td className="bgt-col-amt num bgt-amount--in">₱{formatMoney(tx.amount)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -3590,10 +3636,10 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                     <tr>
                       <th>Item</th>
                       <th>Project</th>
-                      <th className="bgt-col-amt">Price</th>
+                      <th className="bgt-col-amt num">Price</th>
                       <th>Qty</th>
-                      <th className="bgt-col-amt">Discount</th>
-                      <th className="bgt-col-amt">Amount</th>
+                      <th className="bgt-col-amt num">Discount</th>
+                      <th className="bgt-col-amt num">Amount</th>
                       <th>Notes</th>
                     </tr>
                   </thead>
@@ -3606,10 +3652,10 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                         <tr key={item.id} className="bgt-table-row">
                           <td className="bgt-cell-desc">{item.description || <span className="bgt-muted">-</span>}</td>
                           <td>{itemProjectLabel || <span className="bgt-muted">-</span>}</td>
-                          <td className="bgt-col-amt">{item.price == null ? <span className="bgt-muted">-</span> : formatPhpCurrency(item.price)}</td>
-                          <td>{item.quantity == null ? <span className="bgt-muted">-</span> : formatQuantity(item.quantity)}</td>
-                          <td className="bgt-col-amt">{item.discount == null ? <span className="bgt-muted">-</span> : formatPhpCurrency(item.discount)}</td>
-                          <td className={`bgt-col-amt bgt-amount--${itemDirection}`}>
+                          <td className="bgt-col-amt num">{item.price == null ? <span className="bgt-muted">-</span> : formatPhpCurrency(item.price)}</td>
+                          <td className="num">{item.quantity == null ? <span className="bgt-muted">-</span> : formatQuantity(item.quantity)}</td>
+                          <td className="bgt-col-amt num">{item.discount == null ? <span className="bgt-muted">-</span> : formatPhpCurrency(item.discount)}</td>
+                          <td className={`bgt-col-amt num bgt-amount--${itemDirection}`}>
                             <span>{formatPhpCurrency(item.amount)}</span>
                           </td>
                           <td className="bgt-cell-desc bgt-tx-detail-notes">{item.notes || <span className="bgt-muted">-</span>}</td>
@@ -3836,10 +3882,10 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                           <th>Description</th>
                           <th>Category</th>
                           <th>Transaction Type</th>
-                          <th className="bgt-col-amt">Price</th>
+                          <th className="bgt-col-amt num">Price</th>
                           <th>Qty</th>
-                          <th className="bgt-col-amt">Discount</th>
-                          <th className="bgt-col-amt">Amount</th>
+                          <th className="bgt-col-amt num">Discount</th>
+                          <th className="bgt-col-amt num">Amount</th>
                           <th className="bgt-col-actions">Action</th>
                         </tr>
                       </thead>
@@ -3849,7 +3895,7 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                           const txDirection = transactionDirectionFromAccountType(txAccountType);
                           return (
                           <tr key={tx.id}>
-                            <td className="bgt-cell-date">{formatDate(tx.transaction_date)}</td>
+                            <td className="bgt-cell-date mono">{formatDate(tx.transaction_date)}</td>
                             <td>{tx.description || <span className="bgt-muted">—</span>}</td>
                             <td><span className="bgt-account-chip">{tx.account_name || "—"}</span></td>
                             <td>
@@ -3857,10 +3903,10 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                                 {transactionTypeShortLabel(txAccountType)}
                               </span>
                             </td>
-                            <td className="bgt-col-amt">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
-                            <td>{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
-                            <td className="bgt-col-amt">{tx.discount == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.discount)}</>}</td>
-                            <td className={`bgt-col-amt bgt-amount--${txDirection}`}>₱{formatMoney(tx.amount)}</td>
+                            <td className="bgt-col-amt num">{tx.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.price)}</>}</td>
+                            <td className="num">{tx.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(tx.quantity)}</td>
+                            <td className="bgt-col-amt num">{tx.discount == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(tx.discount)}</>}</td>
+                            <td className={`bgt-col-amt num bgt-amount--${txDirection}`}>₱{formatMoney(tx.amount)}</td>
                             <td className="bgt-col-actions">
                               <button
                                 type="button"
@@ -3876,14 +3922,14 @@ export default function BudgetTab({ moduleMode = "combined" }) {
                         })}
                         {(!importResult.transactions || importResult.transactions.length === 0) && (importResult.rows || []).map((r, i) => (
                           <tr key={i}>
-                            <td className="bgt-cell-date">{formatDate(r.transactionDate)}</td>
+                            <td className="bgt-cell-date mono">{formatDate(r.transactionDate)}</td>
                             <td>{r.description}</td>
                             <td><span className="bgt-muted">—</span></td>
                             <td><span className="bgt-muted">—</span></td>
-                            <td className="bgt-col-amt">{r.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(r.price)}</>}</td>
-                            <td>{r.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(r.quantity)}</td>
-                            <td className="bgt-col-amt">{r.discount == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(r.discount)}</>}</td>
-                            <td className="bgt-col-amt bgt-amount--out">₱{formatMoney(r.amount)}</td>
+                            <td className="bgt-col-amt num">{r.price == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(r.price)}</>}</td>
+                            <td className="num">{r.quantity == null ? <span className="bgt-muted">—</span> : formatQuantity(r.quantity)}</td>
+                            <td className="bgt-col-amt num">{r.discount == null ? <span className="bgt-muted">—</span> : <>₱{formatMoney(r.discount)}</>}</td>
+                            <td className="bgt-col-amt num bgt-amount--out">₱{formatMoney(r.amount)}</td>
                             <td className="bgt-col-actions"><span className="bgt-muted">Reload required</span></td>
                           </tr>
                         ))}

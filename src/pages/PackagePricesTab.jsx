@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../api/client";
+import "../styles/pricing.css";
 
 function toNumber(value, fallback = 0) {
   const n = Number(value);
@@ -141,6 +142,9 @@ export default function PackagePricesTab() {
   const [editPrice, setEditPrice] = useState("");
   const [editActive, setEditActive] = useState(true);
 
+  // Atlas UI-only state: whether the "Add scenario" panel is expanded.
+  const [showCreate, setShowCreate] = useState(false);
+
   const loadTemplates = async () => {
     const res = await api.get("/templates", { params: { includeAll: 1 } });
     setTemplates(Array.isArray(res.data) ? res.data : []);
@@ -269,123 +273,162 @@ export default function PackagePricesTab() {
   };
 
   return (
-    <div>
-      <div className="materials-card">
-        <div className="module-card-head">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+    <div className="pricing-page">
+      {/* ── Page head (Atlas §4) ── */}
+      <header className="page-head">
+        <span className="page-head-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.83z"/>
+            <line x1="7" y1="7" x2="7.01" y2="7"/>
           </svg>
-          <div className="module-card-head-text">
-            <strong>Package Costing Matrix</strong>
-            <span>Live material costing, package prices, installation allowance, and margin by system package.</span>
-          </div>
+        </span>
+        <div className="page-head-text">
+          <h2 className="page-head-title">Package Prices</h2>
+          <p className="page-head-desc">
+            Live material costing, package prices, installation allowance, and margin by system package.
+          </p>
         </div>
-
-        <div className="pkg-template-selector package-selector-grid">
-          <label className="field">
-            <span>Select Template</span>
-            <select
-              id="packageTemplate"
-              className="select template-group-select"
-              value={templateId}
-              onChange={(e) => {
-                setTemplateId(e.target.value);
-                cancelEdit();
-              }}
-            >
-              <option value="">Choose a template</option>
-              {groupedTemplates.map((group) => (
-                <optgroup label={`---- ${group.label} ----`} key={group.label}>
-                  {group.rows.map((tpl) => (
-                    <option value={tpl.id} key={tpl.id}>{tpl.name}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </label>
-
-          <label className="field">
-            <span>Costing Basis</span>
-            <select
-              className="select"
-              value={vatMode}
-              onChange={(e) => setVatMode(e.target.value)}
-            >
-              <option value="incl">With VAT</option>
-              <option value="excl">Without VAT</option>
-            </select>
-          </label>
+        <div className="page-head-actions">
+          <button
+            className="btn btn-primary"
+            type="button"
+            aria-expanded={showCreate}
+            aria-controls="pricing-add-scenario-panel"
+            disabled={!templateId}
+            title={templateId ? undefined : "Select a template first"}
+            onClick={() => setShowCreate((open) => !open)}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Add scenario
+          </button>
         </div>
+      </header>
+
+      {/* ── Toolbar: template + costing basis left, quiet stat chips right ── */}
+      <div className="page-toolbar pricing-toolbar">
+        <label className="pricing-toolbar-field">
+          <span>Template</span>
+          <select
+            id="packageTemplate"
+            className="select template-group-select pricing-template-select"
+            value={templateId}
+            onChange={(e) => {
+              setTemplateId(e.target.value);
+              cancelEdit();
+            }}
+          >
+            <option value="">Choose a template</option>
+            {groupedTemplates.map((group) => (
+              <optgroup label={`---- ${group.label} ----`} key={group.label}>
+                {group.rows.map((tpl) => (
+                  <option value={tpl.id} key={tpl.id}>{tpl.name}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+
+        <label className="pricing-toolbar-field">
+          <span>Costing basis</span>
+          <select
+            className="select"
+            value={vatMode}
+            onChange={(e) => setVatMode(e.target.value)}
+          >
+            <option value="incl">With VAT</option>
+            <option value="excl">Without VAT</option>
+          </select>
+        </label>
 
         {templateId && costing && (
-          <div className="package-costing-summary">
-            <div className="package-costing-stat">
-              <span>Material Cost</span>
-              <strong>{formatCurrency(costing.material_cost_total)}</strong>
-              <small>{costingBasisLabel}</small>
-            </div>
-            <div className="package-costing-stat">
-              <span>Quoted Material Subtotal</span>
-              <strong>{formatCurrency(costing.quoted_material_total)}</strong>
-              <small>{formatPercent(toNumber(costing.material_markup_rate, 0) * 100)} markup</small>
-            </div>
-            <div className="package-costing-stat">
-              <span>Catalog Links</span>
-              <strong>{costingLinkedLabel}</strong>
-              <small>{toNumber(costing.unlinked_item_count, 0)} template-priced item(s)</small>
-            </div>
+          <div className="page-toolbar-actions pricing-statbar">
+            <span className="pricing-stat-chip">
+              <span className="pricing-stat-chip-label">Material cost · {costingBasisLabel}</span>
+              <span className="pricing-stat-chip-value num">{formatCurrency(costing.material_cost_total)}</span>
+            </span>
+            <span className="pricing-stat-chip">
+              <span className="pricing-stat-chip-label">Quoted materials</span>
+              <span className="pricing-stat-chip-value num">{formatCurrency(costing.quoted_material_total)}</span>
+            </span>
+            <span className="pricing-stat-chip">
+              <span className="pricing-stat-chip-label">Markup</span>
+              <span className="pricing-stat-chip-value num">{formatPercent(toNumber(costing.material_markup_rate, 0) * 100)}</span>
+            </span>
+            <span className="pricing-stat-chip">
+              <span className="pricing-stat-chip-label">Catalog links</span>
+              <span className="pricing-stat-chip-value num">{costingLinkedLabel}</span>
+            </span>
+            <span className="pricing-stat-chip">
+              <span className="pricing-stat-chip-label">Template-priced</span>
+              <span className="pricing-stat-chip-value num">{toNumber(costing.unlinked_item_count, 0)}</span>
+            </span>
           </div>
         )}
+      </div>
 
-        {templateId && (
-          <div className="add-item-card">
-            <div className="add-item-card-head">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+      {/* ── Collapsed create form (opens from the page-head button) ── */}
+      {templateId && showCreate && (
+        <section className="add-item-card pricing-create-card" id="pricing-add-scenario-panel">
+          <div className="add-item-card-head">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+            </svg>
+            <strong>Add Price Scenario</strong>
+            {selectedTemplateName && (
+              <span className="add-item-card-sub">for {selectedTemplateName}</span>
+            )}
+            <button
+              className="btn btn-ghost pricing-card-close"
+              type="button"
+              onClick={() => setShowCreate(false)}
+              aria-label="Close add scenario form"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
               </svg>
-              <strong>Add Price Scenario</strong>
-              {selectedTemplateName && (
-                <span className="add-item-card-sub">for {selectedTemplateName}</span>
-              )}
-            </div>
-            <div className="add-item-details-row row-auto">
-              <label className="field">
-                <span>Scenario Label</span>
-                <input
-                  className="input"
-                  placeholder="e.g. 314AH Battery"
-                  value={scenarioLabel}
-                  onChange={(e) => setScenarioLabel(e.target.value)}
-                />
-              </label>
-              <label className="field">
-                <span>Package Price (PHP)</span>
-                <input
-                  className="input"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={packagePrice}
-                  onChange={(e) => setPackagePrice(e.target.value)}
-                />
-              </label>
-              <button
-                className="btn btn-primary add-item-submit"
-                type="button"
-                onClick={createScenario}
-                disabled={!scenarioLabel.trim() || !templateId}
-              >
-                Add Scenario
-              </button>
-            </div>
+            </button>
           </div>
-        )}
+          <div className="add-item-details-row row-auto">
+            <label className="field">
+              <span>Scenario Label</span>
+              <input
+                className="input"
+                placeholder="e.g. 314AH Battery"
+                value={scenarioLabel}
+                onChange={(e) => setScenarioLabel(e.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>Package Price (PHP)</span>
+              <input
+                className="input"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={packagePrice}
+                onChange={(e) => setPackagePrice(e.target.value)}
+              />
+            </label>
+            <button
+              className="btn btn-primary add-item-submit"
+              type="button"
+              onClick={createScenario}
+              disabled={!scenarioLabel.trim() || !templateId}
+            >
+              Add Scenario
+            </button>
+          </div>
+        </section>
+      )}
 
-        {error && <div className="error-text">{error}</div>}
-        {loading && <p className="section-note">Loading package costing...</p>}
+      {error && <div className="error-text">{error}</div>}
+      {loading && <p className="section-note">Loading package costing...</p>}
 
-        {!templateId && !loading && (
+      {!templateId && !loading && (
+        <div className="materials-card pricing-table-card">
           <div className="template-empty-state">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
               <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
@@ -398,10 +441,12 @@ export default function PackagePricesTab() {
               </p>
             )}
           </div>
-        )}
+        </div>
+      )}
 
-        {templateId && (
-          <>
+      {templateId && (
+        <>
+          <section className="materials-card pricing-table-card">
             <div className="package-costing-section-head">
               <strong>Package Costing Table</strong>
               <span>{selectedTemplateName || "Selected template"}</span>
@@ -411,13 +456,13 @@ export default function PackagePricesTab() {
                 <thead>
                   <tr>
                     <th>Scenario</th>
-                    <th>Package Price</th>
-                    <th>Material Cost</th>
-                    <th>Quoted Materials</th>
-                    <th>Install Allowance</th>
-                    <th>Gross Profit</th>
-                    <th>Margin</th>
-                    <th>Linked Items</th>
+                    <th className="num">Package Price</th>
+                    <th className="num">Material Cost</th>
+                    <th className="num">Quoted Materials</th>
+                    <th className="num">Install Allowance</th>
+                    <th className="num">Gross Profit</th>
+                    <th className="num">Margin</th>
+                    <th className="num">Linked Items</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
@@ -429,7 +474,7 @@ export default function PackagePricesTab() {
                     const profitClass = metrics.grossProfit < 0 ? "is-negative" : "is-positive";
 
                     return (
-                      <tr key={row.id}>
+                      <tr key={row.id} className={isEditing ? "pricing-row-editing" : undefined}>
                         <td>
                           {isEditing ? (
                             <input
@@ -441,7 +486,7 @@ export default function PackagePricesTab() {
                             <strong>{row.scenario_label}</strong>
                           )}
                         </td>
-                        <td>
+                        <td className="num">
                           {isEditing ? (
                             <input
                               className="input"
@@ -455,16 +500,16 @@ export default function PackagePricesTab() {
                             formatCurrency(metrics.packagePrice)
                           )}
                         </td>
-                        <td>{formatCurrency(metrics.materialCost)}</td>
-                        <td>{formatCurrency(metrics.quotedMaterialTotal)}</td>
-                        <td>{formatCurrency(metrics.installationAllowance)}</td>
-                        <td className={`package-money ${profitClass}`}>
+                        <td className="num">{formatCurrency(metrics.materialCost)}</td>
+                        <td className="num">{formatCurrency(metrics.quotedMaterialTotal)}</td>
+                        <td className="num">{formatCurrency(metrics.installationAllowance)}</td>
+                        <td className={`num package-money ${profitClass}`}>
                           {formatCurrency(metrics.grossProfit)}
                         </td>
-                        <td className={`package-money ${profitClass}`}>
+                        <td className={`num package-money ${profitClass}`}>
                           {formatPercent(metrics.grossMarginPercent)}
                         </td>
-                        <td>{toNumber(row.costing_linked_item_count, 0)} / {toNumber(row.costing_item_count, 0)}</td>
+                        <td className="num">{toNumber(row.costing_linked_item_count, 0)} / {toNumber(row.costing_item_count, 0)}</td>
                         <td>
                           {isEditing ? (
                             <select
@@ -476,9 +521,9 @@ export default function PackagePricesTab() {
                               <option value="0">Inactive</option>
                             </select>
                           ) : Number(row.is_active) === 1 ? (
-                            "Active"
+                            <span className="chip chip-success">Active</span>
                           ) : (
-                            "Inactive"
+                            <span className="chip chip-danger">Inactive</span>
                           )}
                         </td>
                         <td>
@@ -498,7 +543,7 @@ export default function PackagePricesTab() {
                                   Edit
                                 </button>
                                 <button
-                                  className="btn btn-ghost"
+                                  className="btn btn-ghost pricing-btn-danger"
                                   type="button"
                                   onClick={() => removeScenario(row.id)}
                                 >
@@ -514,7 +559,7 @@ export default function PackagePricesTab() {
 
                   {!rows.length && !loading && (
                     <tr>
-                      <td colSpan={10} className="section-note">
+                      <td colSpan={10} className="section-note empty-state-cell">
                         No package scenarios yet for this template.
                       </td>
                     </tr>
@@ -522,7 +567,9 @@ export default function PackagePricesTab() {
                 </tbody>
               </table>
             </div>
+          </section>
 
+          <section className="materials-card pricing-table-card">
             <div className="package-costing-section-head">
               <strong>Material Cost Breakdown</strong>
               <span>{costingSections.length} section{costingSections.length === 1 ? "" : "s"}</span>
@@ -534,9 +581,9 @@ export default function PackagePricesTab() {
                     <th>Section</th>
                     <th>Material</th>
                     <th>Unit</th>
-                    <th>Qty</th>
-                    <th>Unit Cost</th>
-                    <th>Line Cost</th>
+                    <th className="num">Qty</th>
+                    <th className="num">Unit Cost</th>
+                    <th className="num">Line Cost</th>
                     <th>Source</th>
                   </tr>
                 </thead>
@@ -551,14 +598,14 @@ export default function PackagePricesTab() {
                         </div>
                       </td>
                       <td>{item.unit || "-"}</td>
-                      <td>{formatNumber(item.qty, 2)}</td>
-                      <td>{formatCurrency(item.unit_cost)}</td>
-                      <td>{formatCurrency(item.line_cost)}</td>
+                      <td className="num">{formatNumber(item.qty, 2)}</td>
+                      <td className="num">{formatCurrency(item.unit_cost)}</td>
+                      <td className="num">{formatCurrency(item.line_cost)}</td>
                       <td>
                         {item.price_source === "catalog" ? (
-                          <span className="package-source-chip">Catalog</span>
+                          <span className="chip chip-info">Catalog</span>
                         ) : (
-                          <span className="package-source-chip is-template">Template</span>
+                          <span className="chip chip-neutral">Template</span>
                         )}
                       </td>
                     </tr>
@@ -566,7 +613,7 @@ export default function PackagePricesTab() {
 
                   {!costingItems.length && !loading && (
                     <tr>
-                      <td colSpan={7} className="section-note">
+                      <td colSpan={7} className="section-note empty-state-cell">
                         No costing items found for this template.
                       </td>
                     </tr>
@@ -574,9 +621,9 @@ export default function PackagePricesTab() {
                 </tbody>
               </table>
             </div>
-          </>
-        )}
-      </div>
+          </section>
+        </>
+      )}
     </div>
   );
 }

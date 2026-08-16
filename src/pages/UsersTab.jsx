@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import api from "../api/client";
 import { getRoleBadgeClass, normalizeRoleKey, roleLabel } from "../constants/access";
 import useBodyScrollLock from "../hooks/useBodyScrollLock";
+import "../styles/admin.css";
 
 const EMPTY_FORM = {
   firstName: "",
@@ -26,6 +27,41 @@ function generateTemporaryPassword(length = 12) {
   window.crypto.getRandomValues(bytes);
   return Array.from(bytes, (value) => alphabet[value % alphabet.length]).join("");
 }
+
+function initialsOf(value) {
+  const parts = String(value || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "?";
+  const first = parts[0][0] || "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] || "" : "";
+  return (first + last).toUpperCase() || "?";
+}
+
+/* Presentational icons for the summary stat cards, keyed by accent. */
+const STAT_ICONS = {
+  blue: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
+  green: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="8.5" cy="7" r="4" />
+      <polyline points="17 11 19 13 23 9" />
+    </svg>
+  ),
+  purple: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  )
+};
 
 function splitNameParts(value) {
   const parts = String(value || "")
@@ -134,9 +170,9 @@ export default function UsersTab({ currentUser }) {
     const active = users.filter((user) => user.status === "active").length;
     const admins = users.filter((user) => normalizeRoleKey(user.role) === "admin").length;
     return [
-      { label: "Total Users", value: total, accent: "blue" },
-      { label: "Active Users", value: active, accent: "green" },
-      { label: "Admin Accounts", value: admins, accent: "purple" }
+      { label: "Total users", value: total, accent: "blue" },
+      { label: "Active users", value: active, accent: "green" },
+      { label: "Admin accounts", value: admins, accent: "purple" }
     ];
   }, [users]);
 
@@ -306,160 +342,175 @@ export default function UsersTab({ currentUser }) {
   };
 
   return (
-    <div>
+    <div className="admin-page">
+      <header className="page-head">
+        <span className="page-head-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </span>
+        <div className="page-head-text">
+          <h2 className="page-head-title">Users</h2>
+          <p className="page-head-desc">Manage login accounts, assign saved roles, and issue generated temporary passwords.</p>
+        </div>
+        <div className="page-head-actions">
+          <button className="btn btn-primary" type="button" onClick={openCreate} disabled={loadingRoles}>
+            Add User
+          </button>
+        </div>
+      </header>
+
       <div className="admin-summary-grid">
         {stats.map((stat) => (
-          <article className={`admin-summary-card accent-${stat.accent}`} key={stat.label}>
-            <strong>{stat.value}</strong>
-            <span>{stat.label}</span>
+          <article className={`admin-summary-card metric-accent-${stat.accent}`} key={stat.label}>
+            <span className="admin-summary-icon" aria-hidden="true">{STAT_ICONS[stat.accent]}</span>
+            <div className="admin-summary-copy">
+              <span>{stat.label}</span>
+              <strong>{stat.value}</strong>
+            </div>
           </article>
         ))}
       </div>
 
-      <div className="materials-card">
-        <div className="module-card-head">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
-          <div className="module-card-head-text">
-            <strong>User Accounts</strong>
-            <span>Manage login accounts, assign saved roles, and issue generated temporary passwords.</span>
-          </div>
-        </div>
-        <div className="admin-toolbar">
-          <div className="admin-toolbar-filters">
-            <input
-              className="input"
-              placeholder="Search users"
-              value={filters.q}
-              onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
-            />
-            <select
-              className="select"
-              value={filters.role}
-              onChange={(e) => setFilters((prev) => ({ ...prev, role: e.target.value }))}
-            >
-              <option value="">All Roles</option>
-              {roles.map((role) => (
-                <option value={role.key} key={role.key}>
-                  {role.label}
-                </option>
-              ))}
-            </select>
-            <select
-              className="select"
-              value={filters.status}
-              onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
-            >
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-
-          <div className="admin-toolbar-actions">
-            <button className="btn btn-ghost" type="button" onClick={() => loadUsers()}>
-              Refresh
-            </button>
-            <button className="btn btn-secondary" type="button" onClick={() => loadUsers(filters)}>
-              Apply Filters
-            </button>
-            <button className="btn btn-primary" type="button" onClick={openCreate} disabled={loadingRoles}>
-              Add User
-            </button>
-          </div>
+      <div className="page-toolbar">
+        <div className="admin-toolbar-filters">
+          <input
+            className="input"
+            placeholder="Search users"
+            value={filters.q}
+            onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
+          />
+          <select
+            className="select"
+            value={filters.role}
+            onChange={(e) => setFilters((prev) => ({ ...prev, role: e.target.value }))}
+          >
+            <option value="">All Roles</option>
+            {roles.map((role) => (
+              <option value={role.key} key={role.key}>
+                {role.label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="select"
+            value={filters.status}
+            onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
+          >
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
         </div>
 
-        {error && <div className="error-text">{error}</div>}
+        <div className="page-toolbar-actions">
+          <button className="btn btn-ghost" type="button" onClick={() => loadUsers()}>
+            Refresh
+          </button>
+          <button className="btn btn-secondary" type="button" onClick={() => loadUsers(filters)}>
+            Apply Filters
+          </button>
+        </div>
+      </div>
 
-        <div className="materials-table-wrap">
-          <table className="materials-table">
-            <thead>
-              <tr>
-                <th>Username</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user) => {
-                const isSelf = Number(currentUser?.id || 0) === Number(user.id || 0);
-                const toggleLabel = user.status === "active" ? "Deactivate" : "Activate";
+      {error && <div className="error-text">{error}</div>}
 
-                return (
-                  <tr key={user.id}>
-                    <td>
-                      <strong>{user.username || "-"}</strong>
-                    </td>
-                    <td>
-                      <strong>{user.name}</strong>
-                      {isSelf ? <span className="table-subtext">You</span> : null}
-                    </td>
-                    <td>{user.email}</td>
-                    <td>
-                      <span className={`role-pill ${getRoleBadgeClass(user.role)}`}>
-                        {user.roleLabel || roleLabel(user.role)}
+      <div className="materials-table-wrap">
+        <table className="materials-table">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((user) => {
+              const isSelf = Number(currentUser?.id || 0) === Number(user.id || 0);
+              const toggleLabel = user.status === "active" ? "Deactivate" : "Activate";
+
+              return (
+                <tr key={user.id}>
+                  <td>
+                    <strong className="mono">{user.username || "-"}</strong>
+                  </td>
+                  <td>
+                    <div className="admin-user-cell">
+                      <span className="admin-avatar" aria-hidden="true">
+                        {initialsOf(user.name || user.username)}
                       </span>
-                      {user.roleStatus === "inactive" ? (
-                        <span className="table-subtext">Assigned role is inactive</span>
-                      ) : null}
-                      {user.mustChangePassword ? (
-                        <span className="table-subtext">Waiting for first password change</span>
-                      ) : null}
-                    </td>
-                    <td>
-                      <span className={`status-pill status-pill-${user.status}`}>{user.status}</span>
-                    </td>
-                    <td>{formatDateTime(user.createdAt)}</td>
-                    <td>
-                      <div className="materials-actions">
-                        <button className="btn btn-ghost" type="button" onClick={() => openEdit(user)}>
-                          Edit
-                        </button>
-                        <button
-                          className="btn btn-ghost"
-                          type="button"
-                          onClick={() => toggleStatus(user)}
-                          disabled={saving || (isSelf && user.status === "active")}
-                        >
-                          {toggleLabel}
-                        </button>
-                        <button
-                          className="btn btn-danger"
-                          type="button"
-                          onClick={() => deleteUser(user)}
-                          disabled={saving || isSelf}
-                        >
-                          Delete
-                        </button>
+                      <div>
+                        <strong>{user.name}</strong>
+                        {isSelf ? <span className="table-subtext">You</span> : null}
                       </div>
-                    </td>
-                  </tr>
-                );
-              })}
-
-              {!users.length && !loading && (
-                <tr>
-                  <td colSpan={7} className="empty-state-cell">
-                    No users matched the current filters.
+                    </div>
+                  </td>
+                  <td>{user.email}</td>
+                  <td>
+                    <span className={`chip role-pill ${getRoleBadgeClass(user.role)}`}>
+                      {user.roleLabel || roleLabel(user.role)}
+                    </span>
+                    {user.roleStatus === "inactive" ? (
+                      <span className="table-subtext">Assigned role is inactive</span>
+                    ) : null}
+                    {user.mustChangePassword ? (
+                      <span className="table-subtext">Waiting for first password change</span>
+                    ) : null}
+                  </td>
+                  <td>
+                    <span className={`chip admin-status-chip ${user.status === "active" ? "chip-success" : "chip-danger"}`}>
+                      {user.status}
+                    </span>
+                  </td>
+                  <td className="mono">{formatDateTime(user.createdAt)}</td>
+                  <td>
+                    <div className="materials-actions">
+                      <button className="btn btn-ghost" type="button" onClick={() => openEdit(user)}>
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn-ghost"
+                        type="button"
+                        onClick={() => toggleStatus(user)}
+                        disabled={saving || (isSelf && user.status === "active")}
+                      >
+                        {toggleLabel}
+                      </button>
+                      <button
+                        className="btn btn-danger"
+                        type="button"
+                        onClick={() => deleteUser(user)}
+                        disabled={saving || isSelf}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
-              )}
+              );
+            })}
 
-              {(loading || loadingRoles) && (
-                <tr>
-                  <td colSpan={7} className="empty-state-cell">
-                    Loading users...
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            {!users.length && !loading && (
+              <tr>
+                <td colSpan={7} className="empty-state-cell">
+                  No users matched the current filters.
+                </td>
+              </tr>
+            )}
+
+            {(loading || loadingRoles) && (
+              <tr>
+                <td colSpan={7} className="empty-state-cell">
+                  Loading users...
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       {showEditor && (

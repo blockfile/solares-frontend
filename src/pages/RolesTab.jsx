@@ -7,12 +7,36 @@ import {
   normalizeRoleKey,
   roleLabel
 } from "../constants/access";
+import "../styles/admin.css";
 
 const EMPTY_FORM = {
   label: "",
   description: "",
   status: "active",
   modules: []
+};
+
+/* Presentational icons for the summary stat cards, keyed by accent. */
+const STAT_ICONS = {
+  blue: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+      <polyline points="2 17 12 22 22 17" />
+      <polyline points="2 12 12 17 22 12" />
+    </svg>
+  ),
+  gold: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  ),
+  green: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+      <polyline points="22 4 12 14.01 9 11.01" />
+    </svg>
+  )
 };
 
 export default function RolesTab() {
@@ -44,9 +68,9 @@ export default function RolesTab() {
 
   const roleStats = useMemo(
     () => [
-      { label: "Total Roles", value: roles.length, accent: "blue" },
-      { label: "System Roles", value: roles.filter((role) => role.isSystem).length, accent: "amber" },
-      { label: "Active Roles", value: roles.filter((role) => role.status === "active").length, accent: "green" }
+      { label: "Total roles", value: roles.length, accent: "blue" },
+      { label: "System roles", value: roles.filter((role) => role.isSystem).length, accent: "gold" },
+      { label: "Active roles", value: roles.filter((role) => role.status === "active").length, accent: "green" }
     ],
     [roles]
   );
@@ -129,168 +153,169 @@ export default function RolesTab() {
   };
 
   return (
-    <div>
+    <div className="admin-page">
+      <header className="page-head">
+        <span className="page-head-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </span>
+        <div className="page-head-text">
+          <h2 className="page-head-title">Roles</h2>
+          <p className="page-head-desc">Create roles, choose the modules they can access, and assign them from the Users screen.</p>
+        </div>
+        <div className="page-head-actions">
+          <button className="btn btn-ghost" type="button" onClick={loadRoles}>
+            Refresh
+          </button>
+          <button className="btn btn-primary" type="button" onClick={openCreate}>
+            Add Role
+          </button>
+        </div>
+      </header>
+
       <div className="admin-summary-grid">
         {roleStats.map((stat) => (
-          <article className={`admin-summary-card accent-${stat.accent}`} key={stat.label}>
-            <strong>{stat.value}</strong>
-            <span>{stat.label}</span>
+          <article className={`admin-summary-card metric-accent-${stat.accent}`} key={stat.label}>
+            <span className="admin-summary-icon" aria-hidden="true">{STAT_ICONS[stat.accent]}</span>
+            <div className="admin-summary-copy">
+              <span>{stat.label}</span>
+              <strong>{stat.value}</strong>
+            </div>
           </article>
         ))}
       </div>
 
-      <div className="materials-card">
-        <div className="module-card-head">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          </svg>
-          <div className="module-card-head-text">
-            <strong>Role Management</strong>
-            <span>Create roles, choose the modules they can access, and assign them from the Users screen.</span>
+      {error && <div className="error-text">{error}</div>}
+
+      {showEditor && (
+        <form className="role-form-card" onSubmit={saveRole}>
+          <div className="role-form-grid">
+            <input
+              className="input"
+              placeholder="Role name"
+              value={form.label}
+              onChange={(e) => setForm((prev) => ({ ...prev, label: e.target.value }))}
+            />
+            <select
+              className="select"
+              value={form.status}
+              onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}
+              disabled={normalizeRoleKey(editingRoleKey) === "admin"}
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            <input
+              className="input role-key-preview"
+              value={
+                editingRoleKey
+                  ? normalizeRoleKey(editingRoleKey)
+                  : normalizeRoleKey(form.label || "new_role")
+              }
+              readOnly
+            />
           </div>
-        </div>
-        <div className="admin-toolbar">
-          <div>
-            <p className="section-note">
-              `Admin` always keeps full access. Other roles can be tailored module by module.
-            </p>
+
+          <textarea
+            className="input role-description-input"
+            placeholder="Role description"
+            value={form.description}
+            onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+            rows={3}
+          />
+
+          <div className="role-modules-grid">
+            {MODULE_DEFINITIONS.map((module) => {
+              const checked = normalizeModules(form.modules, []).includes(module.key);
+              const disableToggle =
+                normalizeRoleKey(editingRoleKey) === "admin" || (!editingRoleKey && false);
+
+              return (
+                <label className="module-check-card" key={module.key}>
+                  <input
+                    type="checkbox"
+                    checked={
+                      normalizeRoleKey(editingRoleKey) === "admin" ? true : checked
+                    }
+                    disabled={disableToggle}
+                    onChange={() => toggleModule(module.key)}
+                  />
+                  <div>
+                    <strong>{module.label}</strong>
+                    <span>{module.description}</span>
+                  </div>
+                </label>
+              );
+            })}
           </div>
 
           <div className="admin-toolbar-actions">
-            <button className="btn btn-ghost" type="button" onClick={loadRoles}>
-              Refresh
+            <button className="btn btn-primary" type="submit" disabled={saving}>
+              {saving ? "Saving..." : editingRoleKey ? "Save Role" : "Create Role"}
             </button>
-            <button className="btn btn-primary" type="button" onClick={openCreate}>
-              Add Role
+            <button className="btn btn-ghost" type="button" onClick={closeEditor} disabled={saving}>
+              Cancel
             </button>
           </div>
-        </div>
+        </form>
+      )}
 
-        {error && <div className="error-text">{error}</div>}
+      <p className="section-note admin-roles-note">
+        Admin always keeps full access. Other roles can be tailored module by module.
+      </p>
 
-        {showEditor && (
-          <form className="role-form-card" onSubmit={saveRole}>
-            <div className="role-form-grid">
-              <input
-                className="input"
-                placeholder="Role name"
-                value={form.label}
-                onChange={(e) => setForm((prev) => ({ ...prev, label: e.target.value }))}
-              />
-              <select
-                className="select"
-                value={form.status}
-                onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}
-                disabled={normalizeRoleKey(editingRoleKey) === "admin"}
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-              <input
-                className="input role-key-preview"
-                value={
-                  editingRoleKey
-                    ? normalizeRoleKey(editingRoleKey)
-                    : normalizeRoleKey(form.label || "new_role")
-                }
-                readOnly
-              />
+      <div className="admin-summary-grid">
+        {roles.map((role) => (
+          <article className="admin-summary-card role-card" key={role.key}>
+            <div className="role-card-head">
+              <div>
+                <h4>{role.label || roleLabel(role.key)}</h4>
+                <span className="table-subtext mono">{role.key}</span>
+              </div>
+              <span className={`chip role-pill ${getRoleBadgeClass(role.key)}`}>
+                {role.activeUsers} active
+              </span>
             </div>
-
-            <textarea
-              className="input role-description-input"
-              placeholder="Role description"
-              value={form.description}
-              onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-              rows={3}
-            />
-
-            <div className="role-modules-grid">
-              {MODULE_DEFINITIONS.map((module) => {
-                const checked = normalizeModules(form.modules, []).includes(module.key);
-                const disableToggle =
-                  normalizeRoleKey(editingRoleKey) === "admin" || (!editingRoleKey && false);
-
+            <p className="section-note">{role.description || "No description provided."}</p>
+            <div className="role-counts">
+              <strong className="mono">{role.totalUsers}</strong>
+              <span>Total users assigned</span>
+            </div>
+            <div className="permissions-list">
+              {(role.modules || []).map((moduleKey) => {
+                const module = MODULE_DEFINITIONS.find((item) => item.key === moduleKey);
                 return (
-                  <label className="module-check-card" key={module.key}>
-                    <input
-                      type="checkbox"
-                      checked={
-                        normalizeRoleKey(editingRoleKey) === "admin" ? true : checked
-                      }
-                      disabled={disableToggle}
-                      onChange={() => toggleModule(module.key)}
-                    />
-                    <div>
-                      <strong>{module.label}</strong>
-                      <span>{module.description}</span>
-                    </div>
-                  </label>
+                  <span className="chip chip-neutral" key={moduleKey}>
+                    {module?.label || moduleKey}
+                  </span>
                 );
               })}
             </div>
-
-            <div className="admin-toolbar-actions">
-              <button className="btn btn-primary" type="submit" disabled={saving}>
-                {saving ? "Saving..." : editingRoleKey ? "Save Role" : "Create Role"}
+            <div className="materials-actions">
+              <button className="btn btn-ghost" type="button" onClick={() => openEdit(role)}>
+                Edit
               </button>
-              <button className="btn btn-ghost" type="button" onClick={closeEditor} disabled={saving}>
-                Cancel
-              </button>
+              <span className={`chip admin-status-chip ${role.status === "active" ? "chip-success" : "chip-danger"}`}>
+                {role.status}
+              </span>
             </div>
-          </form>
+          </article>
+        ))}
+
+        {!roles.length && !loading && (
+          <article className="admin-summary-card">
+            <strong>0</strong>
+            <span>No roles available</span>
+          </article>
         )}
 
-        <div className="admin-summary-grid">
-          {roles.map((role) => (
-            <article className="admin-summary-card role-card" key={role.key}>
-              <div className="role-card-head">
-                <div>
-                  <h4>{role.label || roleLabel(role.key)}</h4>
-                  <span className="table-subtext">{role.key}</span>
-                </div>
-                <span className={`role-pill ${getRoleBadgeClass(role.key)}`}>
-                  {role.activeUsers} active
-                </span>
-              </div>
-              <p className="section-note">{role.description || "No description provided."}</p>
-              <div className="role-counts">
-                <strong>{role.totalUsers}</strong>
-                <span>Total users assigned</span>
-              </div>
-              <div className="permissions-list">
-                {(role.modules || []).map((moduleKey) => {
-                  const module = MODULE_DEFINITIONS.find((item) => item.key === moduleKey);
-                  return (
-                    <span className="permission-pill" key={moduleKey}>
-                      {module?.label || moduleKey}
-                    </span>
-                  );
-                })}
-              </div>
-              <div className="materials-actions">
-                <button className="btn btn-ghost" type="button" onClick={() => openEdit(role)}>
-                  Edit
-                </button>
-                <span className={`status-pill status-pill-${role.status}`}>{role.status}</span>
-              </div>
-            </article>
-          ))}
-
-          {!roles.length && !loading && (
-            <article className="admin-summary-card">
-              <strong>0</strong>
-              <span>No roles available</span>
-            </article>
-          )}
-
-          {loading && (
-            <article className="admin-summary-card">
-              <strong>...</strong>
-              <span>Loading roles...</span>
-            </article>
-          )}
-        </div>
+        {loading && (
+          <article className="admin-summary-card">
+            <strong>...</strong>
+            <span>Loading roles...</span>
+          </article>
+        )}
       </div>
     </div>
   );

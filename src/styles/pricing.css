@@ -1,0 +1,771 @@
+/* HELIOS — Pricing (Package Prices + Margin Setup) module styles.
+   Consumes tokens from index.css only.
+
+   Scope: everything is namespaced under .pricing-page so no other
+   module is affected. Shared vocabulary (.page-head*, .page-toolbar*,
+   .btn*, .chip*, .num, .field, .input, .select, .materials-card,
+   .materials-table*, .materials-actions, .add-item-card,
+   .add-item-card-head, .add-item-details-row, .add-item-submit,
+   .error-text, .section-note, .empty-state-cell) is owned by
+   index.css — this file only EXTENDS those under .pricing-page where
+   the module needs density or rhythm, and fully styles every
+   pricing-owned class.
+
+   Contents
+   01. Page frame rhythm
+   02. Toolbar — template picker, costing basis, readout chips
+   03. Collapsed create panels (scenario + margin template)
+   04. Table cards + hero corner brackets (§8, one per page)
+   05. Section heads with dotted leaders (§8 readout)
+   06. Costing / breakdown / margin tables
+   07. Inline editing — amber rail, compact controls
+   08. Margin setup editor — six spec plates
+   09. Empty state
+   10. Motion (namespaced keyframes + reduced-motion guard)
+   11. Breakpoints — 1400 / 900 / 720 / 600 (ported triggers)      */
+
+/* ── 01. Page frame rhythm ────────────────────────────────────── */
+
+.pricing-page {
+  min-width: 0;
+}
+
+.pricing-page > .error-text,
+.pricing-page > .section-note {
+  margin: 0 0 12px;
+}
+
+/* Cards sit directly on the page; the toolbar provides the top gap. */
+.pricing-page .materials-card {
+  margin-top: 0;
+}
+
+.pricing-page .pricing-table-card {
+  gap: 12px;
+}
+
+.pricing-page .pricing-table-card + .pricing-table-card {
+  margin-top: 16px;
+}
+
+/* ── 02. Toolbar — picker fields + quiet readout chips ────────── */
+
+.pricing-page .pricing-toolbar {
+  row-gap: 10px;
+}
+
+.pricing-page .pricing-toolbar-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Field caption = technical micro-label (mono eyebrow voice, §3). */
+.pricing-page .pricing-toolbar-field > span {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.pricing-page .pricing-template-select {
+  min-width: 240px;
+  max-width: 360px;
+}
+
+/* Grouped template dropdown: optgroup headers read as mono section
+   tags; options return to body voice. */
+.pricing-page .template-group-select optgroup {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+
+.pricing-page .template-group-select option {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text);
+}
+
+/* Readout strip — `LABEL ▸ value` pairs (§8), mono, hairline chips.
+   Square 4px corners: nothing pill-shaped in HELIOS (§4). */
+.pricing-page .pricing-statbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.pricing-page .pricing-stat-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  white-space: nowrap;
+}
+
+.pricing-page .pricing-stat-chip-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+
+.pricing-page .pricing-stat-chip-label::after {
+  content: " ▸";
+  color: var(--primary);
+}
+
+.pricing-page .pricing-stat-chip-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ── 03. Collapsed create panels ──────────────────────────────── */
+/* .add-item-card look is global; the module owns rhythm + entry. */
+
+.pricing-page .pricing-create-card,
+.pricing-page .margin-setup-editor {
+  margin-bottom: 16px;
+}
+
+/* Context tag next to the panel title — mono readout of the target
+   template. Not in the §6 global list, so styled here. */
+.pricing-page .add-item-card-sub {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 300px;
+  margin-left: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--text-faint);
+}
+
+/* Close (×) pinned to the right of the panel head. */
+.pricing-page .pricing-card-close {
+  flex: 0 0 auto;
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  line-height: 1;
+  color: var(--text-faint);
+}
+
+.pricing-page .pricing-card-close:hover:not(:disabled) {
+  color: var(--text);
+}
+
+/* Flexible 3-col details row: label · price · submit. */
+.pricing-page .add-item-details-row.row-auto {
+  grid-template-columns: 1fr 1.4fr auto;
+}
+
+/* ── 04. Table cards — hero corner brackets (§8) ──────────────── */
+/* Exactly ONE hero per page: the first .pricing-table-card gets
+   amber corner brackets; any later table card is stripped of them. */
+
+.pricing-page .pricing-table-card {
+  position: relative;
+}
+
+.pricing-page .pricing-table-card::before,
+.pricing-page .pricing-table-card::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.pricing-page .pricing-table-card::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--primary);
+  border-left: 2px solid var(--primary);
+}
+
+.pricing-page .pricing-table-card::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--primary);
+  border-right: 2px solid var(--primary);
+}
+
+.pricing-page .pricing-table-card ~ .pricing-table-card::before,
+.pricing-page .pricing-table-card ~ .pricing-table-card::after {
+  content: none;
+}
+
+/* ── 05. Section heads — dotted leader readout (§8) ───────────── */
+/* `Title ····················· meta` — spec-sheet leader line. */
+
+.pricing-page .package-costing-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  min-width: 0;
+}
+
+.pricing-page .package-costing-section-head strong {
+  order: 1;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-family: var(--font-title);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.pricing-page .package-costing-section-head::before {
+  content: "";
+  order: 2;
+  flex: 1 1 24px;
+  min-width: 24px;
+  align-self: center;
+  transform: translateY(1px);
+  border-bottom: 1px dotted var(--border-strong);
+}
+
+.pricing-page .package-costing-section-head span {
+  order: 3;
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* ── 06. Costing / breakdown / margin tables ──────────────────── */
+/* Chrome (sticky header, hairline rows, amber hover) is global —
+   the module sets scroll ceilings, widths, and data voices. */
+
+.pricing-page .package-costing-table-wrap {
+  max-height: min(55vh, 520px);
+}
+
+.pricing-page .package-breakdown-table-wrap {
+  max-height: min(58vh, 620px);
+}
+
+.pricing-page .package-costing-table {
+  min-width: 1220px;
+}
+
+.pricing-page .package-breakdown-table {
+  min-width: 980px;
+}
+
+.pricing-page .margin-setup-table {
+  margin-top: 2px;
+}
+
+/* Scenario name = plate designation (Space Grotesk, tight). */
+.pricing-page .package-costing-table td:first-child strong {
+  font-family: var(--font-title);
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+/* Margin percentages: emphasized mono figures. */
+.pricing-page .margin-setup-table td.num {
+  font-weight: 600;
+}
+
+/* Signed money — profit/margin verdict colors from tokens only. */
+.pricing-page .package-money {
+  font-weight: 700;
+}
+
+.pricing-page .package-money.is-positive {
+  color: var(--success);
+}
+
+.pricing-page .package-money.is-negative {
+  color: var(--danger);
+}
+
+/* Material + linked catalog name, stacked. */
+.pricing-page .package-material-name {
+  display: grid;
+  gap: 3px;
+  min-width: 280px;
+  max-width: 520px;
+}
+
+.pricing-page .package-material-name strong {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.pricing-page .package-material-name span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  color: var(--text-faint);
+}
+
+/* Row action clusters stay on one line inside cells. */
+.pricing-page .package-actions,
+.pricing-page .materials-table .materials-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pricing-page .package-actions {
+  flex-wrap: nowrap;
+}
+
+/* Dense in-table controls (module density extension). */
+.pricing-page .materials-table .btn {
+  height: var(--ctrl-h-sm);
+  min-height: var(--ctrl-h-sm);
+  padding: 0 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Row-level destructive action — quiet danger ghost. Filled red is
+   reserved for confirm-modal primaries. Inset ring, not border, so
+   the control never shifts layout. */
+.pricing-page .pricing-btn-danger {
+  color: var(--danger);
+}
+
+.pricing-page .pricing-btn-danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 35%, transparent);
+}
+
+.pricing-page .pricing-btn-danger:focus-visible {
+  outline-color: var(--danger);
+}
+
+/* ── 07. Inline editing — amber rail + compact controls ───────── */
+
+/* Row being edited: amber tint + 2px inset rail (§8 rail rule). */
+.pricing-page .materials-table tr.pricing-row-editing td {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.pricing-page .materials-table tr.pricing-row-editing td:first-child {
+  box-shadow: inset 2px 0 0 var(--primary);
+}
+
+/* Controls shrink to row scale. */
+.pricing-page .materials-table td .input,
+.pricing-page .materials-table td .select {
+  height: var(--ctrl-h-sm);
+  min-height: var(--ctrl-h-sm);
+  padding: 2px 8px;
+  font-size: 12.5px;
+}
+
+.pricing-page .materials-table td.num .input {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.pricing-page .pricing-inline-input {
+  width: 84px;
+  min-width: 64px;
+}
+
+.pricing-page .pricing-inline-name {
+  width: 100%;
+  min-width: 180px;
+  text-align: left;
+}
+
+/* Active checkbox inside the editing row. */
+.pricing-page .pricing-active-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pricing-page .pricing-active-toggle input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+/* ── 08. Margin setup editor — six spec plates ────────────────── */
+
+.pricing-page .margin-setup-editor {
+  display: grid;
+  gap: 16px;
+  padding: 16px 18px 18px;
+  align-content: start;
+}
+
+.pricing-page .margin-setup-editor-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.pricing-page .margin-setup-editor-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pricing-page .margin-setup-editor-copy strong {
+  font-family: var(--font-title);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.pricing-page .margin-setup-editor-copy span {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-soft);
+}
+
+/* Active-template switch — squared control chip, mono caption. */
+.pricing-page .margin-setup-status {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--ctrl-h);
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-soft);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--speed) var(--ease-out);
+}
+
+.pricing-page .margin-setup-status:hover {
+  border-color: var(--border-strong);
+}
+
+.pricing-page .margin-setup-status input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.pricing-page .margin-setup-topbar {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+/* Plate rack — numbered via CSS counter for the M·01…M·06 tags. */
+.pricing-page .margin-setup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  counter-reset: pricing-plate;
+}
+
+/* One margin bucket = one spec plate: hairline card, dotted-leader
+   divider, mono index tag, right-aligned mono percentage. */
+.pricing-page .margin-setup-card {
+  counter-increment: pricing-plate;
+  position: relative;
+  display: grid;
+  gap: 10px;
+  padding: 14px 14px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--speed) var(--ease-out),
+    box-shadow var(--speed) var(--ease-out);
+}
+
+.pricing-page .margin-setup-card:focus-within {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  box-shadow: var(--shadow-sm), 0 0 0 1px var(--primary-soft);
+}
+
+.pricing-page .margin-setup-card::after {
+  content: "M·" counter(pricing-plate, decimal-leading-zero);
+  position: absolute;
+  top: 13px;
+  right: 14px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.pricing-page .margin-setup-card-head {
+  display: grid;
+  gap: 4px;
+  padding-right: 48px;
+  padding-bottom: 9px;
+  border-bottom: 1px dotted var(--border-strong);
+}
+
+.pricing-page .margin-setup-card-head strong {
+  font-family: var(--font-title);
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.pricing-page .margin-setup-card-head span {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+
+/* Percent inputs read as instrument values. */
+.pricing-page .margin-setup-card .input {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Footer actions — dashed divider, right-aligned. */
+.pricing-page .margin-setup-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.pricing-page .margin-setup-actions .btn {
+  width: auto;
+  min-width: 128px;
+}
+
+/* ── 09. Empty state (§8) ─────────────────────────────────────── */
+
+.pricing-page .template-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 40px 24px 32px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-soft) 55%, transparent);
+}
+
+.pricing-page .template-empty-state > svg {
+  color: var(--text-faint);
+  opacity: 0.8;
+  margin-bottom: 4px;
+}
+
+.pricing-page .template-empty-state > strong {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text);
+}
+
+.pricing-page .template-empty-state > strong::before {
+  content: "▪ ";
+  color: var(--primary);
+}
+
+.pricing-page .template-empty-state > p {
+  margin: 0;
+  max-width: 420px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-soft);
+}
+
+.pricing-page .template-empty-count {
+  margin-top: 4px;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--primary-soft);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--primary-deep);
+}
+
+/* ── 10. Motion — namespaced, guarded ─────────────────────────── */
+
+@media (prefers-reduced-motion: no-preference) {
+  .pricing-page .pricing-create-card,
+  .pricing-page .margin-setup-editor {
+    animation: pricing-panel-in var(--speed-slow) var(--ease-out);
+  }
+}
+
+@keyframes pricing-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pricing-page .pricing-create-card,
+  .pricing-page .margin-setup-editor,
+  .pricing-page .margin-setup-card,
+  .pricing-page .margin-setup-status {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ── 11. Breakpoints (old triggers kept: 1400/900/720/600) ────── */
+
+@media (min-width: 1400px) {
+  .pricing-page .margin-setup-editor {
+    max-width: 1320px;
+    margin-inline: auto;
+  }
+
+  .pricing-page .margin-setup-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .pricing-page .add-item-details-row.row-auto {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .pricing-page .add-item-details-row.row-auto .add-item-submit {
+    grid-column: span 2;
+  }
+
+  .pricing-page .margin-setup-topbar,
+  .pricing-page .margin-setup-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pricing-page .margin-setup-editor-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pricing-page .margin-setup-status {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .pricing-page .margin-setup-editor {
+    padding: 14px;
+  }
+
+  .pricing-page .margin-setup-actions {
+    justify-content: stretch;
+  }
+
+  .pricing-page .margin-setup-actions .btn {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  .pricing-page .pricing-toolbar-field {
+    flex: 1 1 100%;
+  }
+
+  .pricing-page .pricing-template-select {
+    max-width: none;
+    flex: 1;
+  }
+
+  .pricing-page .page-toolbar-actions.pricing-statbar {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .pricing-page .add-item-details-row.row-auto {
+    grid-template-columns: 1fr;
+  }
+
+  .pricing-page .add-item-details-row.row-auto .add-item-submit {
+    grid-column: span 1;
+  }
+}

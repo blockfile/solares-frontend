@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../api/client";
+import "../styles/pricing.css";
 
 function normalizeRateInput(value) {
   const parsed = Number(value);
@@ -82,29 +83,6 @@ const MARGIN_FIELDS = [
   }
 ];
 
-// Compact inline cell input — stays small to fit inside the table row.
-const inlineInputStyle = {
-  width: "78px",
-  minWidth: "60px",
-  padding: "6px 8px",
-  fontSize: "13px",
-  color: "#0f172a",
-  background: "#fff",
-  border: "1.5px solid #cbd5e1",
-  borderRadius: "8px"
-};
-
-const inlineNameInputStyle = {
-  width: "100%",
-  minWidth: "180px",
-  padding: "6px 8px",
-  fontSize: "13px",
-  color: "#0f172a",
-  background: "#fff",
-  border: "1.5px solid #cbd5e1",
-  borderRadius: "8px"
-};
-
 export default function MarginTemplatesTab() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -118,6 +96,9 @@ export default function MarginTemplatesTab() {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
+
+  // Atlas UI-only state: whether the create-template panel is expanded.
+  const [showCreate, setShowCreate] = useState(false);
 
   const loadRows = async () => {
     setLoading(true);
@@ -195,25 +176,61 @@ export default function MarginTemplatesTab() {
     }
   };
 
-  return (
-    <div>
-      <div className="materials-card">
-        <div className="module-card-head">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 19h16" /><path d="M4 15h16" /><path d="M8 11h12" /><path d="M12 7h8" />
-          </svg>
-          <div className="module-card-head-text">
-            <strong>Margin Setup</strong>
-            <span>Build reusable pricing presets for the six quote buckets used during quotation.</span>
-          </div>
-        </div>
+  const activeCount = rows.filter((row) => Boolean(row.isActive)).length;
 
-        {/* CREATE-ONLY top form. Editing happens inline in the table below. */}
-        <div className="add-item-card margin-setup-editor">
+  return (
+    <div className="pricing-page">
+      {/* ── Page head (Atlas §4) ── */}
+      <header className="page-head">
+        <span className="page-head-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>
+          </svg>
+        </span>
+        <div className="page-head-text">
+          <h2 className="page-head-title">Margin Setup</h2>
+          <p className="page-head-desc">
+            Reusable pricing presets for the six quote buckets used during quotation.
+          </p>
+        </div>
+        <div className="page-head-actions">
+          <button
+            className="btn btn-primary"
+            type="button"
+            aria-expanded={showCreate}
+            aria-controls="margin-create-panel"
+            onClick={() => setShowCreate((open) => !open)}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            New template
+          </button>
+        </div>
+      </header>
+
+      {/* ── Toolbar: quiet stat chips (moved from the old ink banner) ── */}
+      <div className="page-toolbar pricing-toolbar">
+        <div className="pricing-statbar">
+          <span className="pricing-stat-chip">
+            <span className="pricing-stat-chip-label">Templates</span>
+            <span className="pricing-stat-chip-value num">{rows.length}</span>
+          </span>
+          <span className="pricing-stat-chip">
+            <span className="pricing-stat-chip-label">Active</span>
+            <span className="pricing-stat-chip-value num">{activeCount}</span>
+          </span>
+        </div>
+      </div>
+
+      {/* ── Collapsed CREATE-ONLY form (opens from the page-head button).
+             Editing happens inline in the table below. ── */}
+      {showCreate && (
+        <section className="add-item-card margin-setup-editor" id="margin-create-panel">
           <div className="margin-setup-editor-head">
             <div className="margin-setup-editor-copy">
-              <strong style={{ color: "#fff" }}>Create Margin Template</strong>
-              <span style={{ color: "rgba(255,255,255,0.72)" }}>
+              <strong>Create margin template</strong>
+              <span>
                 Set percentage margins for system hardware, protection, mounting, and installation.
                 Existing templates can be edited inline in the table below.
               </span>
@@ -281,23 +298,37 @@ export default function MarginTemplatesTab() {
             >
               Reset
             </button>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={() => setShowCreate(false)}
+              disabled={creating}
+            >
+              Close
+            </button>
           </div>
+        </section>
+      )}
+
+      {error && <div className="error-text">{error}</div>}
+      {loading && <p className="section-note">Loading margin templates...</p>}
+
+      <section className="materials-card pricing-table-card">
+        <div className="package-costing-section-head">
+          <strong>Margin Templates</strong>
+          <span>{rows.length} template{rows.length === 1 ? "" : "s"}</span>
         </div>
-
-        {error && <div className="error-text">{error}</div>}
-        {loading && <p className="section-note">Loading margin templates...</p>}
-
         <div className="materials-table-wrap margin-setup-table">
           <table className="materials-table">
             <thead>
               <tr>
                 <th>Template</th>
-                <th>Inverter</th>
-                <th>Panel</th>
-                <th>Battery</th>
-                <th>Safety</th>
-                <th>Mounting</th>
-                <th>Installation</th>
+                <th className="num">Inverter</th>
+                <th className="num">Panel</th>
+                <th className="num">Battery</th>
+                <th className="num">Safety</th>
+                <th className="num">Mounting</th>
+                <th className="num">Installation</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -311,16 +342,14 @@ export default function MarginTemplatesTab() {
                   return (
                     <tr key={row.id}>
                       <td>{row.name}</td>
-                      <td>{percentInputValue(row.inverterMargin)}%</td>
-                      <td>{percentInputValue(row.panelMargin)}%</td>
-                      <td>{percentInputValue(row.batteryMargin)}%</td>
-                      <td>{percentInputValue(row.safetyMargin)}%</td>
-                      <td>{percentInputValue(row.mountingMargin)}%</td>
-                      <td>{percentInputValue(row.installationMargin)}%</td>
+                      <td className="num">{percentInputValue(row.inverterMargin)}%</td>
+                      <td className="num">{percentInputValue(row.panelMargin)}%</td>
+                      <td className="num">{percentInputValue(row.batteryMargin)}%</td>
+                      <td className="num">{percentInputValue(row.safetyMargin)}%</td>
+                      <td className="num">{percentInputValue(row.mountingMargin)}%</td>
+                      <td className="num">{percentInputValue(row.installationMargin)}%</td>
                       <td>
-                        <span
-                          className={`status-pill ${row.isActive ? "status-active" : "status-inactive"}`}
-                        >
+                        <span className={`chip ${row.isActive ? "chip-success" : "chip-danger"}`}>
                           {row.isActive ? "Active" : "Inactive"}
                         </span>
                       </td>
@@ -336,7 +365,7 @@ export default function MarginTemplatesTab() {
                             Edit
                           </button>
                           <button
-                            className="btn btn-danger"
+                            className="btn btn-ghost pricing-btn-danger"
                             type="button"
                             onClick={() => remove(row.id)}
                             disabled={Boolean(editingId)}
@@ -351,10 +380,10 @@ export default function MarginTemplatesTab() {
 
                 // Inline-editing row
                 return (
-                  <tr key={row.id} style={{ background: "#fffbe6" }}>
+                  <tr key={row.id} className="pricing-row-editing">
                     <td>
                       <input
-                        style={inlineNameInputStyle}
+                        className="input pricing-inline-input pricing-inline-name"
                         value={editForm?.name || ""}
                         onChange={(e) =>
                           setEditForm((prev) => ({ ...(prev || {}), name: e.target.value }))
@@ -363,9 +392,9 @@ export default function MarginTemplatesTab() {
                       />
                     </td>
                     {MARGIN_FIELDS.slice(0, 6).map((field) => (
-                      <td key={field.key}>
+                      <td key={field.key} className="num">
                         <input
-                          style={inlineInputStyle}
+                          className="input pricing-inline-input"
                           type="number"
                           min="0"
                           step="0.01"
@@ -380,17 +409,7 @@ export default function MarginTemplatesTab() {
                       </td>
                     ))}
                     <td>
-                      <label
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: "#0f172a",
-                          whiteSpace: "nowrap"
-                        }}
-                      >
+                      <label className="pricing-active-toggle">
                         <input
                           type="checkbox"
                           checked={Boolean(editForm?.isActive)}
@@ -429,7 +448,7 @@ export default function MarginTemplatesTab() {
               })}
               {!rows.length && !loading && (
                 <tr>
-                  <td colSpan="9" className="section-note">
+                  <td colSpan="9" className="section-note empty-state-cell">
                     No margin templates yet.
                   </td>
                 </tr>
@@ -437,7 +456,7 @@ export default function MarginTemplatesTab() {
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

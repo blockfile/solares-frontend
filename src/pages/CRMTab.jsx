@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { isAdminRole } from "../constants/access";
 import QuotesTab from "./QuotesTab";
 import SalesTab from "./SalesTab";
+import "../styles/sales.css";
 
 function IconUsers() {
   return (
@@ -39,20 +40,28 @@ export default function CRMTab({ currentUser }) {
 
   return (
     <div className="crm-module">
-      <div className="bgt-toolbar crm-toolbar">
-        <div className="bgt-seg">
-          {canManageClients && (
-            <button className={`bgt-seg-btn${view === "clients" ? " bgt-seg-btn--on" : ""}`} type="button" onClick={() => setView("clients")}>
-              <IconUsers /> Clients & Projects
-            </button>
-          )}
-          {canUseQuotations && (
-            <button className={`bgt-seg-btn${view === "quotations" ? " bgt-seg-btn--on" : ""}`} type="button" onClick={() => setView("quotations")}>
-              <IconQuote /> Quotations
-            </button>
-          )}
-        </div>
-      </div>
+      <nav className="tabs-underline crm-tabs" aria-label="CRM sections">
+        {canManageClients && (
+          <button
+            className={`tab-underline${view === "clients" ? " tab-underline--on" : ""}`}
+            type="button"
+            aria-current={view === "clients" ? "page" : undefined}
+            onClick={() => setView("clients")}
+          >
+            <IconUsers /> Clients & Projects
+          </button>
+        )}
+        {canUseQuotations && (
+          <button
+            className={`tab-underline${view === "quotations" ? " tab-underline--on" : ""}`}
+            type="button"
+            aria-current={view === "quotations" ? "page" : undefined}
+            onClick={() => setView("quotations")}
+          >
+            <IconQuote /> Quotations
+          </button>
+        )}
+      </nav>
 
       {view === "clients" ? <SalesTab /> : <QuotesTab />}
     </div>

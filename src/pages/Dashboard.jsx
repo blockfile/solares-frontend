@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/client";
+import OverviewTab from "./OverviewTab";
 import CalendarTab from "./CalendarTab";
 import CRMTab from "./CRMTab";
 import MaterialsTab from "./MaterialsTab";
@@ -14,11 +15,15 @@ import AuditTab from "./AuditTab";
 import FinancialManagementTab from "./FinancialManagementTab";
 import AccountingManagementTab from "./AccountingManagementTab";
 import solaresLogo from "../components/assets/SOLARES.png";
+import SidebarIcon from "../components/shell/SidebarIcon";
+import CommandPalette from "../components/shell/CommandPalette";
 import { clearAuthToken } from "../auth/tokenStorage";
 import { isAdminRole, normalizeModules, roleLabel } from "../constants/access";
 import useBodyScrollLock from "../hooks/useBodyScrollLock";
+import "../styles/shell.css";
 
 const TAB_CONFIG = [
+  { key: "overview", label: "Overview", group: "Workspace", icon: "overview" },
   { key: "calendar", label: "Calendar Dashboard", group: "Workspace", icon: "calendar" },
   { key: "crm", label: "Customer Relationship Management", group: "Workspace", icon: "crm", accessKeys: ["crm", "quotes"] },
   { key: "payroll", label: "Payroll", group: "Workspace", icon: "payroll" },
@@ -34,170 +39,28 @@ const TAB_CONFIG = [
   { key: "audit", label: "Audit", group: "System Administration", icon: "audit" }
 ];
 
+const COLLAPSE_STORAGE_KEY = "solaresSideCollapsed";
+
 function toCount(data) {
   return Array.isArray(data) ? data.length : 0;
 }
 
-function SidebarIcon({ icon }) {
-  const common = {
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "1.8",
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-    "aria-hidden": true
-  };
-
-  switch (icon) {
-    case "calendar":
-      return (
-        <svg {...common}>
-          <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
-          <path d="M7.5 3.5v3" />
-          <path d="M16.5 3.5v3" />
-          <path d="M3.5 9.5h17" />
-          <path d="M8 13h3" />
-          <path d="M13 13h3" />
-          <path d="M8 17h3" />
-        </svg>
-      );
-    case "quotes":
-      return (
-        <svg {...common}>
-          <path d="M7 4.5h8l3 3V19a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 19V6A1.5 1.5 0 0 1 7 4.5Z" />
-          <path d="M15 4.5V8h3" />
-          <path d="M8.5 11h7" />
-          <path d="M8.5 14.5h7" />
-          <path d="M8.5 18h4" />
-        </svg>
-      );
-    case "crm":
-      return (
-        <svg {...common}>
-          <path d="M16.5 20v-1.2a3.8 3.8 0 0 0-3.8-3.8H7.8A3.8 3.8 0 0 0 4 18.8V20" />
-          <circle cx="10.2" cy="8" r="3.2" />
-          <path d="M19.5 20v-1a3 3 0 0 0-2.2-2.9" />
-          <path d="M15.7 5.1a3.1 3.1 0 0 1 0 5.9" />
-          <path d="M3.5 5.5h4" />
-          <path d="M5.5 3.5v4" />
-        </svg>
-      );
-    case "payroll":
-      return (
-        <svg {...common}>
-          <rect x="4" y="5.5" width="16" height="13" rx="2.2" />
-          <path d="M7.5 9.5h9" />
-          <path d="M7.5 13h4" />
-          <path d="M15 14.8c.4.4 1 .6 1.7.6 1 0 1.8-.5 1.8-1.3 0-.7-.5-1.1-1.7-1.4-1.1-.3-1.7-.7-1.7-1.4 0-.8.7-1.3 1.6-1.3.7 0 1.2.2 1.6.6" />
-        </svg>
-      );
-    case "templates":
-      return (
-        <svg {...common}>
-          <rect x="4" y="4.5" width="16" height="15" rx="2.5" />
-          <path d="M8 8.5h8" />
-          <path d="M8 12h8" />
-          <path d="M8 15.5h4.5" />
-          <path d="M15.5 15.5h.01" />
-        </svg>
-      );
-    case "materials":
-      return (
-        <svg {...common}>
-          <path d="M6 8.5h12" />
-          <path d="M6 12h12" />
-          <path d="M6 15.5h7" />
-          <path d="M18 6.5H6A1.5 1.5 0 0 0 4.5 8v8A1.5 1.5 0 0 0 6 17.5h12a1.5 1.5 0 0 0 1.5-1.5V8A1.5 1.5 0 0 0 18 6.5Z" />
-          <path d="M8 3.5v3" />
-          <path d="M16 3.5v3" />
-        </svg>
-      );
-    case "packages":
-      return (
-        <svg {...common}>
-          <path d="M12 3.8 19 7.7v8.6L12 20.2 5 16.3V7.7L12 3.8Z" />
-          <path d="M5.6 7.9 12 11.5l6.4-3.6" />
-          <path d="M12 11.5v8.1" />
-        </svg>
-      );
-    case "inventory":
-      return (
-        <svg {...common}>
-          <path d="M4.5 7.5 12 3.5l7.5 4-7.5 4-7.5-4Z" />
-          <path d="M4.5 7.5v8.8l7.5 4.2 7.5-4.2V7.5" />
-          <path d="M12 11.5v8.8" />
-          <path d="M8.2 14.2h2.1" />
-        </svg>
-      );
-    case "margins":
-      return (
-        <svg {...common}>
-          <path d="M4 18h16" />
-          <path d="M7 18V9" />
-          <path d="M12 18V6" />
-          <path d="M17 18v-4" />
-        </svg>
-      );
-    case "users":
-      return (
-        <svg {...common}>
-          <path d="M16.5 20v-1.2a3.8 3.8 0 0 0-3.8-3.8H7.8A3.8 3.8 0 0 0 4 18.8V20" />
-          <circle cx="10.2" cy="8" r="3.2" />
-          <path d="M19.5 20v-1a3 3 0 0 0-2.2-2.9" />
-          <path d="M15.7 5.1a3.1 3.1 0 0 1 0 5.9" />
-        </svg>
-      );
-    case "roles":
-      return (
-        <svg {...common}>
-          <path d="M7 11.5 4.5 14l2.5 2.5" />
-          <path d="M17 11.5 19.5 14 17 16.5" />
-          <path d="M14 6.5h-4a2.5 2.5 0 0 0-2.5 2.5v10" />
-          <path d="M14 6.5v5h5" />
-          <path d="M14 6.5 19 11.5" />
-        </svg>
-      );
-    case "audit":
-      return (
-        <svg {...common}>
-          <path d="M12 6.5v5l3 1.8" />
-          <circle cx="12" cy="12" r="7.5" />
-          <path d="M12 2.5v2" />
-          <path d="M21.5 12h-2" />
-        </svg>
-      );
-    case "finance":
-      return (
-        <svg {...common}>
-          <rect x="3.5" y="6" width="17" height="13" rx="2" />
-          <path d="M3.5 10h17" />
-          <path d="M7.2 15.5h2.4" />
-          <path d="M12 15.5h1.8" />
-          <path d="M16.4 15.5h.6" />
-          <path d="M7.5 3.5v2.5" />
-          <path d="M16.5 3.5v2.5" />
-        </svg>
-      );
-    case "accounting":
-      return (
-        <svg {...common}>
-          <path d="M6 3.8h12a1.5 1.5 0 0 1 1.5 1.5v15l-2.3-1.2-2.3 1.2-2.3-1.2-2.3 1.2-2.3-1.2L4.5 20.3V5.3A1.5 1.5 0 0 1 6 3.8Z" />
-          <path d="M8 8.5h8" />
-          <path d="M8 12h8" />
-          <path d="M8 15.5h4.5" />
-        </svg>
-      );
-    default:
-      return null;
-  }
+function handleLogout() {
+  clearAuthToken();
+  window.location.href = "/login";
 }
 
 export default function Dashboard({ theme = "light", onToggleTheme }) {
-  const [tab, setTab] = useState("calendar");
+  const [tab, setTab] = useState("overview");
   const [now, setNow] = useState(new Date());
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [summary, setSummary] = useState({
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem(COLLAPSE_STORAGE_KEY) === "1"
+  );
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
+  const [, setSummary] = useState({
     events: 0,
     templates: 0,
     materials: 0,
@@ -219,12 +82,16 @@ export default function Dashboard({ theme = "light", onToggleTheme }) {
 
   useBodyScrollLock(sidebarOpen);
 
+  useEffect(() => {
+    localStorage.setItem(COLLAPSE_STORAGE_KEY, collapsed ? "1" : "0");
+  }, [collapsed]);
+
   const dateLabel = useMemo(
     () =>
       now.toLocaleDateString(undefined, {
-        weekday: "long",
+        weekday: "short",
         year: "numeric",
-        month: "long",
+        month: "short",
         day: "numeric"
       }),
     [now]
@@ -234,7 +101,8 @@ export default function Dashboard({ theme = "light", onToggleTheme }) {
     () =>
       now.toLocaleTimeString(undefined, {
         hour: "2-digit",
-        minute: "2-digit"
+        minute: "2-digit",
+        second: "2-digit"
       }),
     [now]
   );
@@ -242,7 +110,11 @@ export default function Dashboard({ theme = "light", onToggleTheme }) {
   const visibleTabs = useMemo(() => {
     const allowedKeys = normalizeModules(user.permissions, ["calendar"]);
     if (isAdminRole(user.role)) return TAB_CONFIG;
-    return TAB_CONFIG.filter((item) => (item.accessKeys || [item.key]).some((key) => allowedKeys.includes(key)));
+    return TAB_CONFIG.filter(
+      (item) =>
+        item.key === "overview" ||
+        (item.accessKeys || [item.key]).some((key) => allowedKeys.includes(key))
+    );
   }, [user.permissions, user.role]);
 
   const activeTab = useMemo(
@@ -250,9 +122,7 @@ export default function Dashboard({ theme = "light", onToggleTheme }) {
     [tab, visibleTabs]
   );
   const isDarkTheme = theme === "dark";
-
-  const showDashboardMetrics = activeTab?.key === "calendar";
-  const pageEyebrow = showDashboardMetrics ? "Dashboard" : activeTab?.group || "Workspace";
+  const userInitial = (user.name || "U").slice(0, 1).toUpperCase();
 
   const groupedTabs = useMemo(() => {
     return visibleTabs.reduce((acc, item) => {
@@ -316,167 +186,241 @@ export default function Dashboard({ theme = "light", onToggleTheme }) {
 
   useEffect(() => {
     if (!visibleTabs.some((item) => item.key === tab)) {
-      setTab(visibleTabs[0]?.key || "calendar");
+      setTab(visibleTabs[0]?.key || "overview");
     }
   }, [tab, visibleTabs]);
 
-  const stats = useMemo(() => {
-    const items = [];
-    const canAccessModule = (key) => isAdminRole(user.role) || user.permissions.includes(key);
-    if (canAccessModule("calendar")) {
-      items.push({ label: "Scheduled Events", value: summary.events });
-    }
-    if (canAccessModule("templates")) {
-      items.push({ label: "Quote Templates", value: summary.templates });
-    }
-    if (canAccessModule("materials")) {
-      items.push({ label: "Materials", value: summary.materials });
-    }
-    if (canAccessModule("inventory")) {
-      items.push({ label: "Inventory Items", value: summary.inventory });
-    }
-    if (canAccessModule("payroll")) {
-      items.push({ label: "Payroll Employees", value: summary.payroll });
-    }
-    if (canAccessModule("crm")) {
-      items.push({ label: "CRM Projects", value: summary.crmProjects });
-    }
-    if (canAccessModule("packages")) {
-      items.push({ label: "Active Packages", value: summary.packages });
-    }
-    if (canAccessModule("margins")) {
-      items.push({ label: "Margin Templates", value: summary.margins });
-    }
-    return items;
-  }, [summary, user.permissions, user.role]);
+  // Global Ctrl/Cmd+K toggles the command palette.
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // User menu: click-outside + Esc close.
+  useEffect(() => {
+    if (!userMenuOpen) return undefined;
+    const onPointerDown = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setUserMenuOpen(false);
+      }
+    };
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setUserMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [userMenuOpen]);
+
+  const selectTab = (key) => {
+    setTab(key);
+    setSidebarOpen(false);
+    setPaletteOpen(false);
+  };
+
+  const groupEntries = Object.entries(groupedTabs);
+  const shellClass = [
+    "hx-shell",
+    "page-animate",
+    collapsed ? "hx-side-collapsed" : "",
+    sidebarOpen ? "hx-drawer-open" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <div className={`workspace-shell page-animate${sidebarOpen ? " sidebar-active" : ""}`}>
-      {sidebarOpen && (
-        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
-      )}
-      <aside className={`workspace-sidebar${sidebarOpen ? " sidebar-open" : ""}`}>
-        <div className="sidebar-brand">
-          <img src={solaresLogo} alt="Solares" className="sidebar-brand-logo" />
-          <div className="sidebar-brand-text" aria-label="Solares Energy Solution">
-            <strong>Solares</strong>
-            <span>Energy Solution</span>
+    <div className={shellClass}>
+      {sidebarOpen && <div className="hx-drawer-scrim" onClick={() => setSidebarOpen(false)} />}
+
+      <aside className="hx-side">
+        <div className="hx-side-head">
+          <div className="hx-brand">
+            <img src={solaresLogo} alt="Solares" className="hx-brand-logo" />
+            <span className="hx-brand-lockup" aria-label="Solares Energy Solution">
+              <strong>SOLARES</strong>
+              <small>Helios Console</small>
+            </span>
           </div>
+          <button
+            type="button"
+            className="hx-collapse"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() => setCollapsed((v) => !v)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m14 6-6 6 6 6" />
+            </svg>
+          </button>
         </div>
 
-        <div className="sidebar-groups">
-          {Object.entries(groupedTabs).map(([groupName, items]) => (
-            <div className="sidebar-group" key={groupName}>
-              <p className="sidebar-group-title">{groupName}</p>
-              <div className="sidebar-links">
-                {items.map((item) => (
-                  <button
-                    key={item.key}
-                    className={`sidebar-link ${tab === item.key ? "active" : ""}`}
-                    onClick={() => { setTab(item.key); setSidebarOpen(false); }}
-                  >
-                    <span className="sidebar-link-icon">
-                      <SidebarIcon icon={item.icon} />
-                    </span>
-                    <span className="sidebar-link-label">{item.label}</span>
-                  </button>
-                ))}
-              </div>
+        <div className="hx-side-scroll">
+          {groupEntries.map(([groupName, items]) => (
+            <div className="hx-nav-group" key={groupName} role="group" aria-label={groupName}>
+              <p className="hx-nav-label">{groupName}</p>
+              {items.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={`hx-nav-item${tab === item.key ? " active" : ""}`}
+                  aria-current={tab === item.key ? "page" : undefined}
+                  onClick={() => selectTab(item.key)}
+                >
+                  <SidebarIcon icon={item.icon} />
+                  <span className="hx-nav-text">{item.label}</span>
+                  <span className="hx-flyout" role="tooltip">{item.label}</span>
+                </button>
+              ))}
             </div>
           ))}
         </div>
 
-        <div className="sidebar-footer">
-          <div className="sidebar-user">
-            <div className="sidebar-avatar">
-              {(user.name || "U").slice(0, 1).toUpperCase()}
-            </div>
-            <div className="sidebar-user-meta">
-              <strong>{user.name || "User"}</strong>
-              <p>{user.roleLabel || roleLabel(user.role)}</p>
-              <span>{user.username || user.email || "Authenticated user"}</span>
-            </div>
-          </div>
+        <div className="hx-side-foot">
           <button
-            className="theme-switch"
+            className="hx-theme"
             type="button"
             role="switch"
             aria-checked={isDarkTheme}
             aria-label={`Switch to ${isDarkTheme ? "light" : "dark"} mode`}
             onClick={onToggleTheme}
           >
-            <span className="theme-switch-copy">
-              <span>{isDarkTheme ? "Dark mode" : "Light mode"}</span>
-              <small>{isDarkTheme ? "Night workspace" : "Day workspace"}</small>
+            <span className="hx-theme-copy">
+              <span>{isDarkTheme ? "Night ops" : "Daylight"}</span>
+              <small>{isDarkTheme ? "Dark stage" : "Light stage"}</small>
             </span>
-            <span className="theme-switch-track" aria-hidden="true">
-              <span className="theme-switch-thumb" />
+            <span className="hx-theme-track" aria-hidden="true">
+              <span className="hx-theme-thumb" />
             </span>
           </button>
-          <button
-            className="btn btn-ghost sidebar-logout-btn"
-            onClick={() => {
-              clearAuthToken();
-              window.location.href = "/login";
-            }}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+
+          <div className="hx-user">
+            <div className="hx-avatar">{userInitial}</div>
+            <div className="hx-user-meta">
+              <strong>{user.name || "User"}</strong>
+              <small>{user.roleLabel || roleLabel(user.role)}</small>
+            </div>
+          </div>
+
+          <button className="hx-logout" onClick={handleLogout}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
             </svg>
-            Log Out
+            <span>Log out</span>
           </button>
         </div>
       </aside>
 
-      <main className="workspace-main">
-        <header className="workspace-topbar">
-          <div className="workspace-topbar-left">
+      <div className="hx-main">
+        <header className="hx-top">
+          <div className="hx-top-left">
             <button
-              className="sidebar-hamburger"
+              className="hx-burger"
               type="button"
               aria-label="Toggle menu"
               onClick={() => setSidebarOpen((v) => !v)}
             >
               <span /><span /><span />
             </button>
-            <div>
-              <p className="eyebrow">{pageEyebrow}</p>
-              <h1 className="workspace-title">{activeTab.label}</h1>
+            <div className="hx-module" aria-label="Current module">
+              <span className="hx-module-group">{activeTab.group}</span>
+              <strong className="hx-module-title">{activeTab.label}</strong>
             </div>
           </div>
-          <div className="workspace-datetime">
-            <span>{dateLabel}</span>
-            <strong>{timeLabel}</strong>
+
+          <div className="hx-top-right">
+            <button
+              type="button"
+              className="hx-search"
+              onClick={() => setPaletteOpen(true)}
+              aria-label="Search modules (Ctrl+K)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.6-3.6" />
+              </svg>
+              <span className="hx-search-label">Search…</span>
+              <kbd className="kbd">Ctrl K</kbd>
+            </button>
+
+            <div className="hx-clock" aria-hidden="true">
+              <span className="hx-clock-time">
+                <span className="hx-clock-dot" />
+                {timeLabel}
+              </span>
+              <span className="hx-clock-date">{dateLabel}</span>
+            </div>
+
+            <div className="hx-usermenu" ref={userMenuRef}>
+              <button
+                type="button"
+                className="hx-usermenu-btn"
+                aria-haspopup="menu"
+                aria-expanded={userMenuOpen}
+                aria-label="User menu"
+                onClick={() => setUserMenuOpen((open) => !open)}
+              >
+                {userInitial}
+              </button>
+              {userMenuOpen && (
+                <div className="hx-usermenu-pop" role="menu" aria-label="User menu">
+                  <div className="hx-usermenu-id">
+                    <strong>{user.name || "User"}</strong>
+                    <span className="hx-usermenu-role">{user.roleLabel || roleLabel(user.role)}</span>
+                    <span className="hx-usermenu-name">{user.username || user.email || "Authenticated user"}</span>
+                  </div>
+                  <div className="hx-usermenu-divider" aria-hidden="true" />
+                  <button type="button" className="hx-usermenu-logout" role="menuitem" onClick={handleLogout}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+                    </svg>
+                    Log out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
-        {showDashboardMetrics && (
-          <div className="workspace-metrics">
-            {stats.map((stat) => (
-              <article className="metric-card" key={stat.label}>
-                <strong>{stat.value}</strong>
-                <span>{stat.label}</span>
-              </article>
-            ))}
-          </div>
-        )}
+        <div className="hx-stage">
+          <section
+            className={
+              tab === "overview"
+                ? "workspace-panel workspace-panel-plain"
+                : `workspace-panel${tab === "crm" ? " workspace-panel-fill" : ""}`
+            }
+          >
+            {tab === "overview" && <OverviewTab currentUser={user} theme={theme} />}
+            {tab === "calendar" && <CalendarTab currentUser={user} onActivityChange={loadSummary} />}
+            {tab === "crm" && <CRMTab currentUser={user} />}
+            {tab === "payroll" && <PayrollTab />}
+            {tab === "templates" && <TemplatesTab />}
+            {tab === "materials" && <MaterialsTab />}
+            {tab === "inventory" && <InventoryTab />}
+            {tab === "packages" && <PackagePricesTab />}
+            {tab === "margins" && <MarginTemplatesTab />}
+            {tab === "finance" && <FinancialManagementTab />}
+            {tab === "accounting" && <AccountingManagementTab />}
+            {tab === "users" && <UsersTab currentUser={user} />}
+            {tab === "roles" && <RolesTab />}
+            {tab === "audit" && <AuditTab />}
+          </section>
+        </div>
+      </div>
 
-        <section className={`panel workspace-panel ${tab === "crm" ? "workspace-panel-fill" : ""}`}>
-          {tab === "calendar" && <CalendarTab currentUser={user} onActivityChange={loadSummary} />}
-          {tab === "crm" && <CRMTab currentUser={user} />}
-          {tab === "payroll" && <PayrollTab />}
-          {tab === "templates" && <TemplatesTab />}
-          {tab === "materials" && <MaterialsTab />}
-          {tab === "inventory" && <InventoryTab />}
-          {tab === "packages" && <PackagePricesTab />}
-          {tab === "margins" && <MarginTemplatesTab />}
-          {tab === "finance" && <FinancialManagementTab />}
-          {tab === "accounting" && <AccountingManagementTab />}
-          {tab === "users" && <UsersTab currentUser={user} />}
-          {tab === "roles" && <RolesTab />}
-          {tab === "audit" && <AuditTab />}
-        </section>
-      </main>
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        items={visibleTabs}
+        onSelect={selectTab}
+      />
     </div>
   );
 }

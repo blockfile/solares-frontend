@@ -4,31 +4,28 @@ import { setAuthToken } from "../auth/tokenStorage";
 import solaresLogo from "../components/assets/SOLARES.png";
 import useBodyScrollLock from "../hooks/useBodyScrollLock";
 
-// Three.js is heavy — load it as its own chunk so it only downloads on the
-// login screen and never bloats the authenticated app bundle. The CSS gradient
-// behind the canvas serves as the fallback while it loads.
+// The animated solar canvas is its own chunk so it never bloats the
+// authenticated app bundle; the chrome background covers while it loads.
 const LoginBackground = lazy(() => import("../components/LoginBackground"));
 
 const MAX_IDENTIFIER_LENGTH = 150;
 const MAX_PASSWORD_LENGTH = 72;
 
-const HERO_FEATURES = [
+const READOUTS = [
   {
+    key: "QUO/01",
     title: "Solar-grade quoting",
-    copy: "Build accurate quotations from live material costs and margin templates.",
-    icon: (
-      <path d="M12 3v2m0 14v2m9-9h-2M5 12H3m14.5-6.5-1.4 1.4M7.9 16.1l-1.4 1.4m11 0-1.4-1.4M7.9 7.9 6.5 6.5M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Z" />
-    )
+    copy: "Quotations built from live material costs and margin templates."
   },
   {
+    key: "OPS/02",
     title: "End-to-end operations",
-    copy: "Scheduling, inventory, payroll and accounting in one connected workspace.",
-    icon: <path d="M4 7h16M4 12h16M4 17h10M6.5 4.5v2m11-2v2" />
+    copy: "Scheduling, inventory, payroll and accounting in one console."
   },
   {
-    title: "Secure & role-based",
-    copy: "Granular module access keeps every team focused on what they own.",
-    icon: <path d="M12 3 5 6v5c0 4.2 2.9 7.7 7 9 4.1-1.3 7-4.8 7-9V6l-7-3Zm0 6.5v3m-2.2 0h4.4" />
+    key: "SEC/03",
+    title: "Role-based access",
+    copy: "Granular module permissions keep every team on mission."
   }
 ];
 
@@ -136,159 +133,154 @@ export default function Login({ theme = "light", onToggleTheme }) {
   };
 
   return (
-    <div className="login-stage page-animate">
+    <div className="hx-login page-animate">
       <Suspense fallback={null}>
         <LoginBackground theme={theme} />
       </Suspense>
-      <div className="login-scrim" aria-hidden="true" />
+      <div className="hx-login-scrim" aria-hidden="true" />
 
       <button
-        className="theme-switch login-theme-toggle"
+        className="hx-login-theme"
         type="button"
-        role="switch"
-        aria-checked={isDarkTheme}
         aria-label={`Switch to ${isDarkTheme ? "light" : "dark"} mode`}
         onClick={onToggleTheme}
       >
-        <span className="theme-switch-copy">
-          <span>{isDarkTheme ? "Dark" : "Light"}</span>
-          <small>{isDarkTheme ? "Night workspace" : "Day workspace"}</small>
-        </span>
-        <span className="theme-switch-track" aria-hidden="true">
-          <span className="theme-switch-thumb" />
-        </span>
+        {isDarkTheme ? (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4.2" />
+            <path d="M12 2.8v2" /><path d="M12 19.2v2" /><path d="M4.2 12h-2" /><path d="M21.8 12h-2" />
+            <path d="m5.4 5.4 1.4 1.4" /><path d="m17.2 17.2 1.4 1.4" /><path d="m18.6 5.4-1.4 1.4" /><path d="m6.8 17.2-1.4 1.4" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z" />
+          </svg>
+        )}
       </button>
 
-      <div className="login-grid">
-        <section className="login-hero">
-          <div className="login-hero-brand">
-            <img src={solaresLogo} alt="Solares" className="login-hero-logo" />
-            <span className="login-hero-lockup">
-              <strong>SOLARES</strong>
-              <small>Energy Solutions</small>
-            </span>
-          </div>
+      <section className="hx-login-hero">
+        <div className="hx-login-brand">
+          <img src={solaresLogo} alt="Solares" />
+          <span className="hx-login-lockup">
+            <strong>SOLARES</strong>
+            <small>Energy Solutions</small>
+          </span>
+        </div>
 
-          <div className="login-hero-copy">
-            <p className="login-hero-eyebrow">Management Information System</p>
-            <h1 className="login-hero-title">
-              Power your operations<br />from quote to commission.
-            </h1>
-            <p className="login-hero-lede">
-              One secure workspace for quoting, inventory, scheduling, payroll and
-              accounting — built for the way solar teams actually work.
-            </p>
-          </div>
+        <div className="hx-login-copy">
+          <p className="hx-login-eyebrow">Helios · Management Console</p>
+          <h1 className="hx-login-title">
+            Every watt, every peso,<br />
+            <em>one command deck.</em>
+          </h1>
+          <p className="hx-login-lede">
+            The Solares operations console — quoting, scheduling, inventory,
+            payroll and accounting for solar teams that run on precision.
+          </p>
+        </div>
 
-          <ul className="login-hero-features">
-            {HERO_FEATURES.map((feature) => (
-              <li key={feature.title} className="login-hero-feature">
-                <span className="login-hero-feature-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                    {feature.icon}
-                  </svg>
-                </span>
-                <span className="login-hero-feature-text">
-                  <strong>{feature.title}</strong>
-                  <small>{feature.copy}</small>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <ul className="hx-login-readouts">
+          {READOUTS.map((item) => (
+            <li key={item.key} className="hx-login-readout">
+              <span className="hx-login-readout-key">{item.key}</span>
+              <span className="hx-login-readout-copy">
+                <strong>{item.title}</strong>
+                <small>{item.copy}</small>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
-        <section className="login-panel">
-          <div className="login-card">
-            <div className="login-card-head">
-              <img src={solaresLogo} alt="Solares" className="login-card-logo" />
-              <h2 className="login-card-title">Welcome back</h2>
-              <p className="login-card-sub">Sign in to your Solares workspace</p>
+      <section className="hx-login-stage">
+        <div className="hx-login-card">
+          <p className="hx-login-card-eyebrow">Secure access</p>
+          <h2 className="hx-login-card-title">Sign in to the console</h2>
+          <p className="hx-login-card-sub">Authenticate with your Solares operator account</p>
+
+          <form onSubmit={submit} className="hx-login-form">
+            <div className="hx-login-field">
+              <label htmlFor="identifier">Operator ID / Email</label>
+              <input
+                id="identifier"
+                className="hx-login-input"
+                placeholder="username or email"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                autoComplete="username"
+                maxLength={MAX_IDENTIFIER_LENGTH}
+                required
+                spellCheck="false"
+              />
             </div>
 
-            <form onSubmit={submit} className="login-form">
-              <div className="field">
-                <label htmlFor="identifier">Username or Email</label>
+            <div className="hx-login-field">
+              <label htmlFor="password">Passphrase</label>
+              <div className="hx-login-pass">
                 <input
-                  id="identifier"
-                  className="input login-input"
-                  placeholder="Enter username or email"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  autoComplete="username"
-                  maxLength={MAX_IDENTIFIER_LENGTH}
+                  id="password"
+                  className="hx-login-input"
+                  placeholder="••••••••"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  maxLength={MAX_PASSWORD_LENGTH}
                   required
-                  spellCheck="false"
                 />
+                <button
+                  type="button"
+                  className="hx-login-eye"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
               </div>
+            </div>
 
-              <div className="field">
-                <label htmlFor="password">Password</label>
-                <div className="login-pass-wrap">
-                  <input
-                    id="password"
-                    className="input login-input"
-                    placeholder="Enter password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="current-password"
-                    maxLength={MAX_PASSWORD_LENGTH}
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="login-eye"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? "Hide" : "Show"}
-                  </button>
-                </div>
-              </div>
+            <label className="hx-login-remember">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />
+              <span>Keep me signed in on this device</span>
+            </label>
 
-              <label className="login-remember">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                />
-                <span>Remember me on this device</span>
-              </label>
+            {err && <div className="hx-login-error">{err}</div>}
 
-              {err && <div className="error-text">{err}</div>}
+            <button className="hx-login-submit" type="submit" disabled={submitting}>
+              {submitting ? "Authenticating…" : "Enter console"}
+              {!submitting && (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M5 12h14" /><path d="m13 6 6 6-6 6" />
+                </svg>
+              )}
+            </button>
+          </form>
 
-              <button className="btn btn-primary login-submit" type="submit" disabled={submitting}>
-                {submitting ? "Signing in…" : "Sign in"}
-                {!submitting && (
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M5 12h14" /><path d="m13 6 6 6-6 6" />
-                  </svg>
-                )}
-              </button>
-            </form>
-
-            <p className="login-card-foot">
-              &copy; {new Date().getFullYear()} Solares Energy Solutions · All rights reserved
-            </p>
-          </div>
-        </section>
-      </div>
+          <p className="hx-login-foot">
+            © {new Date().getFullYear()} Solares Energy Solutions · All systems nominal
+          </p>
+        </div>
+      </section>
 
       {pendingLogin && (
         <div className="modal-backdrop">
-          <div className="modal-card login-password-modal">
+          <div className="modal-card">
             <div className="modal-copy">
-              <h4>Change Password</h4>
+              <h4>Set a new passphrase</h4>
               <p>
-                This account is using a generated temporary password. Create a new password before
-                entering the dashboard.
+                This account is using a generated temporary password. Create a new
+                password before entering the console.
               </p>
-              <p className="login-password-user">
+              <p className="hx-login-password-user">
                 {pendingLogin.user?.username || pendingLogin.user?.email || identifier}
               </p>
             </div>
 
-            <form className="login-password-form" onSubmit={submitPasswordChange}>
+            <form className="hx-login-form" onSubmit={submitPasswordChange} style={{ marginTop: 16 }}>
               <input
                 className="input"
                 type="password"
@@ -308,7 +300,7 @@ export default function Login({ theme = "light", onToggleTheme }) {
                 maxLength={MAX_PASSWORD_LENGTH}
               />
 
-              {changeErr && <div className="error-text">{changeErr}</div>}
+              {changeErr && <div className="hx-login-error">{changeErr}</div>}
 
               <div className="modal-actions">
                 <button
@@ -320,7 +312,7 @@ export default function Login({ theme = "light", onToggleTheme }) {
                   Back
                 </button>
                 <button className="btn btn-primary" type="submit" disabled={changingPassword}>
-                  {changingPassword ? "Updating..." : "Save Password"}
+                  {changingPassword ? "Updating…" : "Save passphrase"}
                 </button>
               </div>
             </form>

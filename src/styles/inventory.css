@@ -1,0 +1,309 @@
+/* HELIOS — Inventory module styles. Consumes tokens from index.css only. */
+/* ─────────────────────────────────────────────────────────────────────
+   Stock control room: instrument-style level stats, movement entry
+   consoles and the shared data-table kit (base lives in index.css).
+   ───────────────────────────────────────────────────────────────────── */
+
+.inventory-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+/* ── Header ──────────────────────────────────────────────────────── */
+.inventory-page .inventory-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.inventory-page .inventory-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.inventory-page .inventory-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* form toggle buttons carry an open state */
+.inventory-page .btn.is-open {
+  border-color: var(--primary);
+  color: var(--primary-deep);
+  background: var(--primary-soft);
+  box-shadow: inset 0 -2px 0 var(--primary);
+}
+
+/* ── Stock instrument strip ──────────────────────────────────────── */
+.inv-stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.inv-stat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 13px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.inv-stat > span {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.inv-stat > strong {
+  font-family: var(--font-title);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.inv-stat:first-child {
+  border-left-color: var(--primary);
+}
+
+.inv-stat--warn {
+  border-left-color: var(--warn);
+}
+
+.inv-stat--warn > strong {
+  color: var(--warn);
+}
+
+.inv-stat--danger {
+  border-left-color: var(--danger);
+}
+
+.inv-stat--danger > strong {
+  color: var(--danger);
+}
+
+/* ── Toolbar ─────────────────────────────────────────────────────── */
+.inventory-page .inventory-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.inventory-page .inventory-toolbar-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.inventory-page .inventory-toolbar-filters .materials-filter-search {
+  min-width: 220px;
+}
+
+.inventory-page .inventory-toolbar-note {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+
+/* ── Entry consoles (item + movement forms) ──────────────────────── */
+.inventory-page .inventory-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.inventory-page .inventory-form-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  animation: hx-rise var(--speed-slow) var(--ease-out) both;
+}
+
+.inventory-page .inventory-form-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.inventory-page .inventory-form-card-head strong,
+.inventory-page .add-item-card-head strong {
+  font-family: var(--font-title);
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.inventory-page .btn.inventory-form-close {
+  margin-left: auto;
+}
+
+.inventory-page .inventory-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.inventory-page .inventory-field-wide {
+  grid-column: 1 / -1;
+}
+
+.inventory-page .inventory-edit-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* live stock readout inside the movement form */
+.inventory-page .inventory-selected-stock {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+}
+
+.inventory-page .inventory-selected-stock span {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.inventory-page .inventory-selected-stock strong {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-deep);
+}
+
+/* ── Table cells ─────────────────────────────────────────────────── */
+.inventory-page .inventory-table-wrap {
+  overflow-x: auto;
+}
+
+.inventory-page .inventory-table {
+  min-width: 680px;
+}
+
+.inventory-page .inventory-stock-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.inventory-page .inventory-stock-cell strong {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.inventory-page .inventory-stock-cell span {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+}
+
+.inventory-page .inventory-positive {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.inventory-page .inventory-negative {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.inventory-page .inventory-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.inventory-page .btn.inventory-btn-danger {
+  border-color: color-mix(in srgb, var(--danger) 50%, transparent);
+  color: var(--danger);
+  background: transparent;
+}
+
+.inventory-page .btn.inventory-btn-danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .inventory-page .inventory-entry-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .inventory-page .inventory-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inventory-page .inventory-toolbar-filters .materials-filter-search {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .inv-stat-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .inventory-page .inventory-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inventory-page .inventory-form-card {
+    animation: none;
+  }
+}

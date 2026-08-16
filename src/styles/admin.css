@@ -1,0 +1,846 @@
+/* HELIOS — Admin (Users · Roles · Audit) module styles. Consumes tokens from index.css only.
+   Scope: everything sits under .admin-page — the security console of the app.
+   Owns: admin-* classes (per-module exception), summary stat cards, role editor +
+   permission toggle grid, role cards, user roster details, audit terminal readout,
+   user editor / confirm / delete-blocker modal extensions.
+   Globals (btn, chip, input, field, page-head, page-toolbar, materials-table,
+   modal-*, error-text, section-note, table-subtext, empty-state-cell, mono) come
+   from index.css and are only extended under module parents where unavoidable. */
+
+/* ── 01 · Page scaffold · rhythm ─────────────────────────────────── */
+
+.admin-page {
+  position: relative;
+  min-width: 0;
+  animation: hx-rise var(--speed-slow) var(--ease-out) both;
+}
+
+/* Page-level error banner sits between toolbar and table/cards. */
+.admin-page > .error-text {
+  margin: 0 0 14px;
+}
+
+/* Roles: quiet helper note between editor card and the role card grid. */
+.admin-page .admin-roles-note {
+  margin: 0 0 12px;
+  max-width: 72ch;
+}
+
+/* ── 02 · Summary stat cards (eyebrow caption + accent bar + icon tile) ── */
+
+.admin-page .admin-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+/* Role cards reuse the same grid but need wider tracks. */
+.admin-page .admin-summary-grid:has(.role-card) {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+.admin-page .admin-summary-card {
+  --adm-accent: var(--primary);
+  --adm-accent-soft: var(--primary-soft);
+  position: relative;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-width: 0;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Stat variant: icon tile beside copy, 2px energized top bar in the accent. */
+.admin-page .admin-summary-card[class*="metric-accent-"] {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.admin-page .admin-summary-card[class*="metric-accent-"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--adm-accent);
+}
+
+/* Accent mapping — tokens only (no rainbow hexes). */
+.admin-page .admin-summary-card.metric-accent-blue {
+  --adm-accent: var(--info);
+  --adm-accent-soft: var(--info-soft);
+}
+
+.admin-page .admin-summary-card.metric-accent-green {
+  --adm-accent: var(--success);
+  --adm-accent-soft: var(--success-soft);
+}
+
+.admin-page .admin-summary-card.metric-accent-purple {
+  --adm-accent: var(--accent);
+  --adm-accent-soft: var(--accent-soft);
+}
+
+.admin-page .admin-summary-card.metric-accent-gold {
+  --adm-accent: var(--primary);
+  --adm-accent-soft: var(--primary-soft);
+}
+
+.admin-page .admin-summary-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius);
+  background: var(--adm-accent-soft);
+  color: var(--adm-accent);
+}
+
+.admin-page .admin-summary-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.admin-page .admin-summary-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+/* Eyebrow caption — mono micro-label with an accent-coloured square marker. */
+.admin-page .admin-summary-copy span {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.admin-page .admin-summary-copy span::before {
+  content: "▪ ";
+  color: var(--adm-accent);
+}
+
+.admin-page .admin-summary-copy strong {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* Plain placeholder cards (Roles: empty / loading states). */
+.admin-page .admin-summary-card > strong {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.admin-page .admin-summary-card > span:not(.admin-summary-icon) {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.admin-page .admin-summary-card > span:not(.admin-summary-icon)::before {
+  content: "▪ ";
+  color: var(--primary);
+}
+
+/* ── 03 · Toolbar filters · action rows ──────────────────────────── */
+
+.admin-page .admin-toolbar-filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.6fr) repeat(2, minmax(150px, 0.7fr));
+  gap: 8px;
+  flex: 1 1 560px;
+  min-width: 0;
+}
+
+/* Roles editor footer (also reused as a generic action row). */
+.admin-page .admin-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── 04 · Roster / log tables (module extensions of .materials-table) ── */
+
+/* Compact console row actions. */
+.admin-page .materials-actions .btn {
+  height: var(--ctrl-h-sm);
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+/* Row-level destructive action reads as outline; filled red stays reserved
+   for the confirm-modal primary (extends global .btn-danger under module scope). */
+.admin-page .materials-actions .btn-danger {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  color: var(--danger);
+  box-shadow: none;
+}
+
+.admin-page .materials-actions .btn-danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* Mono data cells (created-at, IP) read as instrument output. */
+.admin-page .materials-table td.mono {
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+/* Mono usernames — roster identity column. */
+.admin-page .materials-table td strong.mono {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.admin-page .admin-user-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.admin-page .admin-user-cell > div {
+  min-width: 0;
+}
+
+.admin-page .admin-user-cell strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Graphite avatar disc — two-tone chrome signature carried into the stage. */
+.admin-page .admin-avatar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--chrome-bg-soft);
+  border: 1px solid var(--chrome-border);
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+/* Status chips align as a fixed-width console column. */
+.admin-page .admin-status-chip {
+  min-width: 80px;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+/* Role chips — token-tinted variants on the global chip recipe. */
+.admin-page .role-pill {
+  letter-spacing: 0.06em;
+  max-width: 100%;
+}
+
+.admin-page .role-pill-admin {
+  background: var(--primary-soft);
+  color: var(--primary-deep);
+}
+
+.admin-page .role-pill-field_work {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+.admin-page .role-pill-generic {
+  background: var(--bg-deep);
+  color: var(--text-soft);
+}
+
+/* ── 05 · Audit log — terminal-flavoured readout ─────────────────── */
+
+/* Only the audit table contains .audit-detail cells; tighten it into a
+   mono log without touching the Users roster. */
+.admin-page .materials-table:has(td.audit-detail) tbody td {
+  font-size: 12.5px;
+  padding: 9px 14px;
+  vertical-align: top;
+}
+
+/* Timestamp column — faint mono, the quiet edge of every log line. */
+.admin-page .materials-table:has(td.audit-detail) tbody td.mono:first-child {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.admin-page .materials-table:has(td.audit-detail) tbody td strong {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* Action verbs — colour comes from global chip-* tokens; keep them tight. */
+.admin-page .audit-action-chip {
+  letter-spacing: 0.06em;
+}
+
+.admin-page .audit-detail {
+  min-width: 260px;
+  max-width: 560px;
+  white-space: normal;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-soft);
+}
+
+/* ── 06 · Roles — editor card (page hero: corner brackets) ───────── */
+
+.admin-page .role-form-card {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  animation: hx-rise var(--speed-slow) var(--ease-out) both;
+}
+
+.admin-page .role-form-card::before,
+.admin-page .role-form-card::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+
+.admin-page .role-form-card::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--primary);
+  border-left: 2px solid var(--primary);
+}
+
+.admin-page .role-form-card::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--primary);
+  border-right: 2px solid var(--primary);
+}
+
+.admin-page .role-form-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 0.7fr 0.8fr;
+  gap: 10px;
+}
+
+/* Read-only slug — mono code box with dashed border. */
+.admin-page .role-key-preview {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  background: var(--bg-deep);
+  border-style: dashed;
+  border-color: var(--border-strong);
+  color: var(--text-soft);
+}
+
+.admin-page .role-description-input {
+  min-height: 92px;
+  resize: vertical;
+  line-height: 1.55;
+}
+
+/* ── 07 · Permission matrix — compact toggle grid, amber active cells ── */
+
+.admin-page .role-modules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.admin-page .module-check-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  padding: 11px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color var(--speed) var(--ease-out),
+    background var(--speed) var(--ease-out),
+    box-shadow var(--speed) var(--ease-out);
+}
+
+.admin-page .module-check-card:hover {
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--primary) 3%, var(--surface));
+}
+
+/* Active cell — amber tint + rail rule. */
+.admin-page .module-check-card:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  box-shadow: inset 2px 0 0 var(--primary);
+}
+
+.admin-page .module-check-card:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.admin-page .module-check-card input[type="checkbox"] {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.admin-page .module-check-card input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.admin-page .module-check-card strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.admin-page .module-check-card span {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+
+/* ── 08 · Role cards ─────────────────────────────────────────────── */
+
+.admin-page .role-card {
+  gap: 12px;
+  padding: 18px 18px 16px;
+}
+
+.admin-page .role-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-page .role-card-head > div {
+  min-width: 0;
+}
+
+.admin-page .role-card-head h4 {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.admin-page .role-card-head .table-subtext {
+  letter-spacing: 0.03em;
+}
+
+.admin-page .role-card .section-note {
+  margin: 0;
+}
+
+/* Assigned-users readout — dashed divider, mono value, eyebrow label. */
+.admin-page .role-counts {
+  display: grid;
+  gap: 3px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.admin-page .role-counts strong {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.admin-page .role-counts span {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.admin-page .permissions-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Pin the action row to the card foot so grid rows align. */
+.admin-page .role-card .materials-actions {
+  margin-top: auto;
+  justify-content: space-between;
+}
+
+/* ── 09 · Modal form vocabulary (shared by all three admin modals) ── */
+
+/* Admin field captions: JSX uses bare <span> inside .field, which the global
+   sheet does not cover — replicate the global label recipe here. */
+.admin-page .field > span {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* ── 10 · User editor modal ──────────────────────────────────────── */
+
+.admin-page .user-editor-modal {
+  width: min(920px, 100%);
+}
+
+.admin-page .user-modal-header {
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.admin-page .user-modal-header p {
+  max-width: 64ch;
+}
+
+.admin-page .user-modal-form {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-page .user-modal-section {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+}
+
+.admin-page .user-modal-section-head {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-page .user-modal-section-head strong {
+  font-family: var(--font-title);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.admin-page .user-modal-section-head span {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-soft);
+}
+
+.admin-page .user-modal-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 12px;
+  align-items: start;
+}
+
+.admin-page .user-field-span-2 {
+  grid-column: span 2;
+}
+
+/* Temp-credential card — the energy zone of the editor. */
+.admin-page .generated-password-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+}
+
+.admin-page .generated-password-label {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-page .generated-password-label strong {
+  font-family: var(--font-title);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.admin-page .generated-password-label span {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-soft);
+  max-width: 64ch;
+}
+
+.admin-page .generated-password-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+/* The credential readout itself — mono code box, dashed border, recessed bg. */
+.admin-page .generated-password-row .input {
+  height: var(--ctrl-h-lg);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-deep);
+  border: 1px dashed var(--border-strong);
+  color: var(--text);
+  text-overflow: ellipsis;
+}
+
+.admin-page .generated-password-row .btn {
+  height: var(--ctrl-h-lg);
+  min-width: 92px;
+}
+
+.admin-page .user-modal-form .error-text {
+  margin: 0;
+}
+
+.admin-page .user-modal-form .modal-actions {
+  margin-top: 2px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+
+/* ── 11 · Confirm + delete-blocker modals ────────────────────────── */
+
+.admin-page .user-confirm-modal {
+  width: min(440px, 100%);
+}
+
+.admin-page .user-blocker-modal {
+  width: min(720px, 100%);
+}
+
+.admin-page .user-blocker-groups {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.admin-page .user-blocker-group {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+}
+
+/* Group titles as mono micro-labels — section-divider voice. */
+.admin-page .user-blocker-group > strong {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.admin-page .user-blocker-group > strong::before {
+  content: "▪ ";
+  color: var(--primary);
+}
+
+.admin-page .user-blocker-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-page .user-blocker-item {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.admin-page .user-blocker-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.admin-page .user-blocker-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Linked-record facts as mono data tags. */
+.admin-page .user-blocker-item-meta span {
+  padding: 2px 6px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+}
+
+.admin-page .user-blocker-group .section-note {
+  margin: 0;
+  font-size: 12px;
+}
+
+/* ── 12 · Breakpoints ────────────────────────────────────────────── */
+
+/* Compress: editor fields drop to two columns. */
+@media (max-width: 1200px) {
+  .admin-page .user-modal-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Stack: filters, editor grids, and footer actions go single-file. */
+@media (max-width: 900px) {
+  .admin-page .admin-toolbar-filters {
+    grid-template-columns: 1fr;
+    flex-basis: 100%;
+  }
+
+  .admin-page .user-modal-fields,
+  .admin-page .role-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-page .user-field-span-2 {
+    grid-column: auto;
+  }
+
+  .admin-page .admin-toolbar-actions {
+    width: 100%;
+  }
+}
+
+/* Mobile: single-column everything, full-width modals and buttons. */
+@media (max-width: 640px) {
+  .admin-page .admin-summary-grid,
+  .admin-page .admin-summary-grid:has(.role-card),
+  .admin-page .role-modules-grid,
+  .admin-page .generated-password-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-page .user-editor-modal,
+  .admin-page .user-confirm-modal,
+  .admin-page .user-blocker-modal {
+    width: 100%;
+  }
+
+  .admin-page .user-modal-section,
+  .admin-page .generated-password-card {
+    padding: 14px;
+  }
+
+  .admin-page .user-modal-form {
+    gap: 12px;
+  }
+
+  .admin-page .user-modal-fields {
+    gap: 12px;
+  }
+
+  .admin-page .generated-password-row .btn {
+    width: 100%;
+  }
+
+  .admin-page .admin-toolbar-actions .btn {
+    width: 100%;
+  }
+
+  .admin-page .audit-detail {
+    min-width: 200px;
+  }
+}
+
+/* Small phones: tighten card and modal padding. */
+@media (max-width: 420px) {
+  .admin-page .admin-summary-card {
+    padding: 14px;
+  }
+
+  .admin-page .role-form-card {
+    padding: 16px;
+  }
+
+  .admin-page .user-editor-modal {
+    padding: 16px;
+  }
+}
+
+/* ── 13 · Motion guard ───────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-page,
+  .admin-page .role-form-card {
+    animation: none;
+  }
+
+  .admin-page .module-check-card {
+    transition: none;
+  }
+}

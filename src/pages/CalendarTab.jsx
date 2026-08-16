@@ -6,6 +6,7 @@ import interactionPlugin from "@fullcalendar/interaction";
 import ConfirmModal from "../components/ConfirmModal";
 import useBodyScrollLock from "../hooks/useBodyScrollLock";
 import { motion, AnimatePresence } from "framer-motion";
+import "../styles/calendar.css";
 
 const ACTIVITY_TYPES = [
   { key: "survey", label: "Site Survey" },
@@ -219,6 +220,24 @@ function activityTypeLabel(typeKey) {
 function statusLabel(statusKey) {
   return STATUS_OPTIONS.find((item) => item.key === statusKey)?.label || "Planned";
 }
+
+const STATUS_CHIP_VARIANTS = {
+  planned: "info",
+  in_progress: "warn",
+  completed: "success",
+  cancelled: "neutral"
+};
+
+function statusChipClass(statusKey) {
+  return `chip chip-${STATUS_CHIP_VARIANTS[statusKey] || "neutral"}`;
+}
+
+const STAT_ACCENT_TO_KPI = {
+  blue: "blue",
+  amber: "gold",
+  orange: "orange",
+  green: "green"
+};
 
 function sortEventsByStart(a, b) {
   const first = parseLocalDate(a.startDateTime)?.getTime() || 0;
@@ -632,25 +651,18 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
   };
 
   return (
-    <div>
-      <div className="calendar-hero-head">
-        <div className="calendar-hero-left">
-          <div className="calendar-hero-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-          </div>
-          <div>
-            <h3>Operations Calendar</h3>
-            <p className="section-note">
-              Plan future activities, track field work, and capture completion notes with proof photos.
-            </p>
-          </div>
+    <div className="calendar-module">
+      <header className="page-head calendar-page-head">
+        <div className="page-head-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
         </div>
-        <div className="calendar-head-actions">
-          <button className="btn btn-primary" type="button" onClick={() => openCreateModal(selectedDate)}>
-            Schedule Activity
-          </button>
+        <div className="page-head-copy calendar-page-head-copy">
+          <h3>Operations Calendar</h3>
+          <p>Plan future activities, track field work, and capture completion notes with proof photos.</p>
+        </div>
+        <div className="page-head-actions calendar-page-head-actions">
           <button
             className="btn btn-ghost"
             type="button"
@@ -661,13 +673,32 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
           >
             Focus Today
           </button>
+          <button className="btn btn-primary" type="button" onClick={() => openCreateModal(selectedDate)}>
+            Schedule Activity
+          </button>
+        </div>
+      </header>
+
+      <div className="page-toolbar calendar-page-toolbar">
+        <div className="tabs-underline calendar-status-tabs" aria-label="Filter activities by status">
+          {STATUS_OPTIONS.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              className={statusFilter === option.key ? "active" : ""}
+              aria-pressed={statusFilter === option.key}
+              onClick={() => setStatusFilter(option.key)}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
       </div>
 
       <div className="calendar-ops-summary">
         {stats.map((stat, index) => (
           <motion.article
-            className={`calendar-ops-stat calendar-ops-stat-${stat.accent}`}
+            className={`calendar-ops-stat calendar-ops-stat-${stat.accent} metric-accent-${STAT_ACCENT_TO_KPI[stat.accent] || "green"}`}
             key={stat.label}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -735,18 +766,6 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                   ? "Assign work to field staff, log survey notes, and manage operational follow-ups."
                   : "Track your assigned field work, add future notes, and submit completion reports."}
               </p>
-            </div>
-            <div className="calendar-filter-pills">
-              {STATUS_OPTIONS.map((option) => (
-                <button
-                  key={option.key}
-                  type="button"
-                  className={`step-pill ${statusFilter === option.key ? "active" : ""}`}
-                  onClick={() => setStatusFilter(option.key)}
-                >
-                  {option.label}
-                </button>
-              ))}
             </div>
           </div>
 
@@ -820,7 +839,7 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                 whileTap={{ scale: 0.98 }}
               >
                 <div className="calendar-activity-card-top">
-                  <span className={`status-pill status-pill-${event.status}`}>{statusLabel(event.status)}</span>
+                  <span className={statusChipClass(event.status)}>{statusLabel(event.status)}</span>
                   <span className="calendar-activity-type">{activityTypeLabel(event.activityType)}</span>
                 </div>
                 <strong>{event.title}</strong>
@@ -837,7 +856,7 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
             <div className="calendar-sidebar-section-head">
               <strong>Activity Detail</strong>
               {selectedEvent && (
-                <span className={`status-pill status-pill-${selectedEvent.status}`}>
+                <span className={statusChipClass(selectedEvent.status)}>
                   {statusLabel(selectedEvent.status)}
                 </span>
               )}
@@ -995,7 +1014,7 @@ export default function CalendarTab({ currentUser, onActivityChange }) {
                 >
                   <div className="calendar-upcoming-item-top">
                     <span className="calendar-upcoming-type">{activityTypeLabel(event.activityType)}</span>
-                    <span className={`status-pill status-pill-${event.status}`}>{statusLabel(event.status)}</span>
+                    <span className={statusChipClass(event.status)}>{statusLabel(event.status)}</span>
                   </div>
                   <strong>{event.title}</strong>
                   <span>

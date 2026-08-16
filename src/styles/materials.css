@@ -1,0 +1,346 @@
+/* HELIOS — Materials module styles. Consumes tokens from index.css only. */
+/* ─────────────────────────────────────────────────────────────────────
+   Material cost registry: import/upload console, supplier price pills,
+   option pickers and the shared data-table kit (base lives in index.css).
+   ───────────────────────────────────────────────────────────────────── */
+
+/* ── Collapsible feature panels ──────────────────────────────────── */
+.materials-page-grid .materials-collapse-card {
+  animation: hx-rise var(--speed-slow) var(--ease-out) both;
+}
+
+.materials-page-grid .materials-panel-close {
+  margin-left: auto;
+}
+
+.materials-page-grid .materials-table-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* hero treatment — the registry table is the page's featured element */
+.materials-page-grid .materials-table-section {
+  position: relative;
+}
+
+.materials-page-grid .materials-table-section::before,
+.materials-page-grid .materials-table-section::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.materials-page-grid .materials-table-section::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--primary);
+  border-left: 2px solid var(--primary);
+}
+
+.materials-page-grid .materials-table-section::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--primary);
+  border-right: 2px solid var(--primary);
+}
+
+/* toolbar identity inside the table card */
+.materials-page-grid .materials-table-toolbar strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-title);
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.materials-page-grid .materials-table-toolbar strong::before {
+  content: "▪";
+  color: var(--primary);
+  font-size: 9px;
+}
+
+.materials-page-grid .materials-table-toolbar span {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-faint);
+  letter-spacing: 0.06em;
+}
+
+/* ── Import / upload console ─────────────────────────────────────── */
+.materials-page-grid .materials-upload-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.materials-page-grid .materials-upload-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.materials-page-grid .materials-file-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-soft);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.materials-page-grid .materials-pill-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+}
+
+.materials-page-grid .materials-import-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+}
+
+/* ── Option pickers (column mapping / import options) ────────────── */
+.materials-page-grid .materials-option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.materials-page-grid .materials-option-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color var(--speed) var(--ease-out), background var(--speed) var(--ease-out),
+    box-shadow var(--speed) var(--ease-out);
+}
+
+.materials-page-grid .materials-option-card:hover {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 4%, var(--surface));
+}
+
+.materials-page-grid .materials-option-check {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.materials-page-grid .materials-option-check small,
+.materials-page-grid .materials-option-check span {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+.materials-page-grid .materials-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+/* ── Supplier rows + price pills ─────────────────────────────────── */
+.materials-page-grid .materials-supplier-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.materials-page-grid .materials-supplier-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: border-color var(--speed) var(--ease-out), box-shadow var(--speed) var(--ease-out);
+}
+
+.materials-page-grid .materials-supplier-row:hover {
+  border-color: var(--border-strong);
+}
+
+.materials-page-grid .materials-supplier-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.materials-page-grid .materials-supplier-price-list {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.materials-page-grid .materials-supplier-price-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+  transition: border-color var(--speed) var(--ease-out), background var(--speed) var(--ease-out),
+    color var(--speed) var(--ease-out);
+}
+
+.materials-page-grid .materials-supplier-price-pill.active {
+  border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+  background: var(--primary-soft);
+  color: var(--primary-deep);
+  box-shadow: inset 2px 0 0 var(--primary);
+}
+
+/* supplier name accent — inline color comes from supplierColors.js */
+.materials-page-grid .supplier-color-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 12.5px;
+}
+
+.materials-page-grid .supplier-color-text::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* ── Price cell in the registry table ────────────────────────────── */
+.materials-page-grid .materials-price-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.materials-page-grid .materials-price-cell strong {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.materials-page-grid .materials-price-cell span {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+}
+
+/* ── Active filter chips row ─────────────────────────────────────── */
+.materials-page-grid .materials-active-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+}
+
+/* ── Add-item picker row (material + supplier + price) ───────────── */
+.materials-page-grid .add-item-picker-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+/* actions column sizing in the registry table */
+.materials-page-grid .materials-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(76px, 100px));
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.materials-page-grid .materials-actions .btn {
+  width: 100%;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .materials-page-grid .add-item-picker-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .materials-page-grid .materials-actions {
+    grid-template-columns: repeat(2, minmax(68px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .materials-page-grid .materials-upload-grid,
+  .materials-page-grid .materials-option-grid,
+  .materials-page-grid .add-item-picker-row {
+    grid-template-columns: 1fr;
+  }
+
+  .materials-page-grid .materials-supplier-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .materials-page-grid .materials-supplier-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .materials-page-grid .materials-collapse-card {
+    animation: none;
+  }
+}

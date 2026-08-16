@@ -1,0 +1,517 @@
+/* HELIOS — Payroll module styles. Consumes tokens from index.css only. */
+/* ─────────────────────────────────────────────────────────────────────
+   Solar command console: money precision.
+   Structure: .page-head → stat readouts → .page-toolbar → collapsible
+   editor cards (energized edge) → table sections (materials-table skin).
+   Everything below is scoped to .payroll-page / payroll-* classes.
+   Shared-name classes used by this page but NOT in the §6 global list
+   (materials-dashboard-grid, materials-summary-card, metric-accent-*,
+   th-num, btn-outline-danger) are owned here, scoped under .payroll-page.
+   ───────────────────────────────────────────────────────────────────── */
+
+/* ── Page stack ─────────────────────────────────────────────────────── */
+.payroll-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* The page stack already rhythms sections; neutralize any card margin. */
+.payroll-page > .materials-card {
+  margin-top: 0;
+}
+
+/* ── Head actions: hero money readout + toggles ─────────────────────── */
+.payroll-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* "Paid this month" — the page hero readout. Corner brackets (§8),
+   sharp 4px geometry, mono value. One bracketed element per page. */
+.payroll-head-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  min-height: var(--ctrl-h);
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+}
+
+.payroll-head-chip::before,
+.payroll-head-chip::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+
+.payroll-head-chip::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--primary);
+  border-left: 2px solid var(--primary);
+}
+
+.payroll-head-chip::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--primary);
+  border-right: 2px solid var(--primary);
+}
+
+.payroll-head-chip-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.payroll-head-chip-label::before {
+  content: "▪ ";
+  color: var(--primary);
+}
+
+.payroll-head-chip > strong {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ── Summary stat readouts (shared-name grid, owned here for payroll) ─ */
+.payroll-page .materials-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.payroll-page .materials-summary-card {
+  --pr-stat-accent: var(--primary);
+  --pr-stat-soft: var(--primary-soft);
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* 2px instrument rule along the top, tokenized per variant. */
+.payroll-page .materials-summary-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--pr-stat-accent);
+}
+
+/* Status colors from tokens only (§7.10). */
+.payroll-page .materials-summary-card.metric-accent-blue {
+  --pr-stat-accent: var(--info);
+  --pr-stat-soft: var(--info-soft);
+}
+
+.payroll-page .materials-summary-card.metric-accent-orange {
+  --pr-stat-accent: var(--warn);
+  --pr-stat-soft: var(--warn-soft);
+}
+
+.payroll-page .materials-summary-card.metric-accent-green {
+  --pr-stat-accent: var(--success);
+  --pr-stat-soft: var(--success-soft);
+}
+
+.payroll-page .materials-summary-card.metric-accent-gold {
+  --pr-stat-accent: var(--primary-deep);
+  --pr-stat-soft: var(--primary-soft);
+}
+
+.payroll-stat-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius);
+  background: var(--pr-stat-soft, var(--primary-soft));
+  color: var(--pr-stat-accent, var(--primary-deep));
+}
+
+.payroll-stat-icon svg {
+  display: block;
+}
+
+.payroll-stat-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.payroll-stat-text > span {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.payroll-stat-text > strong {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* ── Toolbar: search + filters left, mono tally right ───────────────── */
+.payroll-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.payroll-toolbar-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* Pin the status select down so a width:100% global can't wrap the row. */
+.payroll-toolbar-filters .select {
+  width: auto;
+  min-width: 150px;
+  max-width: 200px;
+  flex: 0 1 auto;
+}
+
+.payroll-toolbar-search {
+  width: min(100%, 240px);
+}
+
+.payroll-toolbar-note {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* ── Collapsible editor cards (inline drawer surfaces) ──────────────── */
+/* Energized top edge marks the active editing surface. */
+.payroll-form-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  animation: pr-form-in var(--speed-slow) var(--ease-out) both;
+}
+
+@keyframes pr-form-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.payroll-form-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.payroll-form-card-head strong {
+  font-family: var(--font-title);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.payroll-form-close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctrl-h-sm);
+  height: var(--ctrl-h-sm);
+  padding: 0;
+  color: var(--text-soft);
+}
+
+.payroll-form-card-body {
+  display: grid;
+  gap: 14px;
+}
+
+/* ── Form grids ─────────────────────────────────────────────────────── */
+.payroll-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.payroll-page .payroll-employee-form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.payroll-page .payroll-entry-form-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.payroll-field-wide {
+  grid-column: 1 / -1;
+}
+
+/* ── Computation readout: Gross ▸ Deductions ▸ Net pay ──────────────── */
+.payroll-preview-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.payroll-preview-row > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-width: 0;
+}
+
+/* Label + dotted leader (§8 readout) running toward the mono value. */
+.payroll-preview-row span {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.payroll-preview-row span::after {
+  content: "";
+  flex: 1;
+  min-width: 12px;
+  border-bottom: 1px dotted var(--border-strong);
+  transform: translateY(-3px);
+}
+
+.payroll-preview-row strong {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* Net pay = the totals cell: 2px amber top rule + amber-tinted stage. */
+.payroll-preview-row > div:last-child {
+  border-top: 2px solid var(--primary);
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+}
+
+.payroll-preview-row > div:last-child span {
+  color: var(--text-soft);
+}
+
+.payroll-preview-row > div:last-child strong {
+  font-weight: 700;
+  color: var(--primary-deep);
+}
+
+/* ── Table section cards ────────────────────────────────────────────── */
+.payroll-section {
+  display: grid;
+  gap: 12px;
+}
+
+/* Scroll container: keep both rosters inside one viewport-friendly band. */
+.payroll-table-wrap {
+  max-height: min(58vh, 520px);
+  overflow: auto;
+}
+
+/* Numeric column headers align over their .num cells (money right). */
+.payroll-page .payroll-table th.th-num {
+  text-align: right;
+}
+
+/* Net-pay emphasis: bold amber mono inside the numeric cell. */
+.payroll-page .payroll-table td.num strong {
+  font-weight: 700;
+  color: var(--primary-deep);
+}
+
+/* Empty-state rows: mono micro-title over a dashed section divider. */
+.payroll-page .payroll-table td.section-note {
+  padding: 28px 16px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  border-bottom: 1px dashed var(--border);
+}
+
+/* ── Row action clusters ────────────────────────────────────────────── */
+.payroll-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* ── Destructive row action (JSX uses btn-outline-danger, not the §6
+      btn-danger-outline — owned here, scoped, tokens only) ───────────── */
+.payroll-page .btn-outline-danger {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  color: var(--danger);
+  box-shadow: none;
+}
+
+.payroll-page .btn-outline-danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* ── Breakpoints ────────────────────────────────────────────────────── */
+/* 1200 — compress: entry editor steps 4 → 3 columns. */
+@media (max-width: 1200px) {
+  .payroll-page .payroll-entry-form-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* 1100 — original trigger: entry editor 2 columns. */
+@media (max-width: 1100px) {
+  .payroll-page .payroll-entry-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* 900 — stack: stat grid 2-up, base form grid single column while the
+   named editors hold 2-up (original behavior). */
+@media (max-width: 900px) {
+  .payroll-page .materials-dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .payroll-page .payroll-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .payroll-page .payroll-employee-form-grid,
+  .payroll-page .payroll-entry-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* 640 — mobile: everything single column, full-width search. */
+@media (max-width: 640px) {
+  .payroll-page .materials-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .payroll-page .payroll-form-grid,
+  .payroll-page .payroll-employee-form-grid,
+  .payroll-page .payroll-entry-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .payroll-preview-row {
+    grid-template-columns: 1fr;
+  }
+
+  .payroll-toolbar-filters {
+    width: 100%;
+  }
+
+  .payroll-toolbar-search {
+    width: 100%;
+  }
+
+  .payroll-toolbar-filters .select {
+    max-width: none;
+    width: 100%;
+  }
+
+  .payroll-head-actions {
+    width: 100%;
+  }
+
+  .payroll-head-chip {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* 420 — dense phones: tighter stat padding (original trigger). */
+@media (max-width: 420px) {
+  .payroll-page .materials-summary-card {
+    padding: 12px 14px;
+  }
+
+  .payroll-stat-text > strong {
+    font-size: 18px;
+  }
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .payroll-form-card {
+    animation: none;
+  }
+}
